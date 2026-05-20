@@ -1,0 +1,138 @@
+/* KIUVO CRM — design tokens */
+
+:root {
+  /* Brand */
+  --kiuvo-blue: #185FA5;
+  --kiuvo-blue-deep: #0C447C;
+  --kiuvo-blue-soft: #E6F1FB;
+  --kiuvo-blue-mid: #B5D4F4;
+
+  /* Semantic */
+  --success: #1D9E75;
+  --success-bg: #E1F5EE;
+  --success-fg: #0F6E56;
+
+  --warning: #BA7517;
+  --warning-bg: #FAEEDA;
+  --warning-border: #FAC775;
+  --warning-fg: #854F0B;
+
+  --danger: #A32D2D;
+  --danger-bg: #FCEBEB;
+  --danger-border: #F7C1C1;
+  --danger-fg: #501313;
+  --danger-fg-mid: #791F1F;
+
+  --info: #378ADD;
+
+  /* Funnel stages */
+  --stage-prospeccion: #888780;
+  --stage-presentacion: #378ADD;
+  --stage-cotizacion: #EF9F27;
+  --stage-negociacion: #D85A30;
+  --stage-cierre: #1D9E75;
+
+  /* Neutrals */
+  --fg: #1A1916;
+  --fg-secondary: #5C5A53;
+  --fg-tertiary: #8D8B83;
+  --bg: #FBFAF8;
+  --bg-secondary: #F4F2EE;
+  --bg-tertiary: #ECEAE3;
+  --border: rgba(20, 18, 14, 0.10);
+  --border-strong: rgba(20, 18, 14, 0.18);
+  --surface: #FFFFFF;
+  --surface-2: #F8F6F2;
+
+  /* Type */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif;
+  --text-h1: 22px;
+  --text-h2: 18px;
+  --text-h3: 16px;
+  --text-body: 14px;
+  --text-small: 12px;
+  --text-tiny: 11px;
+
+  /* Radius */
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+  --r-full: 999px;
+}
+
+.kiuvo-dark {
+  --fg: #F2EFE9;
+  --fg-secondary: #A8A59C;
+  --fg-tertiary: #6C6A62;
+  --bg: #0F0E0C;
+  --bg-secondary: #181614;
+  --bg-tertiary: #221F1B;
+  --border: rgba(255, 250, 240, 0.10);
+  --border-strong: rgba(255, 250, 240, 0.18);
+  --surface: #181614;
+  --surface-2: #221F1B;
+  --kiuvo-blue-soft: #11243A;
+  --kiuvo-blue-mid: #1B3E66;
+  --kiuvo-blue-deep: #9EC4EB;
+  --success-bg: #0F2520;
+  --success-fg: #6BCBA9;
+  --warning-bg: #2A1F0C;
+  --warning-border: #5C4519;
+  --warning-fg: #E0B673;
+  --danger-bg: #2A1313;
+  --danger-border: #5C2828;
+  --danger-fg: #E89E9E;
+  --danger-fg-mid: #C76A6A;
+}
+
+/* Resets / shared */
+.kiuvo, .kiuvo * {
+  box-sizing: border-box;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+.kiuvo {
+  font-size: var(--text-body);
+  color: var(--fg);
+  line-height: 1.4;
+  letter-spacing: -0.005em;
+}
+.kiuvo button {
+  font: inherit;
+  color: inherit;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+}
+.kiuvo .h1 { font-size: var(--text-h1); font-weight: 500; letter-spacing: -0.015em; }
+.kiuvo .h2 { font-size: var(--text-h2); font-weight: 500; letter-spacing: -0.01em; }
+.kiuvo .h3 { font-size: var(--text-h3); font-weight: 500; letter-spacing: -0.005em; }
+.kiuvo .small { font-size: var(--text-small); }
+.kiuvo .tiny { font-size: var(--text-tiny); }
+.kiuvo .muted { color: var(--fg-secondary); }
+.kiuvo .dimmed { color: var(--fg-tertiary); }
+
+.kiuvo .card {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--r-lg);
+}
+.kiuvo .hairline { border-top: 0.5px solid var(--border); }
+.kiuvo .v-hairline { border-left: 0.5px solid var(--border); }
+
+/* Tabler webfont sizing */
+.kiuvo .ti { font-size: 18px; line-height: 1; display: inline-block; vertical-align: middle; }
+.kiuvo .ti-sm { font-size: 16px; }
+.kiuvo .ti-xs { font-size: 14px; }
+.kiuvo .ti-lg { font-size: 20px; }
+
+/* Stage chips/dots */
+.kiuvo .stage-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+
+/* Scrollbar hidden inside artboards */
+.kiuvo *::-webkit-scrollbar { display: none; }
+.kiuvo * { scrollbar-width: none; }

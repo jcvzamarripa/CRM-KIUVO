@@ -1,0 +1,76 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--bg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.kiuvo, .kiuvo * {
+  box-sizing: border-box;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+.kiuvo {
+  font-size: var(--text-body);
+  color: var(--fg);
+  line-height: 1.4;
+  letter-spacing: -0.005em;
+}
+.kiuvo button {
+  font: inherit;
+  color: inherit;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+}
+.kiuvo a {
+  color: inherit;
+  text-decoration: none;
+}
+.kiuvo .h1 { font-size: var(--text-h1); font-weight: 500; letter-spacing: -0.015em; }
+.kiuvo .h2 { font-size: var(--text-h2); font-weight: 500; letter-spacing: -0.01em; }
+.kiuvo .h3 { font-size: var(--text-h3); font-weight: 500; letter-spacing: -0.005em; }
+.kiuvo .small { font-size: var(--text-small); }
+.kiuvo .tiny { font-size: var(--text-tiny); }
+.kiuvo .muted { color: var(--fg-secondary); }
+.kiuvo .dimmed { color: var(--fg-tertiary); }
+
+.kiuvo .card {
+  background: var(--surface);
+  border: 0.5px solid var(--border);
+  border-radius: var(--r-lg);
+}
+.kiuvo .hairline { border-top: 0.5px solid var(--border); }
+.kiuvo .v-hairline { border-left: 0.5px solid var(--border); }
+
+.kiuvo .ti { font-size: 18px; line-height: 1; display: inline-block; vertical-align: middle; }
+.kiuvo .ti-sm { font-size: 16px; }
+.kiuvo .ti-xs { font-size: 14px; }
+.kiuvo .ti-lg { font-size: 20px; }
+
+.kiuvo .stage-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+
+.kiuvo *::-webkit-scrollbar { display: none; }
+.kiuvo * { scrollbar-width: none; }
+
+/* Login page */
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+}
+
+/* Transitions */
+.kiuvo button:active { opacity: 0.75; }
