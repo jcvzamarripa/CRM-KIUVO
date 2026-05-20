@@ -1,16 +1,16 @@
 export const MOCK_PROSPECTS = [
-  { id: 1,  name: 'Ferretería del Valle',      value: 18500, visits: 1, stage: 'presentacion', days: 3,  last: 'WhatsApp · hace 1 día',   health: 'amber', owner: 'LR' },
-  { id: 2,  name: 'Distribuidora Norte',       value: 42800, visits: 4, stage: 'negociacion',  days: 8,  last: 'Visita · hace 2 días',    health: 'green', owner: 'LR' },
-  { id: 3,  name: 'Constructora ABC',          value: 24500, visits: 6, stage: 'cierre',       days: 4,  last: 'Llamada · hoy',           health: 'green', owner: 'LR' },
-  { id: 4,  name: 'Aceros Monterrey',          value: 31200, visits: 2, stage: 'cotizacion',   days: 6,  last: 'Email · hace 3 días',     health: 'green', owner: 'MS' },
-  { id: 5,  name: 'Maderería San Juan',        value: 12400, visits: 1, stage: 'prospeccion',  days: 2,  last: 'Visita · hace 2 días',    health: 'green', owner: 'LR' },
-  { id: 6,  name: 'Plomería Industrial Vega',  value: 9800,  visits: 0, stage: 'prospeccion',  days: 14, last: 'Sin contacto',            health: 'amber', owner: 'LR' },
-  { id: 7,  name: 'Refaccionaria El Bajío',    value: 22000, visits: 1, stage: 'presentacion', days: 24, last: 'WhatsApp · hace 9 días',  health: 'red',   owner: 'MS' },
-  { id: 8,  name: 'Comercial Las Palmas',      value: 16700, visits: 3, stage: 'negociacion',  days: 5,  last: 'Visita · ayer',           health: 'green', owner: 'LR' },
-  { id: 9,  name: 'Materiales Pacífico',       value: 28900, visits: 2, stage: 'cotizacion',   days: 11, last: 'Llamada · hace 4 días',   health: 'amber', owner: 'JT' },
-  { id: 10, name: 'Hidráulica del Pacífico',   value: 35000, visits: 5, stage: 'cierre',       days: 2,  last: 'Visita · hoy',            health: 'green', owner: 'MS' },
-  { id: 11, name: 'Pinturas El Globo',         value: 14200, visits: 0, stage: 'prospeccion',  days: 1,  last: 'Visita · hoy',            health: 'green', owner: 'AD' },
-  { id: 12, name: 'Herrajes San Marcos',       value: 19600, visits: 3, stage: 'cotizacion',   days: 9,  last: 'Email · hace 2 días',     health: 'green', owner: 'RC' },
+  { id: 1,  name: 'Ferretería del Valle',      contact: 'Carlos Mendoza',   phone: '4421234567', value: 18500, visits: 1, stage: 'presentacion', days: 3,  last: 'WhatsApp · hace 1 día',   health: 'amber', owner: 'LR' },
+  { id: 2,  name: 'Distribuidora Norte',       contact: 'Ana Ruiz',         phone: '4429876543', value: 42800, visits: 4, stage: 'negociacion',  days: 8,  last: 'Visita · hace 2 días',    health: 'green', owner: 'LR' },
+  { id: 3,  name: 'Constructora ABC',          contact: 'Pedro Ríos',       phone: '4425551234', value: 24500, visits: 6, stage: 'cierre',       days: 4,  last: 'Llamada · hoy',           health: 'green', owner: 'LR' },
+  { id: 4,  name: 'Aceros Monterrey',          contact: 'Jorge Vega',       phone: '8182345678', value: 31200, visits: 2, stage: 'cotizacion',   days: 6,  last: 'Email · hace 3 días',     health: 'green', owner: 'MS' },
+  { id: 5,  name: 'Maderería San Juan',        contact: 'Roberto Torres',   phone: '4423334444', value: 12400, visits: 1, stage: 'prospeccion',  days: 2,  last: 'Visita · hace 2 días',    health: 'green', owner: 'LR' },
+  { id: 6,  name: 'Plomería Industrial Vega',  contact: 'Luis Vega',        phone: '4426667777', value: 9800,  visits: 0, stage: 'prospeccion',  days: 14, last: 'Sin contacto',            health: 'amber', owner: 'LR' },
+  { id: 7,  name: 'Refaccionaria El Bajío',    contact: 'Mario Salinas',    phone: '4771112222', value: 22000, visits: 1, stage: 'presentacion', days: 24, last: 'WhatsApp · hace 9 días',  health: 'red',   owner: 'MS' },
+  { id: 8,  name: 'Comercial Las Palmas',      contact: 'Sandra López',     phone: '4428889999', value: 16700, visits: 3, stage: 'negociacion',  days: 5,  last: 'Visita · ayer',           health: 'green', owner: 'LR' },
+  { id: 9,  name: 'Materiales Pacífico',       contact: 'Héctor Fuentes',   phone: '3221234567', value: 28900, visits: 2, stage: 'cotizacion',   days: 11, last: 'Llamada · hace 4 días',   health: 'amber', owner: 'JT' },
+  { id: 10, name: 'Hidráulica del Pacífico',   contact: 'Carmen Ibáñez',    phone: '3229876543', value: 35000, visits: 5, stage: 'cierre',       days: 2,  last: 'Visita · hoy',            health: 'green', owner: 'MS' },
+  { id: 11, name: 'Pinturas El Globo',         contact: 'David Morales',    phone: '4424445555', value: 14200, visits: 0, stage: 'prospeccion',  days: 1,  last: 'Visita · hoy',            health: 'green', owner: 'AD' },
+  { id: 12, name: 'Herrajes San Marcos',       contact: 'Patricia Núñez',   phone: '4426660000', value: 19600, visits: 3, stage: 'cotizacion',   days: 9,  last: 'Email · hace 2 días',     health: 'green', owner: 'RC' },
 ]
 
 export const MOCK_FUNNEL = [
@@ -45,3 +45,22 @@ export const MOCK_ACTIVITY = [
 ]
 
 export const MOCK_SALES_TREND = [12, 18, 22, 15, 28, 34, 20, 42, 38, 29, 46, 52, 48, 61]
+
+export const MOCK_PRODUCTS = [
+  { id: 1,  name: 'Válvula de paso 1/2"',        sku: 'VAL-001', price: 185,  unit: 'pza', category: 'Válvulas'    },
+  { id: 2,  name: 'Válvula de paso 3/4"',        sku: 'VAL-002', price: 240,  unit: 'pza', category: 'Válvulas'    },
+  { id: 3,  name: 'Válvula de paso 1"',          sku: 'VAL-003', price: 310,  unit: 'pza', category: 'Válvulas'    },
+  { id: 4,  name: 'Llave de bola 1/2"',          sku: 'LLA-001', price: 195,  unit: 'pza', category: 'Válvulas'    },
+  { id: 5,  name: 'Llave de bola 1"',            sku: 'LLA-002', price: 290,  unit: 'pza', category: 'Válvulas'    },
+  { id: 6,  name: 'Tubería PVC 4"',              sku: 'TUB-004', price: 320,  unit: 'ml',  category: 'Tubería'     },
+  { id: 7,  name: 'Tubería CPVC 1/2"',           sku: 'TUB-012', price: 48,   unit: 'ml',  category: 'Tubería'     },
+  { id: 8,  name: 'Manguera reforzada 1/2"',     sku: 'MAN-012', price: 38,   unit: 'ml',  category: 'Tubería'     },
+  { id: 9,  name: 'Codo galvanizado 3/4"',       sku: 'COD-034', price: 48,   unit: 'pza', category: 'Conexiones'  },
+  { id: 10, name: 'Tee PVC 1"',                  sku: 'TEE-001', price: 32,   unit: 'pza', category: 'Conexiones'  },
+  { id: 11, name: 'Reducción bushing 1" x 3/4"', sku: 'RED-001', price: 22,   unit: 'pza', category: 'Conexiones'  },
+  { id: 12, name: 'Bomba centrífuga 1HP',         sku: 'BOM-001', price: 4200, unit: 'pza', category: 'Equipos'     },
+  { id: 13, name: 'Bomba sumergible 1/2HP',       sku: 'BOM-002', price: 2800, unit: 'pza', category: 'Equipos'     },
+  { id: 14, name: 'Medidor de flujo digital',     sku: 'MED-002', price: 2850, unit: 'pza', category: 'Equipos'     },
+  { id: 15, name: 'Filtro sedimentos 5μ',         sku: 'FIL-005', price: 580,  unit: 'pza', category: 'Filtración'  },
+  { id: 16, name: 'Filtro carbón activado',       sku: 'FIL-006', price: 720,  unit: 'pza', category: 'Filtración'  },
+]

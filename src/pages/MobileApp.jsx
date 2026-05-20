@@ -6,6 +6,9 @@ import Kanban from '../components/mobile/Kanban'
 import MapScreen from '../components/mobile/MapScreen'
 import VisitModal from '../components/mobile/VisitModal'
 import NewProspectModal from '../components/mobile/NewProspectModal'
+import NotificationsPanel from '../components/mobile/NotificationsPanel'
+import QuoteModal from '../components/mobile/QuoteModal'
+import WhatsAppModal from '../components/mobile/WhatsAppModal'
 import Icon from '../components/shared/Icon'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -29,11 +32,14 @@ export default function MobileApp({ dark }) {
   const [screen, setScreen] = useState('inicio')
   const [showVisitModal, setShowVisitModal] = useState(false)
   const [showNewProspect, setShowNewProspect] = useState(false)
+  const [showNotifications, setShowNotifications] = useState(false)
+  const [showQuote, setShowQuote] = useState(false)
+  const [showWhatsApp, setShowWhatsApp] = useState(false)
   const { profile, signOut } = useAuth()
   const goKanban = () => setScreen('embudo')
 
   let content
-  if (screen === 'inicio')      content = <Dashboard profile={profile} alertHero={false} onOpenKanban={goKanban} onRegisterVisit={() => setShowVisitModal(true)} onNewProspect={() => setShowNewProspect(true)} />
+  if (screen === 'inicio')      content = <Dashboard profile={profile} alertHero={false} onOpenKanban={goKanban} onRegisterVisit={() => setShowVisitModal(true)} onNewProspect={() => setShowNewProspect(true)} onOpenNotifications={() => setShowNotifications(true)} onQuote={() => setShowQuote(true)} onWhatsApp={() => setShowWhatsApp(true)} />
   else if (screen === 'embudo') content = <Kanban />
   else if (screen === 'mapa')   content = <MapScreen />
   else if (screen === 'agenda') content = <PlaceholderScreen title="Agenda" icon="calendar" />
@@ -64,6 +70,9 @@ export default function MobileApp({ dark }) {
       <BottomNav active={screen} onChange={setScreen} />
       {showVisitModal && <VisitModal onClose={() => setShowVisitModal(false)} />}
       {showNewProspect && <NewProspectModal onClose={() => setShowNewProspect(false)} />}
+      {showNotifications && <NotificationsPanel onClose={() => setShowNotifications(false)} />}
+      {showQuote && <QuoteModal onClose={() => setShowQuote(false)} />}
+      {showWhatsApp && <WhatsAppModal onClose={() => setShowWhatsApp(false)} />}
     </div>
   )
 }

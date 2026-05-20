@@ -1,13 +1,23 @@
 import React, { useState } from 'react'
 import Icon from '../shared/Icon'
 import StageDot from '../shared/StageDot'
+
+function BellSvg({ size = 18, color = 'currentColor' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  )
+}
 import { STAGES, STAGE_BY_ID } from '../../constants/stages'
 import { MOCK_FUNNEL, MOCK_AGENDA } from '../../constants/mockData'
 
 const fmt = n => '$' + n.toLocaleString('es-MX')
 
 // ── Header ────────────────────────────────────────────────────────
-function Header({ profile }) {
+function Header({ profile, onOpenNotifications }) {
   const name = profile?.full_name || 'Vendedor'
   const initials = profile?.initials || name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
@@ -29,12 +39,15 @@ function Header({ profile }) {
         </div>
       </div>
       <div style={{ position: 'relative' }}>
-        <button style={{
-          width: 36, height: 36, borderRadius: '50%',
-          border: '0.5px solid var(--border)', background: 'var(--surface)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg)',
-        }}>
-          <Icon name="bell" size={18} />
+        <button
+          onClick={onOpenNotifications}
+          style={{
+            width: 36, height: 36, borderRadius: '50%',
+            border: '0.5px solid var(--border)', background: 'var(--surface)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg)',
+          }}
+        >
+          <BellSvg size={18} color="var(--fg)" />
         </button>
         <span style={{
           position: 'absolute', top: -2, right: -2,
@@ -191,13 +204,56 @@ function FollowupAlert({ hero = false, onOpen }) {
   )
 }
 
+// ── QuickAction SVG icons ─────────────────────────────────────────
+function IcoMapPin({ size = 18, color = 'currentColor' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2a7 7 0 0 1 7 7c0 4.5-7 13-7 13S5 13.5 5 9a7 7 0 0 1 7-7z" />
+      <circle cx="12" cy="9" r="2.5" />
+    </svg>
+  )
+}
+function IcoUserPlus({ size = 18, color = 'currentColor' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <line x1="19" y1="8" x2="19" y2="14" />
+      <line x1="22" y1="11" x2="16" y2="11" />
+    </svg>
+  )
+}
+function IcoFileText({ size = 18, color = 'currentColor' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
+      <line x1="10" y1="9" x2="8" y2="9" />
+    </svg>
+  )
+}
+function IcoWhatsapp({ size = 18, color = 'currentColor' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21" />
+      <path d="M9 10a.5.5 0 0 0 1 0V9a.5.5 0 0 0-1 0v1a5 5 0 0 0 5 5h1a.5.5 0 0 0 0-1h-1a.5.5 0 0 0 0 1" />
+    </svg>
+  )
+}
+
 // ── QuickActions ──────────────────────────────────────────────────
-function QuickActions({ onRegisterVisit, onNewProspect }) {
+function QuickActions({ onRegisterVisit, onNewProspect, onQuote, onWhatsApp }) {
   const actions = [
-    { label: 'Registrar visita', icon: 'map-pin',        bg: '#E6F1FB', fg: '#185FA5', onClick: onRegisterVisit },
-    { label: 'Nuevo prospecto',  icon: 'user-plus',      bg: '#EAF3DE', fg: '#3B6D11', onClick: onNewProspect },
-    { label: 'Cotizar',          icon: 'file-text',      bg: '#FAEEDA', fg: '#854F0B', onClick: null },
-    { label: 'WhatsApp',         icon: 'brand-whatsapp', bg: '#E1F5EE', fg: '#0F6E56', onClick: null },
+    { label: 'Registrar visita', Ico: IcoMapPin,    bg: '#E6F1FB', fg: '#185FA5', onClick: onRegisterVisit },
+    { label: 'Nuevo prospecto',  Ico: IcoUserPlus,  bg: '#EAF3DE', fg: '#3B6D11', onClick: onNewProspect },
+    { label: 'Cotizar',          Ico: IcoFileText,  bg: '#FAEEDA', fg: '#854F0B', onClick: onQuote },
+    { label: 'WhatsApp',         Ico: IcoWhatsapp,  bg: '#E1F5EE', fg: '#0F6E56', onClick: onWhatsApp },
   ]
   return (
     <div style={{ margin: '0 16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -210,10 +266,10 @@ function QuickActions({ onRegisterVisit, onNewProspect }) {
         }}>
           <div style={{
             width: 32, height: 32, borderRadius: 'var(--r-sm)',
-            background: a.bg, color: a.fg,
+            background: a.bg,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <Icon name={a.icon} size={18} />
+            <a.Ico size={18} color={a.fg} />
           </div>
           <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>{a.label}</div>
         </button>
@@ -339,14 +395,14 @@ function ReactivatorBanner() {
 }
 
 // ── Dashboard (main export) ───────────────────────────────────────
-export default function Dashboard({ profile, metaState = 'mid', alertHero = false, onOpenKanban, onRegisterVisit, onNewProspect }) {
+export default function Dashboard({ profile, metaState = 'mid', alertHero = false, onOpenKanban, onRegisterVisit, onNewProspect, onOpenNotifications, onQuote, onWhatsApp }) {
   return (
     <div style={{ paddingBottom: 92, paddingTop: 4, display: 'flex', flexDirection: 'column', gap: 14, background: 'var(--bg)', minHeight: '100%' }}>
-      <Header profile={profile} />
+      <Header profile={profile} onOpenNotifications={onOpenNotifications} />
       <MetaCard state={metaState} />
       <DayStats />
       <FollowupAlert hero={alertHero} onOpen={onOpenKanban} />
-      <QuickActions onRegisterVisit={onRegisterVisit} onNewProspect={onNewProspect} />
+      <QuickActions onRegisterVisit={onRegisterVisit} onNewProspect={onNewProspect} onQuote={onQuote} onWhatsApp={onWhatsApp} />
       <Agenda />
       <FunnelSummary onOpenKanban={onOpenKanban} />
       <ReactivatorBanner />

@@ -3,6 +3,16 @@ import Icon from '../shared/Icon'
 
 const EMPLOYEE_RANGES = ['1–10', '11–50', '51–200', '201–500', '500+']
 
+function CameraIcon({ size = 22, color = 'currentColor' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3L14.5 4z" />
+      <circle cx="12" cy="13" r="3" />
+    </svg>
+  )
+}
+
 function GpsPinIcon({ size = 18, color = 'currentColor' }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -175,7 +185,7 @@ function PhotoField({ photo, onPhoto }) {
               display: 'flex', alignItems: 'center', gap: 4,
             }}
           >
-            <Icon name="camera" size={12} />
+            <CameraIcon size={12} color="#fff" />
             Cambiar
           </button>
         </div>
@@ -196,7 +206,7 @@ function PhotoField({ photo, onPhoto }) {
             background: 'var(--kiuvo-blue-soft)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
-            <Icon name="camera" size={22} color="var(--kiuvo-blue)" />
+            <CameraIcon size={22} color="var(--kiuvo-blue)" />
           </div>
           <div>
             <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg-secondary)' }}>Tomar foto o elegir imagen</div>
