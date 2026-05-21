@@ -91,7 +91,7 @@ function SuccessView({ items, prospect }) {
 }
 
 // ── Main ──────────────────────────────────────────────────────────
-export default function QuoteModal({ onClose }) {
+export default function QuoteModal({ onClose, onGenerated }) {
   const [step, setStep]           = useState('form')   // form | success
   const [search, setSearch]       = useState('')
   const [cat, setCat]             = useState('Todos')
@@ -127,6 +127,7 @@ export default function QuoteModal({ onClose }) {
 
   const handleSubmit = () => {
     if (!canSubmit) return
+    onGenerated?.(prospect, total)
     setStep('success')
     setTimeout(onClose, 2200)
   }

@@ -17,7 +17,7 @@ import { MOCK_FUNNEL, MOCK_AGENDA } from '../../constants/mockData'
 const fmt = n => '$' + n.toLocaleString('es-MX')
 
 // ── Header ────────────────────────────────────────────────────────
-function Header({ profile, onOpenNotifications }) {
+function Header({ profile, onOpenNotifications, dark, onToggleDark }) {
   const name = profile?.full_name || 'Vendedor'
   const initials = profile?.initials || name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
@@ -38,25 +38,41 @@ function Header({ profile, onOpenNotifications }) {
           <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg)' }}>{name}</div>
         </div>
       </div>
-      <div style={{ position: 'relative' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {/* Dark mode toggle */}
         <button
-          onClick={onOpenNotifications}
+          onClick={onToggleDark}
+          title={dark ? 'Modo claro' : 'Modo oscuro'}
           style={{
             width: 36, height: 36, borderRadius: '50%',
             border: '0.5px solid var(--border)', background: 'var(--surface)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 16, lineHeight: 1,
           }}
         >
-          <BellSvg size={18} color="var(--fg)" />
+          {dark ? '☀️' : '🌙'}
         </button>
-        <span style={{
-          position: 'absolute', top: -2, right: -2,
-          minWidth: 18, height: 18, padding: '0 4px', borderRadius: 9,
-          background: '#E24B4A', color: '#fff',
-          fontSize: 10, fontWeight: 500,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          border: '1.5px solid var(--bg)',
-        }}>3</span>
+        {/* Notifications */}
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={onOpenNotifications}
+            style={{
+              width: 36, height: 36, borderRadius: '50%',
+              border: '0.5px solid var(--border)', background: 'var(--surface)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg)',
+            }}
+          >
+            <BellSvg size={18} color="var(--fg)" />
+          </button>
+          <span style={{
+            position: 'absolute', top: -2, right: -2,
+            minWidth: 18, height: 18, padding: '0 4px', borderRadius: 9,
+            background: '#E24B4A', color: '#fff',
+            fontSize: 10, fontWeight: 500,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            border: '1.5px solid var(--bg)',
+          }}>3</span>
+        </div>
       </div>
     </div>
   )
@@ -279,18 +295,19 @@ function QuickActions({ onRegisterVisit, onNewProspect, onQuote, onWhatsApp }) {
 }
 
 // ── Agenda ────────────────────────────────────────────────────────
-function Agenda() {
+function Agenda({ onOpenAgenda, onOpenEvent }) {
   return (
     <div style={{ margin: '0 16px' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
         <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--fg)' }}>Agenda de hoy</div>
-        <button style={{ fontSize: 12, color: 'var(--kiuvo-blue)', fontWeight: 500 }}>Ver semana →</button>
+        <button onClick={onOpenAgenda} style={{ fontSize: 12, color: 'var(--kiuvo-blue)', fontWeight: 500 }}>Ver semana →</button>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {MOCK_AGENDA.map((a, i) => {
           const stage = STAGE_BY_ID[a.stage]
           return (
-            <div key={i} style={{
+            <button key={i} onClick={() => onOpenEvent && onOpenEvent(a)} style={{
+              width: '100%', textAlign: 'left',
               background: 'var(--surface)', border: '0.5px solid var(--border)',
               borderRadius: 'var(--r-md)', padding: '10px 12px 10px 13px',
               display: 'flex', gap: 12, position: 'relative', overflow: 'hidden',
@@ -316,7 +333,8 @@ function Agenda() {
                   <span style={{ fontSize: 11, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.address}</span>
                 </div>
               </div>
-            </div>
+              <Icon name="chevron-right" size={16} color="var(--fg-tertiary)" style={{ flexShrink: 0, alignSelf: 'center' }} />
+            </button>
           )
         })}
       </div>
@@ -330,16 +348,18 @@ function FunnelSummary({ onOpenKanban }) {
     <div style={{ margin: '0 16px' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
         <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--fg)' }}>Mi embudo</div>
-        <button onClick={onOpenKanban} style={{ fontSize: 12, color: 'var(--kiuvo-blue)', fontWeight: 500 }}>Ver kanban →</button>
+        <button onClick={() => onOpenKanban()} style={{ fontSize: 12, color: 'var(--kiuvo-blue)', fontWeight: 500 }}>Ver kanban →</button>
       </div>
       <div className="card">
         {MOCK_FUNNEL.map((row, i) => {
           const s = STAGE_BY_ID[row.id]
           return (
-            <div key={row.id} style={{
+            <button key={row.id} onClick={() => onOpenKanban(row.id)} style={{
+              width: '100%', textAlign: 'left',
               display: 'flex', alignItems: 'center', gap: 10,
               padding: '11px 14px',
               borderTop: i === 0 ? 'none' : '0.5px solid var(--border)',
+              background: 'transparent',
             }}>
               <StageDot stage={row.id} />
               <span style={{ fontSize: 13, color: 'var(--fg)' }}>{s.label}</span>
@@ -367,7 +387,8 @@ function FunnelSummary({ onOpenKanban }) {
                 </span>
               )}
               <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg)', minWidth: 18, textAlign: 'right' }}>{row.count}</span>
-            </div>
+              <Icon name="chevron-right" size={14} color="var(--fg-tertiary)" />
+            </button>
           )
         })}
       </div>
@@ -376,9 +397,9 @@ function FunnelSummary({ onOpenKanban }) {
 }
 
 // ── ReactivatorBanner ─────────────────────────────────────────────
-function ReactivatorBanner() {
+function ReactivatorBanner({ onOpen }) {
   return (
-    <button style={{
+    <button onClick={onOpen} style={{
       width: 'calc(100% - 32px)', margin: '0 16px',
       padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10,
       background: 'var(--danger-bg)', border: '0.5px solid var(--danger-border)',
@@ -395,17 +416,17 @@ function ReactivatorBanner() {
 }
 
 // ── Dashboard (main export) ───────────────────────────────────────
-export default function Dashboard({ profile, metaState = 'mid', alertHero = false, onOpenKanban, onRegisterVisit, onNewProspect, onOpenNotifications, onQuote, onWhatsApp }) {
+export default function Dashboard({ profile, metaState = 'mid', alertHero = false, dark, onToggleDark, onOpenKanban, onRegisterVisit, onNewProspect, onOpenNotifications, onQuote, onWhatsApp, onOpenAgenda, onOpenAgendaEvent, onOpenReactivador }) {
   return (
     <div style={{ paddingBottom: 92, paddingTop: 4, display: 'flex', flexDirection: 'column', gap: 14, background: 'var(--bg)', minHeight: '100%' }}>
-      <Header profile={profile} onOpenNotifications={onOpenNotifications} />
+      <Header profile={profile} onOpenNotifications={onOpenNotifications} dark={dark} onToggleDark={onToggleDark} />
       <MetaCard state={metaState} />
       <DayStats />
       <FollowupAlert hero={alertHero} onOpen={onOpenKanban} />
       <QuickActions onRegisterVisit={onRegisterVisit} onNewProspect={onNewProspect} onQuote={onQuote} onWhatsApp={onWhatsApp} />
-      <Agenda />
+      <Agenda onOpenAgenda={onOpenAgenda} onOpenEvent={onOpenAgendaEvent} />
       <FunnelSummary onOpenKanban={onOpenKanban} />
-      <ReactivatorBanner />
+      <ReactivatorBanner onOpen={onOpenReactivador} />
       <div style={{ height: 4 }} />
     </div>
   )

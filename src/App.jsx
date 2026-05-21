@@ -30,24 +30,6 @@ function AppRoutes() {
     )
   }
 
-  // Dark mode toggle button (always visible)
-  const DarkToggle = () => (
-    <button
-      onClick={() => setDark(d => !d)}
-      title={dark ? 'Modo claro' : 'Modo oscuro'}
-      style={{
-        position: 'fixed', bottom: 80, right: 16, zIndex: 999,
-        width: 36, height: 36, borderRadius: '50%',
-        background: 'var(--surface)', border: '0.5px solid var(--border)',
-        color: 'var(--fg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-        fontFamily: 'var(--font-sans)',
-      }}
-    >
-      {dark ? '☀️' : '🌙'}
-    </button>
-  )
-
   return (
     <BrowserRouter>
       <Routes>
@@ -62,15 +44,13 @@ function AppRoutes() {
         <Route path="/app" element={
           !user ? <Navigate to="/login" replace /> : (
             <div style={{ height: '100vh' }}>
-              <DarkToggle />
-              <MobileApp dark={dark} />
+              <MobileApp dark={dark} onToggleDark={() => setDark(d => !d)} />
             </div>
           )
         } />
         <Route path="/admin" element={
           !user ? <Navigate to="/login" replace /> : (
             <div style={{ height: '100vh' }}>
-              <DarkToggle />
               <AdminApp dark={dark} />
             </div>
           )

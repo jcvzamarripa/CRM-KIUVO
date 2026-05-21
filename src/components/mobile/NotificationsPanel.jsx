@@ -7,36 +7,42 @@ const INITIAL = [
     title: 'Seguimiento urgente',
     body: 'Refaccionaria El Bajío lleva 24 días en Presentación sin avance.',
     time: 'hace 5 min',
+    action: { screen: 'embudo', stage: 'presentacion', label: 'Ver en embudo' },
   },
   {
     id: 2, read: false, type: 'warning',
     title: 'Sin contacto reciente',
     body: 'Materiales Pacífico lleva 11 días sin visita ni llamada.',
     time: 'hace 1 h',
+    action: { screen: 'embudo', stage: 'cotizacion', label: 'Ver prospecto' },
   },
   {
     id: 3, read: false, type: 'info',
     title: 'Meta al 68%',
     body: 'Quedan 3 días para cerrar la semana. ¡Buen ritmo, sigue así!',
     time: 'hace 2 h',
+    action: { screen: 'inicio', label: 'Ver dashboard' },
   },
   {
     id: 4, read: true, type: 'danger',
     title: 'Prospecto estancado',
     body: 'Plomería Industrial Vega no tiene visitas registradas desde que ingresó.',
     time: 'ayer',
+    action: { screen: 'embudo', stage: 'prospeccion', label: 'Ver en embudo' },
   },
   {
     id: 5, read: true, type: 'success',
     title: '¡Cierre registrado!',
     body: 'Constructora ABC — $24,500 marcado como ganado.',
     time: 'ayer',
+    action: { screen: 'embudo', stage: 'cierre', label: 'Ver cierre' },
   },
   {
     id: 6, read: true, type: 'info',
     title: 'Nueva cotización',
     body: 'Distribuidora Norte solicitó cotización por $42,800.',
     time: 'hace 2 días',
+    action: { screen: 'embudo', stage: 'cotizacion', label: 'Ver cotización' },
   },
 ]
 
@@ -92,13 +98,21 @@ function TypeIcon({ type, size = 16 }) {
   )
 }
 
-export default function NotificationsPanel({ onClose }) {
+export default function NotificationsPanel({ onClose, onNavigate }) {
   const [items, setItems] = useState(INITIAL)
 
   const unread = items.filter(n => !n.read).length
 
   const markRead = id => setItems(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
   const markAll  = () => setItems(prev => prev.map(n => ({ ...n, read: true })))
+
+  function handleTap(n) {
+    markRead(n.id)
+    if (n.action) {
+      onNavigate?.(n.action)
+      onClose()
+    }
+  }
 
   return (
     <>
@@ -154,7 +168,7 @@ export default function NotificationsPanel({ onClose }) {
             return (
               <button
                 key={n.id}
-                onClick={() => markRead(n.id)}
+                onClick={() => handleTap(n)}
                 style={{
                   display: 'flex', alignItems: 'flex-start', gap: 12,
                   padding: '12px 12px',
@@ -179,6 +193,15 @@ export default function NotificationsPanel({ onClose }) {
                     <div style={{ fontSize: 10, color: 'var(--fg-tertiary)', flexShrink: 0 }}>{n.time}</div>
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--fg-secondary)', lineHeight: 1.4 }}>{n.body}</div>
+                  {n.action && (
+                    <div style={{
+                      marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 4,
+                      fontSize: 11, fontWeight: 600, color: t.iconColor,
+                    }}>
+                      {n.action.label}
+                      <Icon name="chevron-right" size={12} color={t.iconColor} />
+                    </div>
+                  )}
                 </div>
               </button>
             )
