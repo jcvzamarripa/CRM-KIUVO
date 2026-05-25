@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import Icon from '../shared/Icon'
 import { STAGE_BY_ID } from '../../constants/stages'
+import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../contexts/AuthContext'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -31,28 +33,42 @@ function fmtTime(d) {
   return { hh: `${hh}:${mm}`, ampm: h >= 12 ? 'PM' : 'AM' }
 }
 
-function mkDate(offsetDays, h, m) {
-  const d = new Date()
-  d.setDate(d.getDate() + offsetDays)
-  d.setHours(h, m, 0, 0)
-  return d
+function normalize(row) {
+  return {
+    id:       row.id,
+    title:    row.title,
+    type:     row.type,
+    date:     new Date(row.starts_at),
+    duration: row.duration,
+    address:  row.address  || '',
+    notes:    row.notes    || '',
+    activity: row.activity || '',
+    stage:    row.stage    || null,
+    source:   row.source,
+    notified: row.notified ?? false,
+  }
 }
 
-// ─── Seed events (relative to today) ────────────────────────────────────────
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
 
-const SEED = [
-  { id: 'm1', title: 'Ferretería del Valle',    type: 'visit',   date: mkDate(0, 10, 30), duration: 60, activity: 'Presentación de producto',   address: 'Av. Constituyentes 412, Querétaro', stage: 'presentacion', source: 'local', notified: false },
-  { id: 'm2', title: 'Distribuidora Norte',     type: 'visit',   date: mkDate(0, 13,  0), duration: 90, activity: 'Negociación de condiciones',  address: 'Blvd. Bernardo Quintana 4200',      stage: 'negociacion',  source: 'local', notified: false },
-  { id: 'm3', title: 'Constructora ABC',        type: 'visit',   date: mkDate(0, 16,  0), duration: 60, activity: 'Cierre de venta · $24,500',   address: 'Parque Industrial Bernardo Q.',     stage: 'cierre',       source: 'local', notified: false },
-  { id: 'm4', title: 'Aceros Monterrey',        type: 'call',    date: mkDate(1,  9,  0), duration: 30, activity: 'Llamada de seguimiento',      address: '',                                 stage: 'cotizacion',   source: 'local', notified: false },
-  { id: 'm5', title: 'Herrajes San Marcos',     type: 'visit',   date: mkDate(1, 14, 30), duration: 60, activity: 'Presentación catálogo',       address: 'Blvd. Constitución 887',           stage: 'cotizacion',   source: 'local', notified: false },
-  { id: 'm6', title: 'Plomería Industrial Vega',type: 'visit',   date: mkDate(2, 11,  0), duration: 60, activity: 'Primera visita',              address: 'Zona Industrial Benito Juárez',    stage: 'prospeccion',  source: 'local', notified: false },
-  { id: 'm7', title: 'Materiales Pacífico',     type: 'meeting', date: mkDate(2, 15, 30), duration: 60, activity: 'Revisión de cotización',      address: 'Av. 5 de Febrero 220',             stage: 'cotizacion',   source: 'local', notified: false },
-  { id: 'm8', title: 'Maderería San Juan',      type: 'visit',   date: mkDate(4, 10,  0), duration: 60, activity: 'Segunda visita',              address: 'Carretera 57 km 14',               stage: 'prospeccion',  source: 'local', notified: false },
-  { id: 'm9', title: 'Comercial Las Palmas',    type: 'call',    date: mkDate(5,  9, 30), duration: 30, activity: 'Llamada de seguimiento',      address: '',                                 stage: 'negociacion',  source: 'local', notified: false },
-  { id:'m10', title: 'Distribuidora Norte',     type: 'meeting', date: mkDate(7, 11,  0), duration: 90, activity: 'Presentación ejecutiva',      address: 'Blvd. Bernardo Quintana 4200',     stage: 'negociacion',  source: 'local', notified: false },
-  { id:'m11', title: 'Ferretería del Valle',    type: 'visit',   date: mkDate(-1,10,  0), duration: 60, activity: 'Demostración de producto',    address: 'Av. Constituyentes 412, Querétaro',stage: 'presentacion', source: 'local', notified: true  },
-]
+function SkeletonEvent() {
+  return (
+    <div style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)', padding: '10px 12px 10px 13px', display: 'flex', gap: 12 }}>
+      <div style={{ minWidth: 46, display: 'flex', flexDirection: 'column', gap: 7 }}>
+        <div style={{ width: 36, height: 16, borderRadius: 4, background: 'var(--bg-secondary)' }} />
+        <div style={{ width: 22, height: 11, borderRadius: 4, background: 'var(--bg-secondary)' }} />
+      </div>
+      <div style={{ width: '0.5px', background: 'var(--border)', flexShrink: 0 }} />
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+          <div style={{ width: '55%', height: 13, borderRadius: 4, background: 'var(--bg-secondary)' }} />
+          <div style={{ width: 52, height: 20, borderRadius: 10, background: 'var(--bg-secondary)' }} />
+        </div>
+        <div style={{ width: '40%', height: 11, borderRadius: 4, background: 'var(--bg-secondary)' }} />
+      </div>
+    </div>
+  )
+}
 
 // ─── MonthYearPicker ──────────────────────────────────────────────────────────
 
@@ -71,7 +87,6 @@ function MonthYearPicker({ year, month, onSelect, onClose }) {
         background: 'var(--bg)', borderRadius: 'var(--r-lg)', padding: '16px',
         width: 280, boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
       }}>
-        {/* Year navigation */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <button onClick={() => setPickerYear(y => y - 1)} style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--r-md)', color: 'var(--fg-secondary)' }}>
             <Icon name="chevron-left" size={18} />
@@ -81,8 +96,6 @@ function MonthYearPicker({ year, month, onSelect, onClose }) {
             <Icon name="chevron-right" size={18} />
           </button>
         </div>
-
-        {/* Month grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
           {MONTHS_SHORT.map((m, i) => {
             const isSelected = i === month && pickerYear === year
@@ -100,7 +113,6 @@ function MonthYearPicker({ year, month, onSelect, onClose }) {
             )
           })}
         </div>
-
         <button onClick={onClose} style={{ marginTop: 12, width: '100%', padding: '10px', borderRadius: 'var(--r-md)', background: 'var(--surface)', border: '0.5px solid var(--border)', fontSize: 13, color: 'var(--fg-secondary)' }}>
           Cancelar
         </button>
@@ -131,7 +143,6 @@ function WeekStrip({ selected, onChange, events, viewYear, viewMonth: viewMonthI
   const todayKey = dateKey(today)
   const selKey   = dateKey(selected)
 
-  // Show all days of the current view month
   const daysInMonth = new Date(viewYear, viewMonthIdx + 1, 0).getDate()
   const days = Array.from({ length: daysInMonth }, (_, i) => {
     const d = new Date(viewYear, viewMonthIdx, i + 1)
@@ -263,31 +274,77 @@ function EventCard({ event, onPress }) {
 // ─── AddEventModal ────────────────────────────────────────────────────────────
 
 function AddEventModal({ initialDate, prefill, onSave, onClose }) {
+  const { user } = useAuth()
   const pad  = n => n.toString().padStart(2, '0')
   const toDateInput = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 
-  const [title,    setTitle]    = useState(prefill?.title || '')
-  const [type,     setType]     = useState(prefill?.type  || 'visit')
-  const [dateVal,  setDateVal]  = useState(toDateInput(initialDate))
-  const [timeVal,  setTimeVal]  = useState('09:00')
-  const [duration, setDuration] = useState(60)
-  const [address,  setAddress]  = useState('')
-  const [notes,    setNotes]    = useState('')
+  const [title,          setTitle]          = useState(prefill?.title || '')
+  const [type,           setType]           = useState(prefill?.type  || 'visit')
+  const [dateVal,        setDateVal]        = useState(toDateInput(initialDate))
+  const [timeVal,        setTimeVal]        = useState('09:00')
+  const [duration,       setDuration]       = useState(60)
+  const [address,        setAddress]        = useState('')
+  const [notes,          setNotes]          = useState('')
+
+  // Prospect picker state
+  const [prospects,        setProspects]        = useState([])
+  const [prospectQuery,    setProspectQuery]    = useState('')
+  const [selectedProspect, setSelectedProspect] = useState(null)
+  const [showDropdown,     setShowDropdown]     = useState(false)
+  const [prospectMode,     setProspectMode]     = useState('search') // 'search' | 'new'
+
+  // Load prospects once
+  useEffect(() => {
+    if (!supabase || !user) return
+    supabase
+      .from('prospects')
+      .select('id, name, phone, address, stage_id')
+      .eq('owner_id', user.id)
+      .order('name')
+      .then(({ data }) => setProspects(data ?? []))
+  }, [user?.id])
+
+  const matches = prospects
+    .filter(p => p.name.toLowerCase().includes(prospectQuery.toLowerCase()))
+    .slice(0, 6)
+
+  function selectProspect(p) {
+    setSelectedProspect(p)
+    setProspectQuery(p.name)
+    if (!title) setTitle(p.name)
+    if (!address && p.address) setAddress(p.address)
+    setShowDropdown(false)
+  }
+
+  function clearProspect() {
+    setSelectedProspect(null)
+    setProspectQuery('')
+  }
 
   function handleSave() {
-    if (!title.trim()) return
+    const finalTitle = prospectMode === 'new'
+      ? (title.trim() || prospectQuery.trim())
+      : title.trim()
+    if (!finalTitle) return
     const [y, mo, dd] = dateVal.split('-').map(Number)
     const [h, mi]     = timeVal.split(':').map(Number)
     onSave({
-      id: `local-${Date.now()}`,
-      title: title.trim(), type,
+      id: `tmp-${Date.now()}`,
+      title: finalTitle, type,
       date: new Date(y, mo - 1, dd, h, mi),
       duration, address, notes,
-      activity: '', stage: null,
+      prospect_id: selectedProspect?.id ?? null,
+      activity: '', stage: selectedProspect
+        ? (STAGE_BY_ID[selectedProspect.stage_id]?.label ?? null)
+        : null,
       source: 'local', notified: false,
     })
     onClose()
   }
+
+  const canSave = prospectMode === 'search'
+    ? title.trim()
+    : (title.trim() || prospectQuery.trim())
 
   const inputStyle = {
     width: '100%', padding: '10px 12px', boxSizing: 'border-box',
@@ -300,7 +357,7 @@ function AddEventModal({ initialDate, prefill, onSave, onClose }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: 'var(--bg)', borderRadius: '16px 16px 0 0', maxHeight: '88vh', overflowY: 'auto', paddingBottom: 28 }}>
+      <div style={{ background: 'var(--bg)', borderRadius: '16px 16px 0 0', maxHeight: '92vh', overflowY: 'auto', paddingBottom: 28 }}>
         <div style={{ padding: '12px 16px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: 17, fontWeight: 500, color: 'var(--fg)' }}>Nuevo evento</span>
           <button onClick={onClose} style={{ color: 'var(--fg-tertiary)', padding: 4 }}><Icon name="x" size={20} /></button>
@@ -308,13 +365,137 @@ function AddEventModal({ initialDate, prefill, onSave, onClose }) {
         <div style={{ height: '0.5px', background: 'var(--border)', margin: '12px 0 0' }} />
 
         <div style={{ padding: '16px 16px 0', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {/* Title */}
+
+          {/* ── Prospect picker ── */}
           <div>
-            <label style={labelStyle}>Título *</label>
-            <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Nombre del cliente o actividad" style={inputStyle} />
+            <label style={labelStyle}>Prospecto</label>
+
+            {/* Mode toggle */}
+            <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+              {[
+                { id: 'search', label: 'Existente', icon: 'search' },
+                { id: 'new',    label: 'Nuevo / libre', icon: 'plus' },
+              ].map(m => (
+                <button key={m.id} onClick={() => { setProspectMode(m.id); clearProspect() }} style={{
+                  flex: 1, padding: '7px 0', borderRadius: 'var(--r-md)', fontSize: 12, fontWeight: 500,
+                  background: prospectMode === m.id ? 'var(--kiuvo-blue-soft)' : 'var(--surface)',
+                  border: `0.5px solid ${prospectMode === m.id ? 'var(--kiuvo-blue)' : 'var(--border)'}`,
+                  color: prospectMode === m.id ? 'var(--kiuvo-blue-deep)' : 'var(--fg-secondary)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                }}>
+                  <Icon name={m.icon} size={13} color={prospectMode === m.id ? 'var(--kiuvo-blue)' : 'var(--fg-tertiary)'} />
+                  {m.label}
+                </button>
+              ))}
+            </div>
+
+            {prospectMode === 'search' ? (
+              <div style={{ position: 'relative' }}>
+                {selectedProspect ? (
+                  /* Selected chip */
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '10px 12px', borderRadius: 'var(--r-md)',
+                    background: 'var(--kiuvo-blue-soft)',
+                    border: '0.5px solid var(--kiuvo-blue)',
+                  }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: STAGE_BY_ID[selectedProspect.stage_id]?.color ?? '#888', flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--kiuvo-blue-deep)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {selectedProspect.name}
+                      </div>
+                      {selectedProspect.phone && (
+                        <div style={{ fontSize: 11, color: 'var(--kiuvo-blue)', marginTop: 1 }}>{selectedProspect.phone}</div>
+                      )}
+                    </div>
+                    <button onClick={clearProspect} style={{ color: 'var(--kiuvo-blue)', flexShrink: 0 }}>
+                      <Icon name="x" size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  /* Search input */
+                  <>
+                    <div style={{ position: 'relative' }}>
+                      <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
+                        <Icon name="search" size={15} color="var(--fg-tertiary)" />
+                      </span>
+                      <input
+                        value={prospectQuery}
+                        onChange={e => { setProspectQuery(e.target.value); setShowDropdown(true) }}
+                        onFocus={() => setShowDropdown(true)}
+                        onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+                        placeholder="Buscar prospecto existente…"
+                        style={{ ...inputStyle, paddingLeft: 36 }}
+                      />
+                    </div>
+                    {showDropdown && matches.length > 0 && (
+                      <div style={{
+                        position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
+                        background: 'var(--surface)', border: '0.5px solid var(--border)',
+                        borderRadius: 'var(--r-md)', marginTop: 4,
+                        maxHeight: 200, overflowY: 'auto',
+                        boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+                      }}>
+                        {matches.map(p => {
+                          const s = STAGE_BY_ID[p.stage_id]
+                          return (
+                            <button
+                              key={p.id}
+                              onMouseDown={() => selectProspect(p)}
+                              style={{
+                                width: '100%', textAlign: 'left',
+                                padding: '11px 14px',
+                                borderBottom: '0.5px solid var(--border)',
+                                display: 'flex', alignItems: 'center', gap: 10,
+                              }}
+                            >
+                              <span style={{ width: 8, height: 8, borderRadius: '50%', background: s?.color ?? '#888', flexShrink: 0 }} />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                                {s && <div style={{ fontSize: 11, color: s.color, marginTop: 1 }}>{s.label}</div>}
+                              </div>
+                              {p.phone && <span style={{ fontSize: 11, color: 'var(--fg-tertiary)', flexShrink: 0 }}>{p.phone}</span>}
+                            </button>
+                          )
+                        })}
+                        {prospectQuery && matches.length === 0 && (
+                          <div style={{ padding: '12px 14px', fontSize: 13, color: 'var(--fg-tertiary)' }}>
+                            Sin resultados — cambia a "Nuevo / libre"
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            ) : (
+              /* Free text for new prospect */
+              <input
+                value={prospectQuery}
+                onChange={e => setProspectQuery(e.target.value)}
+                placeholder="Nombre del nuevo cliente…"
+                style={inputStyle}
+              />
+            )}
           </div>
 
-          {/* Type */}
+          {/* ── Título del evento ── */}
+          <div>
+            <label style={labelStyle}>Título del evento *</label>
+            <input
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder={selectedProspect ? selectedProspect.name : 'Ej. Presentación de producto'}
+              style={inputStyle}
+            />
+            {selectedProspect && !title && (
+              <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginTop: 4 }}>
+                Se usará el nombre del prospecto si lo dejas vacío
+              </div>
+            )}
+          </div>
+
+          {/* ── Tipo ── */}
           <div>
             <label style={labelStyle}>Tipo</label>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
@@ -333,7 +514,7 @@ function AddEventModal({ initialDate, prefill, onSave, onClose }) {
             </div>
           </div>
 
-          {/* Date + Time */}
+          {/* ── Fecha y hora ── */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
               <label style={labelStyle}>Fecha</label>
@@ -345,7 +526,7 @@ function AddEventModal({ initialDate, prefill, onSave, onClose }) {
             </div>
           </div>
 
-          {/* Duration */}
+          {/* ── Duración ── */}
           <div>
             <label style={labelStyle}>Duración</label>
             <select value={duration} onChange={e => setDuration(Number(e.target.value))} style={{ ...inputStyle, appearance: 'none' }}>
@@ -355,28 +536,37 @@ function AddEventModal({ initialDate, prefill, onSave, onClose }) {
             </select>
           </div>
 
-          {/* Address */}
+          {/* ── Dirección ── */}
           <div>
             <label style={labelStyle}>Dirección (opcional)</label>
             <input value={address} onChange={e => setAddress(e.target.value)} placeholder="Calle, colonia..." style={inputStyle} />
+            {selectedProspect?.address && !address && (
+              <button
+                onClick={() => setAddress(selectedProspect.address)}
+                style={{ marginTop: 5, fontSize: 11, color: 'var(--kiuvo-blue)', display: 'flex', alignItems: 'center', gap: 4 }}
+              >
+                <Icon name="map-pin" size={11} color="var(--kiuvo-blue)" />
+                Usar dirección del prospecto
+              </button>
+            )}
           </div>
 
-          {/* Notes */}
+          {/* ── Notas ── */}
           <div>
             <label style={labelStyle}>Notas (opcional)</label>
             <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
               placeholder="Objetivo, qué llevar..." style={{ ...inputStyle, resize: 'none' }} />
           </div>
 
-          {/* Actions */}
+          {/* ── Botones ── */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8, paddingTop: 4 }}>
             <button onClick={onClose} style={{ padding: 12, borderRadius: 'var(--r-md)', border: '0.5px solid var(--border)', background: 'var(--surface)', color: 'var(--fg-secondary)', fontSize: 14, fontWeight: 500 }}>
               Cancelar
             </button>
-            <button onClick={handleSave} disabled={!title.trim()} style={{
+            <button onClick={handleSave} disabled={!canSave} style={{
               padding: 12, borderRadius: 'var(--r-md)', fontSize: 14, fontWeight: 500,
-              background: title.trim() ? 'var(--kiuvo-blue)' : 'var(--bg-tertiary)',
-              color: title.trim() ? '#fff' : 'var(--fg-tertiary)',
+              background: canSave ? 'var(--kiuvo-blue)' : 'var(--bg-tertiary)',
+              color: canSave ? '#fff' : 'var(--fg-tertiary)',
             }}>
               Guardar evento
             </button>
@@ -574,27 +764,71 @@ function mockAgendaToEvent(a) {
 }
 
 export default function AgendaScreen({ pendingEvent, onClearPending, prefillEvent, onClearPrefill }) {
+  const { user } = useAuth()
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
 
-  const [selected,    setSelected]    = useState(new Date())
+  const [selected,       setSelected]       = useState(new Date())
   const [viewYear,       setViewYear]       = useState(new Date().getFullYear())
   const [viewMonth,      setViewMonth]      = useState(new Date().getMonth())
   const [showMonthPick,  setShowMonthPick]  = useState(false)
-  const [events,      setEvents]      = useState(SEED)
-  const [filter,      setFilter]      = useState('all')
-  const [showAdd,     setShowAdd]     = useState(false)
-  const [addPrefill,  setAddPrefill]  = useState(null)
-  const [showGoogle,  setShowGoogle]  = useState(false)
-  const [showDetail,  setShowDetail]  = useState(null)
-  const [gcConnected, setGcConnected] = useState(() => localStorage.getItem(GC_CONNECTED_KEY) === 'true')
-  const [gcToken,     setGcToken]     = useState(() => localStorage.getItem(GC_TOKEN_KEY) || null)
-  const [gcLoading,   setGcLoading]   = useState(false)
-  const [syncError,   setSyncError]   = useState(null)
-  const [notifOk,     setNotifOk]     = useState(() => {
+  const [events,         setEvents]         = useState([])
+  const [loading,        setLoading]        = useState(true)
+  const [filter,         setFilter]         = useState('all')
+  const [showAdd,        setShowAdd]        = useState(false)
+  const [addPrefill,     setAddPrefill]     = useState(null)
+  const [showGoogle,     setShowGoogle]     = useState(false)
+  const [showDetail,     setShowDetail]     = useState(null)
+  const [gcConnected,    setGcConnected]    = useState(() => localStorage.getItem(GC_CONNECTED_KEY) === 'true')
+  const [gcToken,        setGcToken]        = useState(() => localStorage.getItem(GC_TOKEN_KEY) || null)
+  const [gcLoading,      setGcLoading]      = useState(false)
+  const [syncError,      setSyncError]      = useState(null)
+  const [notifOk,        setNotifOk]        = useState(() => {
     try { return typeof Notification !== 'undefined' && Notification.permission === 'granted' }
     catch { return false }
   })
   const notifiedRef = useRef(new Set(JSON.parse(localStorage.getItem(NOTIFIED_KEY) || '[]')))
+
+  // ── Load from Supabase ────────────────────────────────────────────
+  const load = useCallback(async () => {
+    setLoading(true)
+    const { data } = await supabase
+      .from('events')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('starts_at', { ascending: true })
+
+    setEvents(prev => [
+      ...(data ?? []).map(normalize),
+      ...prev.filter(e => e.source === 'google'),
+    ])
+    setLoading(false)
+  }, [user.id])
+
+  useEffect(() => { load() }, [load])
+
+  // ── Realtime ──────────────────────────────────────────────────────
+  useEffect(() => {
+    const ch = supabase
+      .channel(`agenda-${user.id}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'events',
+        filter: `user_id=eq.${user.id}`,
+      }, ({ eventType, new: row, old: oldRow }) => {
+        if (eventType === 'INSERT') {
+          setEvents(prev =>
+            prev.some(e => e.id === row.id)
+              ? prev
+              : [...prev, normalize(row)].sort((a, b) => a.date - b.date)
+          )
+        } else if (eventType === 'UPDATE') {
+          setEvents(prev => prev.map(e => e.id === row.id ? normalize(row) : e))
+        } else if (eventType === 'DELETE') {
+          setEvents(prev => prev.filter(e => e.id !== oldRow.id))
+        }
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [user.id])
 
   // ── Open event detail from Dashboard ─────────────────────────────
   useEffect(() => {
@@ -693,15 +927,50 @@ export default function AgendaScreen({ pendingEvent, onClearPending, prefillEven
     setNotifOk(perm === 'granted')
   }
 
-  function handleAddEvent(ev) {
-    setEvents(prev => [...prev, ev])
+  async function handleAddEvent(ev) {
+    // Optimistic
+    setEvents(prev => [...prev, ev].sort((a, b) => a.date - b.date))
+
+    // Persist to Supabase
+    const { data, error } = await supabase
+      .from('events')
+      .insert({
+        user_id:      user.id,
+        title:        ev.title,
+        type:         ev.type,
+        starts_at:    ev.date.toISOString(),
+        duration:     ev.duration,
+        address:      ev.address     || null,
+        notes:        ev.notes       || null,
+        activity:     ev.activity    || null,
+        stage:        ev.stage       || null,
+        prospect_id:  ev.prospect_id || null,
+        source:       'local',
+        notified:     false,
+      })
+      .select()
+      .single()
+
+    if (!error && data) {
+      setEvents(prev => prev.map(e => e.id === ev.id ? normalize(data) : e))
+    } else if (error) {
+      setEvents(prev => prev.filter(e => e.id !== ev.id))
+    }
+
     if (gcConnected && gcToken) {
-      import('../../lib/googleCalendar').then(({ createEvent }) => createEvent(gcToken, 'primary', ev).catch(() => {}))
+      import('../../lib/googleCalendar').then(({ createEvent }) =>
+        createEvent(gcToken, 'primary', ev).catch(() => {})
+      )
     }
   }
 
-  function handleDeleteEvent(id) {
+  async function handleDeleteEvent(id) {
+    const backup = events.find(e => e.id === id)
     setEvents(prev => prev.filter(e => e.id !== id))
+    const { error } = await supabase.from('events').delete().eq('id', id)
+    if (error && backup) {
+      setEvents(prev => [...prev, backup].sort((a, b) => a.date - b.date))
+    }
   }
 
   // ── Month navigation ─────────────────────────────────────────────
@@ -720,7 +989,6 @@ export default function AgendaScreen({ pendingEvent, onClearPending, prefillEven
     setViewMonth(now.getMonth())
   }
 
-  // When selecting a day, keep viewMonth in sync
   function handleSelectDay(d) {
     setSelected(d)
     setViewYear(d.getFullYear())
@@ -752,7 +1020,6 @@ export default function AgendaScreen({ pendingEvent, onClearPending, prefillEven
 
       {/* ── Header ── */}
       <div style={{ padding: '8px 16px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        {/* Month navigation */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <button onClick={goToPrevMonth} style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--r-md)', color: 'var(--fg-secondary)' }}>
             <Icon name="chevron-left" size={18} />
@@ -772,7 +1039,6 @@ export default function AgendaScreen({ pendingEvent, onClearPending, prefillEven
           </button>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
-          {/* Google Calendar */}
           <button onClick={() => setShowGoogle(true)} title="Google Calendar" style={{
             width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
             border: gcConnected ? 'none' : '0.5px solid var(--border)',
@@ -784,7 +1050,6 @@ export default function AgendaScreen({ pendingEvent, onClearPending, prefillEven
               : <GoogleColorIcon size={18} />
             }
           </button>
-          {/* Ir a hoy */}
           <button onClick={goToToday} title="Ir a hoy" style={{
             height: 36, padding: '0 10px', borderRadius: 'var(--r-full)', flexShrink: 0,
             border: '0.5px solid var(--kiuvo-blue)',
@@ -811,7 +1076,7 @@ export default function AgendaScreen({ pendingEvent, onClearPending, prefillEven
       {/* ── Day label ── */}
       <div style={{ padding: '2px 16px 10px', display: 'flex', alignItems: 'baseline', gap: 8 }}>
         <span style={{ fontSize: 16, fontWeight: 500, color: 'var(--fg)' }}>{selLabel}</span>
-        {dayEvents.length > 0 && (
+        {!loading && dayEvents.length > 0 && (
           <span style={{ fontSize: 12, color: 'var(--fg-tertiary)' }}>{dayEvents.length} evento{dayEvents.length !== 1 ? 's' : ''}</span>
         )}
       </div>
@@ -833,7 +1098,9 @@ export default function AgendaScreen({ pendingEvent, onClearPending, prefillEven
 
       {/* ── Events list ── */}
       <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {dayEvents.length === 0 ? (
+        {loading ? (
+          [1, 2, 3].map(i => <SkeletonEvent key={i} />)
+        ) : dayEvents.length === 0 ? (
           <div style={{ padding: '40px 20px', textAlign: 'center', border: '0.5px dashed var(--border-strong)', borderRadius: 'var(--r-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
             <Icon name="calendar-off" size={28} color="var(--fg-tertiary)" />
             <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg-secondary)' }}>Sin eventos</div>

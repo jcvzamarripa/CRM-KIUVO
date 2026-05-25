@@ -1,4 +1,6 @@
 import React, { useState } from 'react'
+import { useNotifications } from '../hooks/useNotifications'
+import ErrorBoundary from '../components/shared/ErrorBoundary'
 import StatusBar from '../components/mobile/StatusBar'
 import BottomNav from '../components/mobile/BottomNav'
 import Dashboard from '../components/mobile/Dashboard'
@@ -44,6 +46,7 @@ export default function MobileApp({ dark, onToggleDark }) {
   const [showReactivador, setShowReactivador] = useState(false)
   const [masSubScreen,   setMasSubScreen]   = useState(null)  // null | 'perfil'
   const { profile, signOut } = useAuth()
+  const notifications = useNotifications()
 
   const goKanban = (stageId) => { setKanbanJump(stageId ? { stage: stageId, ts: Date.now() } : null); setScreen('embudo') }
   const handleNotifNavigate = ({ screen: s, stage }) => {
@@ -73,9 +76,10 @@ export default function MobileApp({ dark, onToggleDark }) {
       onOpenAgenda={goAgenda}
       onOpenAgendaEvent={openAgendaEvent}
       onOpenReactivador={() => setShowReactivador(true)}
+      unreadCount={notifications.unreadCount}
     />
   else if (screen === 'embudo')
-    content = <Kanban jumpTo={kanbanJump} onOpenNotifications={() => setShowNotifications(true)} />
+    content = <Kanban jumpTo={kanbanJump} onOpenNotifications={() => setShowNotifications(true)} unreadCount={notifications.unreadCount} />
   else if (screen === 'mapa')
     content = <MapScreen />
   else if (screen === 'agenda')
@@ -86,7 +90,7 @@ export default function MobileApp({ dark, onToggleDark }) {
       onClearPrefill={() => setAgendaPrefill(null)}
     />
   else if (masSubScreen === 'perfil')
-    content = <ProfileScreen profile={profile} onBack={() => setMasSubScreen(null)} />
+    content = <ProfileScreen onBack={() => setMasSubScreen(null)} />
   else
     content = (
       <div style={{ background: 'var(--bg)', minHeight: '100%', padding: '16px 16px 92px' }}>
@@ -135,12 +139,24 @@ export default function MobileApp({ dark, onToggleDark }) {
     }}>
       <StatusBar />
       <div style={{ position: 'absolute', top: 44, bottom: 0, left: 0, right: 0, overflowY: 'auto', overflowX: 'hidden' }}>
-        {content}
+        <ErrorBoundary key={screen}>
+          {content}
+        </ErrorBoundary>
       </div>
       <BottomNav active={screen} onChange={setScreen} />
       {showVisitModal    && <VisitModal       onClose={() => setShowVisitModal(false)} />}
       {showNewProspect   && <NewProspectModal  onClose={() => setShowNewProspect(false)} />}
-      {showNotifications && <NotificationsPanel onClose={() => setShowNotifications(false)} onNavigate={handleNotifNavigate} />}
+      {showNotifications && (
+        <NotificationsPanel
+          onClose={() => setShowNotifications(false)}
+          onNavigate={handleNotifNavigate}
+          items={notifications.items}
+          loading={notifications.loading}
+          unreadCount={notifications.unreadCount}
+          markRead={notifications.markRead}
+          markAll={notifications.markAll}
+        />
+      )}
       {showQuote         && <QuoteModal        onClose={() => setShowQuote(false)} />}
       {showWhatsApp      && <WhatsAppModal     onClose={() => setShowWhatsApp(false)} />}
       {showReactivador   && <ReactivadorModal  onClose={() => setShowReactivador(false)} onSchedule={scheduleReactivation} />}

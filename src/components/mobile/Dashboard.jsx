@@ -1,6 +1,9 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Icon from '../shared/Icon'
 import StageDot from '../shared/StageDot'
+import { STAGES, STAGE_BY_ID } from '../../constants/stages'
+import { MOCK_AGENDA } from '../../constants/mockData'
+import { useFunnelCounts } from '../../hooks/useFunnelCounts'
 
 function BellSvg({ size = 18, color = 'currentColor' }) {
   return (
@@ -11,13 +14,11 @@ function BellSvg({ size = 18, color = 'currentColor' }) {
     </svg>
   )
 }
-import { STAGES, STAGE_BY_ID } from '../../constants/stages'
-import { MOCK_FUNNEL, MOCK_AGENDA } from '../../constants/mockData'
 
-const fmt = n => '$' + n.toLocaleString('es-MX')
+const fmt = n => '$' + (n ?? 0).toLocaleString('es-MX')
 
 // ── Header ────────────────────────────────────────────────────────
-function Header({ profile, onOpenNotifications, dark, onToggleDark }) {
+function Header({ profile, onOpenNotifications, dark, onToggleDark, unreadCount = 0 }) {
   const name = profile?.full_name || 'Vendedor'
   const initials = profile?.initials || name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 
@@ -64,16 +65,76 @@ function Header({ profile, onOpenNotifications, dark, onToggleDark }) {
           >
             <BellSvg size={18} color="var(--fg)" />
           </button>
-          <span style={{
-            position: 'absolute', top: -2, right: -2,
-            minWidth: 18, height: 18, padding: '0 4px', borderRadius: 9,
-            background: '#E24B4A', color: '#fff',
-            fontSize: 10, fontWeight: 500,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            border: '1.5px solid var(--bg)',
-          }}>3</span>
+          {unreadCount > 0 && (
+            <span style={{
+              position: 'absolute', top: -2, right: -2,
+              minWidth: 18, height: 18, padding: '0 4px', borderRadius: 9,
+              background: '#E24B4A', color: '#fff',
+              fontSize: 10, fontWeight: 500,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              border: '1.5px solid var(--bg)',
+            }}>{unreadCount > 9 ? '9+' : unreadCount}</span>
+          )}
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── Shared pulse animation ────────────────────────────────────────
+const PULSE_STYLE = `@keyframes dashPulse { 0%,100%{opacity:.35} 50%{opacity:.8} }`
+function Bone({ w, h, r = 4, style = {} }) {
+  return (
+    <div style={{
+      width: w, height: h, borderRadius: r,
+      background: 'var(--bg-secondary)',
+      animation: 'dashPulse 1.5s ease-in-out infinite',
+      flexShrink: 0,
+      ...style,
+    }} />
+  )
+}
+
+// ── MetaCardSkeleton ──────────────────────────────────────────────
+function MetaCardSkeleton() {
+  return (
+    <>
+      <style>{PULSE_STYLE}</style>
+      <div style={{ margin: '0 16px', padding: '14px 16px', background: 'var(--bg-secondary)', borderRadius: 'var(--r-lg)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <Bone w={80} h={10} />
+            <Bone w={120} h={22} />
+            <Bone w={90} h={9} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+            <Bone w={70} h={22} r={99} />
+            <Bone w={60} h={9} />
+          </div>
+        </div>
+        <Bone w="100%" h={8} r={4} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
+          <Bone w={28} h={9} />
+          <Bone w={80} h={9} />
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ── DayStatsSkeleton ──────────────────────────────────────────────
+function DayStatsSkeleton() {
+  return (
+    <div style={{ margin: '0 16px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+      {[0, 1, 2].map(i => (
+        <div key={i} style={{
+          background: 'var(--bg-secondary)', borderRadius: 'var(--r-md)',
+          padding: '12px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+        }}>
+          <Bone w={36} h={24} />
+          <Bone w={64} h={10} />
+        </div>
+      ))}
     </div>
   )
 }
@@ -344,6 +405,8 @@ function Agenda({ onOpenAgenda, onOpenEvent }) {
 
 // ── FunnelSummary ─────────────────────────────────────────────────
 function FunnelSummary({ onOpenKanban }) {
+  const { rows, loading } = useFunnelCounts()
+
   return (
     <div style={{ margin: '0 16px' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 8 }}>
@@ -351,7 +414,7 @@ function FunnelSummary({ onOpenKanban }) {
         <button onClick={() => onOpenKanban()} style={{ fontSize: 12, color: 'var(--kiuvo-blue)', fontWeight: 500 }}>Ver kanban →</button>
       </div>
       <div className="card">
-        {MOCK_FUNNEL.map((row, i) => {
+        {(loading ? STAGES.map(s => ({ id: s.id, count: null, risk: 0, stuck: 0 })) : rows).map((row, i) => {
           const s = STAGE_BY_ID[row.id]
           return (
             <button key={row.id} onClick={() => onOpenKanban(row.id)} style={{
@@ -364,7 +427,7 @@ function FunnelSummary({ onOpenKanban }) {
               <StageDot stage={row.id} />
               <span style={{ fontSize: 13, color: 'var(--fg)' }}>{s.label}</span>
               <div style={{ flex: 1 }} />
-              {row.risk > 0 && (
+              {!loading && row.risk > 0 && (
                 <span style={{
                   display: 'inline-flex', alignItems: 'center', gap: 3,
                   fontSize: 11, fontWeight: 500, color: 'var(--warning-fg)',
@@ -375,7 +438,7 @@ function FunnelSummary({ onOpenKanban }) {
                   {row.risk}
                 </span>
               )}
-              {row.stuck > 0 && (
+              {!loading && row.stuck > 0 && (
                 <span style={{
                   display: 'inline-flex', alignItems: 'center', gap: 3,
                   fontSize: 11, fontWeight: 500, color: 'var(--danger)',
@@ -386,7 +449,11 @@ function FunnelSummary({ onOpenKanban }) {
                   {row.stuck}
                 </span>
               )}
-              <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg)', minWidth: 18, textAlign: 'right' }}>{row.count}</span>
+              {loading ? (
+                <div style={{ width: 20, height: 14, borderRadius: 4, background: 'var(--bg-secondary)' }} />
+              ) : (
+                <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg)', minWidth: 18, textAlign: 'right' }}>{row.count}</span>
+              )}
               <Icon name="chevron-right" size={14} color="var(--fg-tertiary)" />
             </button>
           )
@@ -416,17 +483,24 @@ function ReactivatorBanner({ onOpen }) {
 }
 
 // ── Dashboard (main export) ───────────────────────────────────────
-export default function Dashboard({ profile, metaState = 'mid', alertHero = false, dark, onToggleDark, onOpenKanban, onRegisterVisit, onNewProspect, onOpenNotifications, onQuote, onWhatsApp, onOpenAgenda, onOpenAgendaEvent, onOpenReactivador }) {
+export default function Dashboard({ profile, metaState = 'mid', alertHero = false, dark, onToggleDark, onOpenKanban, onRegisterVisit, onNewProspect, onOpenNotifications, onQuote, onWhatsApp, onOpenAgenda, onOpenAgendaEvent, onOpenReactivador, unreadCount = 0 }) {
+  // Brief skeleton on first mount so data sections animate in together
+  const [booting, setBooting] = useState(true)
+  useEffect(() => {
+    const t = setTimeout(() => setBooting(false), 650)
+    return () => clearTimeout(t)
+  }, [])
+
   return (
     <div style={{ paddingBottom: 92, paddingTop: 4, display: 'flex', flexDirection: 'column', gap: 14, background: 'var(--bg)', minHeight: '100%' }}>
-      <Header profile={profile} onOpenNotifications={onOpenNotifications} dark={dark} onToggleDark={onToggleDark} />
-      <MetaCard state={metaState} />
-      <DayStats />
-      <FollowupAlert hero={alertHero} onOpen={onOpenKanban} />
+      <Header profile={profile} onOpenNotifications={onOpenNotifications} dark={dark} onToggleDark={onToggleDark} unreadCount={unreadCount} />
+      {booting ? <MetaCardSkeleton /> : <MetaCard state={metaState} />}
+      {booting ? <DayStatsSkeleton /> : <DayStats />}
+      {!booting && <FollowupAlert hero={alertHero} onOpen={onOpenKanban} />}
       <QuickActions onRegisterVisit={onRegisterVisit} onNewProspect={onNewProspect} onQuote={onQuote} onWhatsApp={onWhatsApp} />
       <Agenda onOpenAgenda={onOpenAgenda} onOpenEvent={onOpenAgendaEvent} />
       <FunnelSummary onOpenKanban={onOpenKanban} />
-      <ReactivatorBanner onOpen={onOpenReactivador} />
+      {!booting && <ReactivatorBanner onOpen={onOpenReactivador} />}
       <div style={{ height: 4 }} />
     </div>
   )

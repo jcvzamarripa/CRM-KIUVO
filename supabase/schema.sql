@@ -1,25 +1,34 @@
 -- KIUVO CRM — Supabase schema
 -- Run this in the Supabase SQL editor
+-- If the project already exists, run supabase/rls.sql instead to update policies only.
+
+-- ─── Helper ────────────────────────────────────────────────────────
+-- Security definer avoids recursive RLS lookups on profiles
+create or replace function public.is_admin()
+returns boolean language sql security definer stable
+as $$ select exists (select 1 from public.profiles where id = auth.uid() and role = 'admin') $$;
 
 -- ─── Profiles ─────────────────────────────────────────────────────
 create table if not exists public.profiles (
-  id          uuid references auth.users(id) on delete cascade primary key,
-  full_name   text not null,
-  initials    text not null check (char_length(initials) <= 3),
-  role        text not null check (role in ('admin', 'seller')),
+  id           uuid references auth.users(id) on delete cascade primary key,
+  full_name    text not null,
+  initials     text not null check (char_length(initials) <= 3),
+  role         text not null check (role in ('admin', 'seller')),
+  position     text,                          -- display title, e.g. "Vendedor de campo"
   avatar_color text default '#185FA5',
-  goal_amount numeric default 100000,
-  created_at  timestamptz default now()
+  avatar_url   text,                          -- Supabase Storage public URL
+  goal_amount  numeric default 100000,
+  created_at   timestamptz default now()
 );
 alter table public.profiles enable row level security;
-create policy "Users can read their own profile"
-  on profiles for select using (auth.uid() = id);
-create policy "Users can update their own profile"
-  on profiles for update using (auth.uid() = id);
-create policy "Admins can read all profiles"
-  on profiles for select using (
-    exists (select 1 from profiles where id = auth.uid() and role = 'admin')
-  );
+create policy "profiles: select own or admin"
+  on profiles for select using (auth.uid() = id or is_admin());
+create policy "profiles: update own or admin"
+  on profiles for update using (auth.uid() = id or is_admin());
+create policy "profiles: insert admin only"
+  on profiles for insert with check (is_admin());
+create policy "profiles: delete admin only"
+  on profiles for delete using (is_admin());
 
 -- ─── Stages ────────────────────────────────────────────────────────
 create table if not exists public.stages (
@@ -31,10 +40,8 @@ create table if not exists public.stages (
   updated_at  timestamptz default now()
 );
 alter table public.stages enable row level security;
-create policy "All users can read stages" on stages for select using (true);
-create policy "Admins can update stages" on stages for all using (
-  exists (select 1 from profiles where id = auth.uid() and role = 'admin')
-);
+create policy "stages: select authenticated" on stages for select using (auth.uid() is not null);
+create policy "stages: all admin only" on stages for all using (is_admin());
 
 -- Seed default stages
 insert into stages (id, label, color, min_visits, order_index) values
@@ -66,34 +73,35 @@ create table if not exists public.prospects (
   updated_at      timestamptz default now()
 );
 alter table public.prospects enable row level security;
-create policy "Sellers see their own prospects"
-  on prospects for select using (owner_id = auth.uid());
-create policy "Admins see all prospects"
-  on prospects for select using (
-    exists (select 1 from profiles where id = auth.uid() and role = 'admin')
-  );
-create policy "Sellers can manage their prospects"
-  on prospects for all using (owner_id = auth.uid());
+create policy "prospects: select owner or admin"
+  on prospects for select using (owner_id = auth.uid() or is_admin());
+create policy "prospects: insert own"
+  on prospects for insert with check (owner_id = auth.uid());
+create policy "prospects: update owner or admin"
+  on prospects for update using (owner_id = auth.uid() or is_admin());
+create policy "prospects: delete admin only"
+  on prospects for delete using (is_admin());
 
 -- ─── Visits ────────────────────────────────────────────────────────
 create table if not exists public.visits (
   id           uuid primary key default gen_random_uuid(),
   prospect_id  uuid references prospects(id) on delete cascade,
   seller_id    uuid references profiles(id),
+  kind         text not null check (kind in ('visit', 'call', 'whatsapp', 'email')) default 'visit',
   lat          numeric,
   lng          numeric,
   notes        text,
   created_at   timestamptz default now()
 );
 alter table public.visits enable row level security;
-create policy "Sellers see their own visits"
-  on visits for select using (seller_id = auth.uid());
-create policy "Sellers can insert visits"
+create policy "visits: select own or admin"
+  on visits for select using (seller_id = auth.uid() or is_admin());
+create policy "visits: insert own"
   on visits for insert with check (seller_id = auth.uid());
-create policy "Admins see all visits"
-  on visits for select using (
-    exists (select 1 from profiles where id = auth.uid() and role = 'admin')
-  );
+create policy "visits: update own or admin"
+  on visits for update using (seller_id = auth.uid() or is_admin());
+create policy "visits: delete admin only"
+  on visits for delete using (is_admin());
 
 -- ─── Activities (feed) ─────────────────────────────────────────────
 create table if not exists public.activities (
@@ -105,10 +113,12 @@ create table if not exists public.activities (
   created_at   timestamptz default now()
 );
 alter table public.activities enable row level security;
-create policy "All authenticated users can read activities"
-  on activities for select using (auth.uid() is not null);
-create policy "Sellers can insert activities"
+create policy "activities: select own or admin"
+  on activities for select using (seller_id = auth.uid() or is_admin());
+create policy "activities: insert own"
   on activities for insert with check (seller_id = auth.uid());
+create policy "activities: delete admin only"
+  on activities for delete using (is_admin());
 
 -- ─── Weekly goals ──────────────────────────────────────────────────
 create table if not exists public.weekly_goals (
@@ -120,12 +130,14 @@ create table if not exists public.weekly_goals (
   unique(seller_id, week_start)
 );
 alter table public.weekly_goals enable row level security;
-create policy "Users can see their own goals"
-  on weekly_goals for select using (seller_id = auth.uid());
-create policy "Admins can see all goals"
-  on weekly_goals for all using (
-    exists (select 1 from profiles where id = auth.uid() and role = 'admin')
-  );
+create policy "weekly_goals: select own or admin"
+  on weekly_goals for select using (seller_id = auth.uid() or is_admin());
+create policy "weekly_goals: insert own"
+  on weekly_goals for insert with check (seller_id = auth.uid());
+create policy "weekly_goals: update own or admin"
+  on weekly_goals for update using (seller_id = auth.uid() or is_admin());
+create policy "weekly_goals: delete admin only"
+  on weekly_goals for delete using (is_admin());
 
 -- ─── Stage history ─────────────────────────────────────────────────
 create table if not exists public.stage_history (
@@ -137,9 +149,12 @@ create table if not exists public.stage_history (
   created_at    timestamptz default now()
 );
 alter table public.stage_history enable row level security;
-create policy "All authenticated users can read stage history"
-  on stage_history for select using (auth.uid() is not null);
-create policy "Sellers can insert stage history"
+create policy "stage_history: select own prospects or admin"
+  on stage_history for select using (
+    is_admin() or
+    exists (select 1 from prospects where id = prospect_id and owner_id = auth.uid())
+  );
+create policy "stage_history: insert own"
   on stage_history for insert with check (moved_by = auth.uid());
 
 -- ─── Trigger: auto-create profile on signup ────────────────────────
@@ -161,8 +176,107 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
 
+-- ─── Quotes ────────────────────────────────────────────────────────
+create table if not exists public.quotes (
+  id           uuid primary key default gen_random_uuid(),
+  prospect_id  uuid references prospects(id) on delete cascade,
+  seller_id    uuid references profiles(id),
+  status       text not null check (status in ('draft', 'sent', 'approved', 'rejected')) default 'draft',
+  total        numeric not null default 0,
+  notes        text,
+  created_at   timestamptz default now(),
+  updated_at   timestamptz default now()
+);
+alter table public.quotes enable row level security;
+create policy "quotes: select own or admin"
+  on quotes for select using (seller_id = auth.uid() or is_admin());
+create policy "quotes: insert own"
+  on quotes for insert with check (seller_id = auth.uid());
+create policy "quotes: update own or admin"
+  on quotes for update using (seller_id = auth.uid() or is_admin());
+create policy "quotes: delete own drafts or admin"
+  on quotes for delete using (
+    (seller_id = auth.uid() and status = 'draft') or is_admin()
+  );
+
+-- ─── Quote items ────────────────────────────────────────────────────
+create table if not exists public.quote_items (
+  id           uuid primary key default gen_random_uuid(),
+  quote_id     uuid references quotes(id) on delete cascade,
+  product_name text not null,
+  sku          text,
+  unit         text,
+  quantity     numeric not null default 1,
+  unit_price   numeric not null default 0,
+  subtotal     numeric generated always as (quantity * unit_price) stored,
+  created_at   timestamptz default now()
+);
+alter table public.quote_items enable row level security;
+create policy "quote_items: select via quote owner or admin"
+  on quote_items for select using (
+    is_admin() or
+    exists (select 1 from quotes where id = quote_id and seller_id = auth.uid())
+  );
+create policy "quote_items: insert via own quote"
+  on quote_items for insert with check (
+    exists (select 1 from quotes where id = quote_id and seller_id = auth.uid())
+  );
+create policy "quote_items: update via own quote or admin"
+  on quote_items for update using (
+    is_admin() or
+    exists (select 1 from quotes where id = quote_id and seller_id = auth.uid())
+  );
+create policy "quote_items: delete via own quote or admin"
+  on quote_items for delete using (
+    is_admin() or
+    exists (select 1 from quotes where id = quote_id and seller_id = auth.uid())
+  );
+
+-- ─── Notifications ──────────────────────────────────────────────────
+create table if not exists public.notifications (
+  id           uuid primary key default gen_random_uuid(),
+  user_id      uuid references profiles(id) on delete cascade,
+  kind         text not null, -- inactivity, pending_visit, agenda_reminder, quote_status
+  title        text not null,
+  body         text,
+  read         boolean not null default false,
+  prospect_id  uuid references prospects(id) on delete set null,
+  created_at   timestamptz default now()
+);
+alter table public.notifications enable row level security;
+create policy "notifications: select own"
+  on notifications for select using (user_id = auth.uid());
+create policy "notifications: update own"
+  on notifications for update using (user_id = auth.uid());
+-- DB triggers use security definer and bypass RLS; admin can insert manually
+create policy "notifications: insert admin only"
+  on notifications for insert with check (is_admin());
+create policy "notifications: delete own or admin"
+  on notifications for delete using (user_id = auth.uid() or is_admin());
+
 -- ─── View: visit counts per prospect ──────────────────────────────
 create or replace view public.prospect_visit_counts as
   select prospect_id, count(*) as total_visits
   from visits
   group by prospect_id;
+
+-- ─── Storage: avatars bucket ────────────────────────────────────────
+insert into storage.buckets (id, name, public)
+  values ('avatars', 'avatars', true)
+  on conflict (id) do nothing;
+
+create policy "avatars: insert own"
+  on storage.objects for insert
+  with check (bucket_id = 'avatars' and auth.uid()::text = (storage.foldername(name))[1]);
+
+create policy "avatars: update own"
+  on storage.objects for update
+  using (bucket_id = 'avatars' and auth.uid()::text = (storage.foldername(name))[1]);
+
+create policy "avatars: delete own"
+  on storage.objects for delete
+  using (bucket_id = 'avatars' and auth.uid()::text = (storage.foldername(name))[1]);
+
+create policy "avatars: public read"
+  on storage.objects for select
+  using (bucket_id = 'avatars');

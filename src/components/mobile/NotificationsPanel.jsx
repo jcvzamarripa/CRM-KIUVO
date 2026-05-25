@@ -1,71 +1,39 @@
-import React, { useState } from 'react'
+import React from 'react'
 import Icon from '../shared/Icon'
 
-const INITIAL = [
-  {
-    id: 1, read: false, type: 'warning',
-    title: 'Seguimiento urgente',
-    body: 'Refaccionaria El Bajío lleva 24 días en Presentación sin avance.',
-    time: 'hace 5 min',
-    action: { screen: 'embudo', stage: 'presentacion', label: 'Ver en embudo' },
-  },
-  {
-    id: 2, read: false, type: 'warning',
-    title: 'Sin contacto reciente',
-    body: 'Materiales Pacífico lleva 11 días sin visita ni llamada.',
-    time: 'hace 1 h',
-    action: { screen: 'embudo', stage: 'cotizacion', label: 'Ver prospecto' },
-  },
-  {
-    id: 3, read: false, type: 'info',
-    title: 'Meta al 68%',
-    body: 'Quedan 3 días para cerrar la semana. ¡Buen ritmo, sigue así!',
-    time: 'hace 2 h',
-    action: { screen: 'inicio', label: 'Ver dashboard' },
-  },
-  {
-    id: 4, read: true, type: 'danger',
-    title: 'Prospecto estancado',
-    body: 'Plomería Industrial Vega no tiene visitas registradas desde que ingresó.',
-    time: 'ayer',
-    action: { screen: 'embudo', stage: 'prospeccion', label: 'Ver en embudo' },
-  },
-  {
-    id: 5, read: true, type: 'success',
-    title: '¡Cierre registrado!',
-    body: 'Constructora ABC — $24,500 marcado como ganado.',
-    time: 'ayer',
-    action: { screen: 'embudo', stage: 'cierre', label: 'Ver cierre' },
-  },
-  {
-    id: 6, read: true, type: 'info',
-    title: 'Nueva cotización',
-    body: 'Distribuidora Norte solicitó cotización por $42,800.',
-    time: 'hace 2 días',
-    action: { screen: 'embudo', stage: 'cotizacion', label: 'Ver cotización' },
-  },
-]
-
-const TYPE = {
-  warning: { bg: 'var(--warning-bg)',  border: 'var(--warning-border)', dot: 'var(--warning)',  iconBg: '#FAC775', iconColor: 'var(--warning-fg)', icon: 'alert-triangle' },
-  danger:  { bg: 'var(--danger-bg)',   border: 'var(--danger-border)',  dot: 'var(--danger)',   iconBg: '#FACACA', iconColor: 'var(--danger)',    icon: 'alert-circle'   },
-  success: { bg: 'var(--success-bg)',  border: 'var(--success)',        dot: 'var(--success)',  iconBg: '#B8E3D2', iconColor: 'var(--success)',   icon: 'circle-check'   },
-  info:    { bg: 'var(--kiuvo-blue-soft)', border: 'var(--kiuvo-blue-mid)', dot: 'var(--kiuvo-blue)', iconBg: 'var(--kiuvo-blue-mid)', iconColor: 'var(--kiuvo-blue-deep)', icon: 'info-circle' },
+const KIND_TYPE = {
+  inactivity:      'warning',
+  pending_visit:   'danger',
+  agenda_reminder: 'info',
+  quote_status:    'success',
 }
 
-// ── Inline SVG icons (CDN-independent) ───────────────────────────
-function BellSvg({ size = 18, color = 'currentColor' }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-    </svg>
-  )
+const KIND_ACTION = {
+  inactivity:      { screen: 'embudo',  label: 'Ver en embudo' },
+  pending_visit:   { screen: 'agenda',  label: 'Ver agenda' },
+  agenda_reminder: { screen: 'agenda',  label: 'Ver agenda' },
+  quote_status:    { screen: 'embudo',  stage: 'cotizacion', label: 'Ver cotización' },
+}
+
+const TYPE = {
+  warning: { bg: 'var(--warning-bg)',       border: 'var(--warning-border)',    dot: 'var(--warning)',      iconBg: '#FAC775',               iconColor: 'var(--warning-fg)',      icon: 'alert-triangle' },
+  danger:  { bg: 'var(--danger-bg)',        border: 'var(--danger-border)',     dot: 'var(--danger)',       iconBg: '#FACACA',               iconColor: 'var(--danger)',          icon: 'alert-circle'   },
+  success: { bg: 'var(--success-bg)',       border: 'var(--success)',           dot: 'var(--success)',      iconBg: '#B8E3D2',               iconColor: 'var(--success)',         icon: 'circle-check'   },
+  info:    { bg: 'var(--kiuvo-blue-soft)',  border: 'var(--kiuvo-blue-mid)',    dot: 'var(--kiuvo-blue)',   iconBg: 'var(--kiuvo-blue-mid)', iconColor: 'var(--kiuvo-blue-deep)', icon: 'info-circle'    },
+}
+
+function fmtTime(ts) {
+  if (!ts) return ''
+  const diff = (Date.now() - new Date(ts)) / 1000
+  if (diff < 60)     return 'ahora'
+  if (diff < 3600)   return `hace ${Math.floor(diff / 60)} min`
+  if (diff < 86400)  return `hace ${Math.floor(diff / 3600)} h`
+  if (diff < 172800) return 'ayer'
+  return `hace ${Math.floor(diff / 86400)} días`
 }
 
 function TypeIcon({ type, size = 16 }) {
-  const t = TYPE[type]
+  const t = TYPE[type] ?? TYPE.info
   const icons = {
     'alert-triangle': (
       <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -98,33 +66,36 @@ function TypeIcon({ type, size = 16 }) {
   )
 }
 
-export default function NotificationsPanel({ onClose, onNavigate }) {
-  const [items, setItems] = useState(INITIAL)
+function SkeletonItem() {
+  return (
+    <div style={{ padding: '12px', background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)', display: 'flex', gap: 12 }}>
+      <div style={{ width: 32, height: 32, borderRadius: 'var(--r-md)', background: 'var(--bg-secondary)', flexShrink: 0 }} />
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ width: '60%', height: 12, borderRadius: 4, background: 'var(--bg-secondary)' }} />
+        <div style={{ width: '90%', height: 11, borderRadius: 4, background: 'var(--bg-secondary)' }} />
+      </div>
+    </div>
+  )
+}
 
-  const unread = items.filter(n => !n.read).length
-
-  const markRead = id => setItems(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
-  const markAll  = () => setItems(prev => prev.map(n => ({ ...n, read: true })))
-
+export default function NotificationsPanel({ onClose, onNavigate, items, loading, unreadCount, markRead, markAll }) {
   function handleTap(n) {
     markRead(n.id)
-    if (n.action) {
-      onNavigate?.(n.action)
+    const action = KIND_ACTION[n.kind]
+    if (action) {
+      onNavigate?.(action)
       onClose()
     }
   }
 
   return (
     <>
-      {/* Backdrop */}
       <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100 }} />
 
-      {/* Panel */}
       <div style={{
         position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 101,
         background: 'var(--bg)', borderRadius: '20px 20px 0 0',
-        maxHeight: '88%', display: 'flex', flexDirection: 'column',
-        overflow: 'hidden',
+        maxHeight: '88%', display: 'flex', flexDirection: 'column', overflow: 'hidden',
       }}>
         {/* Handle */}
         <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 2px' }}>
@@ -135,17 +106,16 @@ export default function NotificationsPanel({ onClose, onNavigate }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px 12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--fg)' }}>Notificaciones</div>
-            {unread > 0 && (
+            {unreadCount > 0 && (
               <span style={{
                 minWidth: 20, height: 20, padding: '0 5px', borderRadius: 10,
-                background: '#E24B4A', color: '#fff',
-                fontSize: 11, fontWeight: 500,
+                background: '#E24B4A', color: '#fff', fontSize: 11, fontWeight: 500,
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              }}>{unread}</span>
+              }}>{unreadCount}</span>
             )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {unread > 0 && (
+            {unreadCount > 0 && (
               <button onClick={markAll} style={{ fontSize: 12, color: 'var(--kiuvo-blue)', fontWeight: 500 }}>
                 Marcar todo leído
               </button>
@@ -163,49 +133,55 @@ export default function NotificationsPanel({ onClose, onNavigate }) {
 
         {/* List */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px 24px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {items.map(n => {
-            const t = TYPE[n.type]
-            return (
-              <button
-                key={n.id}
-                onClick={() => handleTap(n)}
-                style={{
-                  display: 'flex', alignItems: 'flex-start', gap: 12,
-                  padding: '12px 12px',
-                  background: n.read ? 'var(--surface)' : t.bg,
-                  border: `0.5px solid ${n.read ? 'var(--border)' : t.border}`,
-                  borderRadius: 'var(--r-md)', textAlign: 'left',
-                  position: 'relative', overflow: 'hidden',
-                }}
-              >
-                {/* Unread stripe */}
-                {!n.read && (
-                  <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: t.dot }} />
-                )}
-
-                <TypeIcon type={n.type} size={16} />
-
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginBottom: 3 }}>
-                    <div style={{ fontSize: 13, fontWeight: n.read ? 400 : 600, color: 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {n.title}
-                    </div>
-                    <div style={{ fontSize: 10, color: 'var(--fg-tertiary)', flexShrink: 0 }}>{n.time}</div>
-                  </div>
-                  <div style={{ fontSize: 12, color: 'var(--fg-secondary)', lineHeight: 1.4 }}>{n.body}</div>
-                  {n.action && (
-                    <div style={{
-                      marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 4,
-                      fontSize: 11, fontWeight: 600, color: t.iconColor,
-                    }}>
-                      {n.action.label}
-                      <Icon name="chevron-right" size={12} color={t.iconColor} />
-                    </div>
+          {loading ? (
+            [1, 2, 3].map(i => <SkeletonItem key={i} />)
+          ) : items.length === 0 ? (
+            <div style={{ padding: '48px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, color: 'var(--fg-tertiary)' }}>
+              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+              </svg>
+              <div style={{ fontSize: 13 }}>Sin notificaciones por ahora</div>
+            </div>
+          ) : (
+            items.map(n => {
+              const type = KIND_TYPE[n.kind] ?? 'info'
+              const t    = TYPE[type]
+              return (
+                <button
+                  key={n.id}
+                  onClick={() => handleTap(n)}
+                  style={{
+                    display: 'flex', alignItems: 'flex-start', gap: 12,
+                    padding: '12px',
+                    background: n.read ? 'var(--surface)' : t.bg,
+                    border: `0.5px solid ${n.read ? 'var(--border)' : t.border}`,
+                    borderRadius: 'var(--r-md)', textAlign: 'left',
+                    position: 'relative', overflow: 'hidden',
+                  }}
+                >
+                  {!n.read && (
+                    <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: t.dot }} />
                   )}
-                </div>
-              </button>
-            )
-          })}
+                  <TypeIcon type={type} size={16} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginBottom: 3 }}>
+                      <div style={{ fontSize: 13, fontWeight: n.read ? 400 : 600, color: 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {n.title}
+                      </div>
+                      <div style={{ fontSize: 10, color: 'var(--fg-tertiary)', flexShrink: 0 }}>{fmtTime(n.created_at)}</div>
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--fg-secondary)', lineHeight: 1.4 }}>{n.body}</div>
+                    {KIND_ACTION[n.kind] && (
+                      <div style={{ marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: t.iconColor }}>
+                        {KIND_ACTION[n.kind].label}
+                        <Icon name="chevron-right" size={12} color={t.iconColor} />
+                      </div>
+                    )}
+                  </div>
+                </button>
+              )
+            })
+          )}
         </div>
       </div>
     </>

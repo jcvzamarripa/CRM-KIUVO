@@ -1,8 +1,17 @@
 node_modules/
 dist/
+
+# ── Archivos de entorno (contienen credenciales reales) ───────────────────────
+# El único archivo que SÍ se commitea es .env.example
 .env
 .env.local
+.env.development
+.env.staging
+.env.production
 .env.*.local
+.env.linear
+
+# ── Logs y archivos de sistema ────────────────────────────────────────────────
 *.log
 .DS_Store
 Thumbs.db

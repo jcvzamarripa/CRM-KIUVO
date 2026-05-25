@@ -74,3 +74,26 @@ html, body, #root {
 
 /* Transitions */
 .kiuvo button:active { opacity: 0.75; }
+
+/* ── Leaflet overrides ───────────────────────────────────────────────────────
+   The .kiuvo * reset can break Leaflet's internal DOM.
+   These rules restore what Leaflet needs to render tiles correctly.        */
+.leaflet-container {
+  font-family: inherit;
+}
+.leaflet-container img.leaflet-tile {
+  /* Prevent global img resets (max-width, border-radius, etc.) */
+  max-width: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+.leaflet-pane,
+.leaflet-pane > svg,
+.leaflet-pane > canvas,
+.leaflet-zoom-box,
+.leaflet-image-layer,
+.leaflet-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+}

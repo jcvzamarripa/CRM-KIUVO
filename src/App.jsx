@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { StagesProvider } from './contexts/StagesContext'
+import { ToastProvider } from './contexts/ToastContext'
 import Login from './pages/Login'
 import MobileApp from './pages/MobileApp'
 import AdminApp from './pages/AdminApp'
+import OfflineBanner from './components/shared/OfflineBanner'
+import ToastManager from './components/shared/ToastManager'
+import ErrorBoundary from './components/shared/ErrorBoundary'
 
 function AppRoutes() {
   const { user, profile, loading } = useAuth()
@@ -51,7 +56,7 @@ function AppRoutes() {
         <Route path="/admin" element={
           !user ? <Navigate to="/login" replace /> : (
             <div style={{ height: '100vh' }}>
-              <AdminApp dark={dark} />
+              <AdminApp dark={dark} onToggleDark={() => setDark(d => !d)} />
             </div>
           )
         } />
@@ -64,7 +69,15 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppRoutes />
+      <StagesProvider>
+        <ToastProvider>
+          <OfflineBanner />
+          <ToastManager />
+          <ErrorBoundary>
+            <AppRoutes />
+          </ErrorBoundary>
+        </ToastProvider>
+      </StagesProvider>
     </AuthProvider>
   )
 }

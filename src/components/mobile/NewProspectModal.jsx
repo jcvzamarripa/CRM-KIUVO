@@ -1,5 +1,10 @@
 import React, { useState, useRef } from 'react'
 import Icon from '../shared/Icon'
+import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../contexts/AuthContext'
+import { rules } from '../../lib/validation'
+import { enqueue } from '../../lib/offlineQueue'
+import useOnlineStatus from '../../hooks/useOnlineStatus'
 
 const EMPLOYEE_RANGES = ['1–10', '11–50', '51–200', '201–500', '500+']
 
@@ -53,36 +58,64 @@ function Field({ icon, label, children, error }) {
   )
 }
 
+async function nominatimGeocode(address) {
+  const res = await fetch(
+    `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1&accept-language=es`,
+    { headers: { 'User-Agent': 'KIUVO-CRM/1.0' } }
+  )
+  const data = await res.json()
+  if (data[0]) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) }
+  return null
+}
+
 // ── LocationField ─────────────────────────────────────────────────
-function LocationField({ value, onChange }) {
-  const [gpsState, setGpsState] = useState('idle') // idle | loading | done | error
+function LocationField({ value, onChange, onCoords }) {
+  const [gpsState,  setGpsState]  = useState('idle') // idle | loading | done | error
+  const [geocoding, setGeocoding] = useState(false)
+  const [geocoded,  setGeocoded]  = useState(false)
 
   const handleGPS = () => {
-    if (!navigator.geolocation) {
-      setGpsState('error')
-      return
-    }
+    if (!navigator.geolocation) { setGpsState('error'); return }
     setGpsState('loading')
     navigator.geolocation.getCurrentPosition(
       async pos => {
-        const { latitude, longitude } = pos.coords
+        const { latitude: lat, longitude: lng } = pos.coords
         try {
           const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=es`,
-            { headers: { 'Accept-Language': 'es' } }
+            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+            { headers: { 'User-Agent': 'KIUVO-CRM/1.0' } }
           )
           const data = await res.json()
-          const addr = data.display_name || `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`
+          const addr = data.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`
           onChange(addr)
           setGpsState('done')
         } catch {
-          onChange(`${latitude.toFixed(5)}, ${longitude.toFixed(5)}`)
+          onChange(`${lat.toFixed(5)}, ${lng.toFixed(5)}`)
           setGpsState('done')
         }
+        onCoords?.({ lat, lng })
+        setGeocoded(true)
       },
       () => setGpsState('error'),
       { timeout: 10000 }
     )
+  }
+
+  async function handleBlur() {
+    if (!value.trim() || geocoding || gpsState === 'done') return
+    setGeocoding(true)
+    try {
+      const coords = await nominatimGeocode(value)
+      if (coords) { onCoords?.(coords); setGeocoded(true) }
+    } catch {}
+    setGeocoding(false)
+  }
+
+  function handleChange(e) {
+    onChange(e.target.value)
+    onCoords?.(null)
+    setGeocoded(false)
+    if (gpsState !== 'idle') setGpsState('idle')
   }
 
   const gpsColor = gpsState === 'done' ? 'var(--success)' : gpsState === 'error' ? 'var(--danger)' : 'var(--kiuvo-blue)'
@@ -99,7 +132,8 @@ function LocationField({ value, onChange }) {
           <Icon name="map-pin" size={15} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--fg-tertiary)', pointerEvents: 'none' }} />
           <input
             value={value}
-            onChange={e => onChange(e.target.value)}
+            onChange={handleChange}
+            onBlur={handleBlur}
             placeholder="Dirección o usa el GPS →"
             style={inputStyle}
           />
@@ -127,6 +161,19 @@ function LocationField({ value, onChange }) {
         </button>
       </div>
 
+      {/* Geocoding status */}
+      {geocoding && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 5, fontSize: 11, color: 'var(--fg-tertiary)' }}>
+          <Icon name="loader" size={12} style={{ animation: 'spin 0.8s linear infinite' }} />
+          Buscando coordenadas…
+        </div>
+      )}
+      {!geocoding && geocoded && gpsState !== 'done' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 5, fontSize: 11, color: 'var(--success)' }}>
+          <Icon name="map-pin" size={12} color="var(--success)" />
+          Ubicación geocodificada
+        </div>
+      )}
       {gpsState === 'error' && (
         <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4 }}>
           No se pudo obtener la ubicación. Escríbela manualmente.
@@ -229,31 +276,98 @@ function PhotoField({ photo, onPhoto }) {
 }
 
 // ── Main component ─────────────────────────────────────────────────
-export default function NewProspectModal({ onClose }) {
-  const [step, setStep] = useState('form')
-  const [form, setForm] = useState({
+export default function NewProspectModal({ onClose, onCreated }) {
+  const { user } = useAuth()
+  const isOnline = useOnlineStatus()
+  const [step, setStep]           = useState('form')
+  const [form, setForm]           = useState({
     clientName: '', businessName: '', phone: '',
     email: '', location: '', employees: '',
   })
-  const [photo, setPhoto] = useState(null)
-  const [errors, setErrors] = useState({})
+  const [photo, setPhoto]         = useState(null)
+  const [locCoords, setLocCoords] = useState(null)
+  const [errors, setErrors]       = useState({})
+  const [loading, setLoading]     = useState(false)
+  const [serverError, setServerError] = useState('')
+  const [savedOffline, setSavedOffline] = useState(false)
 
   const set = key => e => {
     setForm(f => ({ ...f, [key]: e.target.value }))
     if (errors[key]) setErrors(e2 => { const n = { ...e2 }; delete n[key]; return n })
+    if (serverError) setServerError('')
   }
 
   const validate = () => {
     const e = {}
     if (!form.clientName.trim())   e.clientName   = 'Requerido'
     if (!form.businessName.trim()) e.businessName = 'Requerido'
-    if (!form.phone.trim())        e.phone        = 'Requerido'
+
+    // Phone: required AND must have valid format
+    if (!form.phone.trim()) {
+      e.phone = 'Requerido'
+    } else {
+      const phoneErr = rules.phone(form.phone)
+      if (phoneErr) e.phone = phoneErr
+    }
+
+    // Email: optional, but if filled must be valid
+    const emailErr = rules.email(form.email)
+    if (emailErr) e.email = emailErr
+
     return e
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const e = validate()
     if (Object.keys(e).length) { setErrors(e); return }
+
+    setLoading(true)
+    setServerError('')
+
+    // Consolidate non-mapped fields into notes
+    const notesParts = []
+    if (form.clientName.trim())  notesParts.push('Contacto: ' + form.clientName.trim())
+    if (form.employees)          notesParts.push('Empleados: ' + form.employees)
+
+    const payload = {
+      name:      form.businessName.trim(),
+      company:   form.businessName.trim(),
+      phone:     form.phone.trim(),
+      email:     form.email.trim()    || null,
+      address:   form.location.trim() || null,
+      lat:       locCoords?.lat ?? null,
+      lng:       locCoords?.lng ?? null,
+      notes:     notesParts.length ? notesParts.join('\n') : null,
+      owner_id:  user.id,
+      stage_id:  'prospeccion',
+      health:    'green',
+      value:     0,
+    }
+
+    // ── Offline: enqueue locally ──────────────────────────────────────────
+    if (!isOnline) {
+      enqueue({ type: 'INSERT_PROSPECT', table: 'prospects', payload })
+      setLoading(false)
+      setSavedOffline(true)
+      setStep('success')
+      setTimeout(onClose, 2200)
+      return
+    }
+
+    // ── Online: send to Supabase ──────────────────────────────────────────
+    const { data, error } = await supabase.from('prospects').insert(payload).select().single()
+    setLoading(false)
+
+    if (error) {
+      // Network failed despite being "online" — enqueue as fallback
+      enqueue({ type: 'INSERT_PROSPECT', table: 'prospects', payload })
+      setSavedOffline(true)
+      setStep('success')
+      setTimeout(onClose, 2200)
+      return
+    }
+
+    onCreated?.(data)
     setStep('success')
     setTimeout(onClose, 1800)
   }
@@ -269,7 +383,7 @@ export default function NewProspectModal({ onClose }) {
         overflow: 'hidden',
       }}>
         {step === 'success' ? (
-          <SuccessView name={form.businessName || form.clientName} hasPhoto={!!photo} />
+          <SuccessView name={form.businessName || form.clientName} hasPhoto={!!photo} offline={savedOffline} />
         ) : (
           <>
             {/* Handle */}
@@ -322,20 +436,21 @@ export default function NewProspectModal({ onClose }) {
                 />
               </Field>
 
-              <Field label="CORREO ELECTRÓNICO" icon="mail">
+              <Field label="CORREO ELECTRÓNICO" icon="mail" error={errors.email}>
                 <input
                   value={form.email}
                   onChange={set('email')}
                   placeholder="Ej. contacto@negocio.com"
                   type="email"
                   inputMode="email"
-                  style={inputStyle}
+                  style={{ ...inputStyle, borderColor: errors.email ? 'var(--danger)' : 'var(--border)' }}
                 />
               </Field>
 
               <LocationField
                 value={form.location}
                 onChange={loc => setForm(f => ({ ...f, location: loc }))}
+                onCoords={setLocCoords}
               />
 
               {/* Employees */}
@@ -372,12 +487,33 @@ export default function NewProspectModal({ onClose }) {
 
             {/* Footer */}
             <div style={{ padding: '12px 16px 20px', borderTop: '0.5px solid var(--border)' }}>
-              <button onClick={handleSubmit} style={{
-                width: '100%', padding: '14px',
-                background: 'var(--kiuvo-blue)', color: '#fff',
-                borderRadius: 'var(--r-md)', fontSize: 15, fontWeight: 500,
-              }}>
-                Guardar prospecto
+              {serverError && (
+                <div style={{
+                  marginBottom: 10, padding: '10px 14px',
+                  background: 'var(--danger-bg)', border: '0.5px solid var(--danger-border)',
+                  borderRadius: 'var(--r-md)', fontSize: 13, color: 'var(--danger-fg)',
+                }}>
+                  {serverError}
+                </div>
+              )}
+              <button
+                onClick={handleSubmit}
+                disabled={loading}
+                style={{
+                  width: '100%', padding: '14px',
+                  background: 'var(--kiuvo-blue)', color: '#fff',
+                  borderRadius: 'var(--r-md)', fontSize: 15, fontWeight: 500,
+                  opacity: loading ? 0.75 : 1,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                }}
+              >
+                {loading && (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+                    style={{ animation: 'spin 0.7s linear infinite', flexShrink: 0 }}>
+                    <path d="M12 2a10 10 0 0 1 10 10" />
+                  </svg>
+                )}
+                {loading ? 'Guardando…' : 'Guardar prospecto'}
               </button>
             </div>
           </>
@@ -387,22 +523,31 @@ export default function NewProspectModal({ onClose }) {
   )
 }
 
-function SuccessView({ name, hasPhoto }) {
+function SuccessView({ name, hasPhoto, offline }) {
   return (
     <div style={{ padding: '40px 24px 56px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
       <div style={{
         width: 64, height: 64, borderRadius: '50%',
-        background: '#EAF3DE',
+        background: offline ? '#FFF3E0' : '#EAF3DE',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        <Icon name="user-plus" size={30} color="#3B6D11" />
+        <Icon name={offline ? 'cloud-off' : 'user-plus'} size={30} color={offline ? '#EF9F27' : '#3B6D11'} />
       </div>
       <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--fg)', textAlign: 'center' }}>
-        ¡Prospecto guardado!
+        {offline ? 'Guardado sin conexión' : '¡Prospecto guardado!'}
       </div>
       <div style={{ fontSize: 13, color: 'var(--fg-secondary)', textAlign: 'center', lineHeight: 1.5 }}>
-        <b style={{ color: 'var(--fg)' }}>{name}</b> fue agregado a tu embudo en Prospección.
-        {hasPhoto && <span> Foto de fachada adjunta.</span>}
+        {offline ? (
+          <>
+            <b style={{ color: 'var(--fg)' }}>{name}</b> está en cola.{' '}
+            <span style={{ color: '#EF9F27' }}>Se sincronizará con el servidor al reconectar.</span>
+          </>
+        ) : (
+          <>
+            <b style={{ color: 'var(--fg)' }}>{name}</b> fue agregado a tu embudo en Prospección.
+            {hasPhoto && <span> Foto de fachada adjunta.</span>}
+          </>
+        )}
       </div>
     </div>
   )

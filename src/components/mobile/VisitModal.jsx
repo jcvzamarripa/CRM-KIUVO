@@ -1,7 +1,12 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Icon from '../shared/Icon'
-import { MOCK_PROSPECTS } from '../../constants/mockData'
 import { STAGE_BY_ID } from '../../constants/stages'
+import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../contexts/AuthContext'
+import { enqueue } from '../../lib/offlineQueue'
+import useOnlineStatus from '../../hooks/useOnlineStatus'
+
+const PROSPECTS_CACHE_KEY = 'kiuvo_prospects_cache'
 
 const ACTIVITY_TYPES = [
   { id: 'visit',    label: 'Visita',    icon: 'map-pin' },
@@ -10,24 +15,90 @@ const ACTIVITY_TYPES = [
   { id: 'email',    label: 'Email',     icon: 'mail' },
 ]
 
-export default function VisitModal({ onClose }) {
-  const [step, setStep] = useState('form')
-  const [selected, setSelected] = useState(null)
-  const [actType, setActType] = useState('visit')
-  const [note, setNote] = useState('')
-  const [search, setSearch] = useState('')
+export default function VisitModal({ onClose, onSaved }) {
+  const { user } = useAuth()
+  const isOnline = useOnlineStatus()
+  const [step, setStep]             = useState('form')
+  const [selected, setSelected]     = useState(null)
+  const [actType, setActType]       = useState('visit')
+  const [note, setNote]             = useState('')
+  const [search, setSearch]         = useState('')
+  const [prospects, setProspects]   = useState([])
+  const [loadingList, setLoadingList] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [serverError, setServerError] = useState('')
+  const [savedOffline, setSavedOffline] = useState(false)
 
-  const prospects = MOCK_PROSPECTS.filter(p =>
+  // Load seller's prospects — fall back to cache when offline
+  useEffect(() => {
+    if (!isOnline) {
+      try {
+        const cached = JSON.parse(localStorage.getItem(PROSPECTS_CACHE_KEY) || '[]')
+        setProspects(cached)
+      } catch { setProspects([]) }
+      setLoadingList(false)
+      return
+    }
+
+    supabase
+      .from('prospects')
+      .select('id, name, stage_id')
+      .eq('owner_id', user.id)
+      .order('name')
+      .then(({ data }) => {
+        const list = data ?? []
+        setProspects(list)
+        setLoadingList(false)
+        // Keep cache fresh for offline use
+        try { localStorage.setItem(PROSPECTS_CACHE_KEY, JSON.stringify(list)) } catch {}
+      })
+  }, [user.id, isOnline])
+
+  const filtered = prospects.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase())
   )
 
-  const handleSubmit = () => {
-    if (selected === null) return
+  const handleSubmit = async () => {
+    if (!selected) return
+    setSubmitting(true)
+    setServerError('')
+
+    const payload = {
+      prospect_id: selected,
+      seller_id:   user.id,
+      kind:        actType,
+      notes:       note.trim() || null,
+    }
+
+    // ── Offline: enqueue locally ──────────────────────────────────────────
+    if (!isOnline) {
+      enqueue({ type: 'INSERT_VISIT', table: 'visits', payload })
+      setSubmitting(false)
+      setSavedOffline(true)
+      setStep('success')
+      setTimeout(onClose, 2200)
+      return
+    }
+
+    // ── Online: send to Supabase ──────────────────────────────────────────
+    const { error } = await supabase.from('visits').insert(payload)
+    setSubmitting(false)
+
+    if (error) {
+      // Network failed despite being "online" — enqueue as fallback
+      enqueue({ type: 'INSERT_VISIT', table: 'visits', payload })
+      setSavedOffline(true)
+      setStep('success')
+      setTimeout(onClose, 2200)
+      return
+    }
+
+    onSaved?.()
     setStep('success')
     setTimeout(onClose, 1800)
   }
 
-  const selectedProspect = MOCK_PROSPECTS.find(p => p.id === selected)
+  const selectedProspect = prospects.find(p => p.id === selected)
   const selectedAct = ACTIVITY_TYPES.find(a => a.id === actType)
 
   return (
@@ -46,14 +117,17 @@ export default function VisitModal({ onClose }) {
         overflow: 'hidden',
       }}>
         {step === 'success' ? (
-          <SuccessView prospect={selectedProspect} act={selectedAct} />
+          <SuccessView prospect={selectedProspect} act={selectedAct} offline={savedOffline} />
         ) : (
           <FormView
             search={search} setSearch={setSearch}
-            prospects={prospects}
+            prospects={filtered}
+            loadingList={loadingList}
             selected={selected} setSelected={setSelected}
             actType={actType} setActType={setActType}
             note={note} setNote={setNote}
+            submitting={submitting}
+            serverError={serverError}
             onClose={onClose}
             onSubmit={handleSubmit}
           />
@@ -63,28 +137,36 @@ export default function VisitModal({ onClose }) {
   )
 }
 
-function SuccessView({ prospect, act }) {
+function SuccessView({ prospect, act, offline }) {
   return (
     <div style={{ padding: '40px 24px 56px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
       <div style={{
         width: 64, height: 64, borderRadius: '50%',
-        background: 'var(--success-bg)',
+        background: offline ? '#FFF3E0' : 'var(--success-bg)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        <Icon name="check" size={32} color="var(--success)" />
+        <Icon name={offline ? 'cloud-off' : 'check'} size={32} color={offline ? '#EF9F27' : 'var(--success)'} />
       </div>
       <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--fg)', textAlign: 'center' }}>
-        ¡Actividad registrada!
+        {offline ? 'Guardado sin conexión' : '¡Actividad registrada!'}
       </div>
       <div style={{ fontSize: 13, color: 'var(--fg-secondary)', textAlign: 'center', lineHeight: 1.5 }}>
-        <b style={{ color: 'var(--fg)' }}>{act?.label}</b> con <b style={{ color: 'var(--fg)' }}>{prospect?.name}</b> guardada correctamente.
+        {offline
+          ? <>
+              <b style={{ color: 'var(--fg)' }}>{act?.label}</b> con <b style={{ color: 'var(--fg)' }}>{prospect?.name}</b> en cola.{' '}
+              <span style={{ color: '#EF9F27' }}>Se sincronizará al reconectar.</span>
+            </>
+          : <>
+              <b style={{ color: 'var(--fg)' }}>{act?.label}</b> con <b style={{ color: 'var(--fg)' }}>{prospect?.name}</b> guardada correctamente.
+            </>
+        }
       </div>
     </div>
   )
 }
 
-function FormView({ search, setSearch, prospects, selected, setSelected, actType, setActType, note, setNote, onClose, onSubmit }) {
-  const canSubmit = selected !== null
+function FormView({ search, setSearch, prospects, loadingList, selected, setSelected, actType, setActType, note, setNote, submitting, serverError, onClose, onSubmit }) {
+  const canSubmit = selected !== null && !submitting
 
   return (
     <>
@@ -161,12 +243,20 @@ function FormView({ search, setSearch, prospects, selected, setSelected, actType
 
           {/* List */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 210, overflowY: 'auto' }}>
-            {prospects.length === 0 ? (
+            {loadingList ? (
+              [1, 2, 3].map(i => (
+                <div key={i} style={{
+                  height: 52, borderRadius: 'var(--r-md)',
+                  background: 'var(--bg-secondary)', border: '0.5px solid var(--border)',
+                  opacity: 1 - i * 0.2,
+                }} />
+              ))
+            ) : prospects.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--fg-tertiary)', fontSize: 13 }}>
                 Sin resultados
               </div>
             ) : prospects.map(p => {
-              const stage = STAGE_BY_ID[p.stage]
+              const stage = STAGE_BY_ID[p.stage_id] ?? STAGE_BY_ID['prospeccion']
               const on = selected === p.id
               return (
                 <button
@@ -188,7 +278,7 @@ function FormView({ search, setSearch, prospects, selected, setSelected, actType
                       whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                     }}>{p.name}</div>
                     <div style={{ fontSize: 11, color: on ? 'var(--kiuvo-blue)' : 'var(--fg-secondary)' }}>
-                      {stage.label} · {p.visits} visita{p.visits !== 1 ? 's' : ''}
+                      {stage.label}
                     </div>
                   </div>
                   {on && <Icon name="check" size={15} color="var(--kiuvo-blue)" />}
@@ -220,6 +310,15 @@ function FormView({ search, setSearch, prospects, selected, setSelected, actType
 
       {/* Footer */}
       <div style={{ padding: '12px 16px 20px', borderTop: '0.5px solid var(--border)' }}>
+        {serverError && (
+          <div style={{
+            marginBottom: 10, padding: '10px 14px',
+            background: 'var(--danger-bg)', border: '0.5px solid var(--danger-border)',
+            borderRadius: 'var(--r-md)', fontSize: 13, color: 'var(--danger-fg)',
+          }}>
+            {serverError}
+          </div>
+        )}
         <button
           onClick={onSubmit}
           disabled={!canSubmit}
@@ -229,9 +328,17 @@ function FormView({ search, setSearch, prospects, selected, setSelected, actType
             color: canSubmit ? '#fff' : 'var(--fg-tertiary)',
             borderRadius: 'var(--r-md)', fontSize: 15, fontWeight: 500,
             opacity: canSubmit ? 1 : 0.6,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
           }}
         >
-          Registrar
+          {submitting && (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="2.5" strokeLinecap="round"
+              style={{ animation: 'spin 0.7s linear infinite', flexShrink: 0 }}>
+              <path d="M12 2a10 10 0 0 1 10 10" />
+            </svg>
+          )}
+          {submitting ? 'Guardando…' : 'Registrar'}
         </button>
       </div>
     </>
