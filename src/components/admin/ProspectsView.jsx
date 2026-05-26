@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react'
 import Icon from '../shared/Icon'
-import { MOCK_PROSPECTS, MOCK_SELLERS } from '../../constants/mockData'
 import { useStages } from '../../contexts/StagesContext'
+import { useAdminProspects } from '../../hooks/useAdminProspects'
+import { useSellers } from '../../hooks/useSellers'
 import { rules, collectErrors } from '../../lib/validation'
 
 const HEALTH_COLOR = { green: 'var(--success)', amber: 'var(--warning)', red: 'var(--danger)', black: 'var(--fg-tertiary)' }
@@ -15,7 +16,7 @@ function NewProspectPanel({ stages, onSave, onClose }) {
     phone:   '',
     value:   '',
     stage:   stages[0]?.id || 'prospeccion',
-    owner:   MOCK_SELLERS[0]?.init || 'MR',
+    owner:   '',
     city:    '',
   })
   const [errors, setErrors] = useState({})
@@ -326,30 +327,32 @@ const inputStyle = {
 // ─── Main view ────────────────────────────────────────────────────────────────
 export default function ProspectsView() {
   const { stages, stageById } = useStages()
-  const [prospects,   setProspects]   = useState(MOCK_PROSPECTS)
+  const { prospects, loading: loadingProspects, reload } = useAdminProspects()
+  const { sellers }  = useSellers()
   const [search,      setSearch]      = useState('')
   const [stageFilter, setStageFilter] = useState('all')
   const [ownerFilter, setOwnerFilter] = useState('all')
   const [selected,    setSelected]    = useState(null)
   const [showNew,     setShowNew]     = useState(false)
 
-  const sellers = [...new Set(MOCK_PROSPECTS.map(p => p.owner))]
+  const sellerInits = [...new Set(prospects.map(p => p.owner))]
 
   const filtered = prospects.filter(p => {
     const q = search.toLowerCase()
-    const matchQ = !q || p.name.toLowerCase().includes(q) || p.contact.toLowerCase().includes(q)
+    const matchQ = !q || p.name.toLowerCase().includes(q) || (p.contact || '').toLowerCase().includes(q)
     const matchS  = stageFilter === 'all' || p.stage === stageFilter
     const matchO  = ownerFilter === 'all' || p.owner === ownerFilter
     return matchQ && matchS && matchO
   })
 
   function handleNewProspect(p) {
-    setProspects(prev => [p, ...prev])
+    reload()
     setShowNew(false)
     setSelected(p)
   }
 
-  const sellerName = init => MOCK_SELLERS.find(s => s.init === init)?.name || init
+  const sellerName  = init => sellers.find(s => s.init === init)?.name  || init
+  const sellerColor = init => sellers.find(s => s.init === init)?.color || '#888'
 
   // Right panel: new form takes priority over detail
   const rightPanel = showNew
@@ -431,7 +434,7 @@ export default function ProspectsView() {
             }}
           >
             <option value="all">Todos los vendedores</option>
-            {sellers.map(s => <option key={s} value={s}>{sellerName(s)}</option>)}
+            {sellerInits.map(s => <option key={s} value={s}>{sellerName(s)}</option>)}
           </select>
 
           <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--fg-tertiary)' }}>
@@ -488,8 +491,8 @@ export default function ProspectsView() {
                       <span style={{
                         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                         width: 26, height: 26, borderRadius: '50%',
-                        background: (MOCK_SELLERS.find(s => s.init === p.owner)?.color || '#888') + '22',
-                        color: MOCK_SELLERS.find(s => s.init === p.owner)?.color || '#888',
+                        background: sellerColor(p.owner) + '22',
+                        color: sellerColor(p.owner),
                         fontSize: 11, fontWeight: 500,
                       }}>
                         {p.owner}

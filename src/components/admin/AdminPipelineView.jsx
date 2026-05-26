@@ -1,14 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react'
 import Icon from '../shared/Icon'
 import { useStages } from '../../contexts/StagesContext'
-import { MOCK_PROSPECTS, MOCK_SELLERS } from '../../constants/mockData'
+import { useAdminProspects } from '../../hooks/useAdminProspects'
+import { useSellers } from '../../hooks/useSellers'
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
-const fmt       = n => '$' + n.toLocaleString('es-MX')
+const fmt       = n => '$' + (n || 0).toLocaleString('es-MX')
 const HEALTH    = { green: 'var(--success)', amber: 'var(--warning)', red: 'var(--danger)', black: 'var(--fg-tertiary)' }
 const HEALTH_LABEL = { green: 'Al día', amber: 'En riesgo', red: 'Urgente', black: 'Perdido' }
-
-function sellerByInit(init) { return MOCK_SELLERS.find(s => s.init === init) }
 
 // ─── Move stage dropdown ──────────────────────────────────────────────────────
 function MoveDropdown({ currentStage, onMove, onClose }) {
@@ -572,13 +571,15 @@ function StageConfigPanel({ stages: initialStages, saving, onSave, onClose }) {
 // ─── Main view ────────────────────────────────────────────────────────────────
 export default function AdminPipelineView() {
   const { stages, stageById, saveAllStages, saving } = useStages()
-  const [prospects,      setProspects]      = useState(MOCK_PROSPECTS.map(p => ({ ...p })))
+  const { prospects, reload } = useAdminProspects()
+  const { sellers: sellerList } = useSellers()
   const [sellerFilter,   setSellerFilter]   = useState('all')
   const [healthFilter,   setHealthFilter]   = useState('all')
   const [selected,       setSelected]       = useState(null)
   const [showStageConf,  setShowStageConf]  = useState(false)
 
-  const sellers    = [...new Set(MOCK_PROSPECTS.map(p => p.owner))]
+  const sellerByInit = init => sellerList.find(s => s.init === init)
+  const sellers    = [...new Set(prospects.map(p => p.owner))]
   const atRisk     = prospects.filter(p => p.health !== 'green').length
 
   const filtered = prospects.filter(p => {

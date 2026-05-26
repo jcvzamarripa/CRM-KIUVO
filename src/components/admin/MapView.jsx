@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import Icon from '../shared/Icon'
-import { MOCK_PROSPECTS, MOCK_SELLERS } from '../../constants/mockData'
+import { useAdminProspects } from '../../hooks/useAdminProspects'
+import { useSellers } from '../../hooks/useSellers'
 import { STAGE_BY_ID } from '../../constants/stages'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -8,14 +9,7 @@ import { STAGE_BY_ID } from '../../constants/stages'
 const HEALTH_HEX   = { green: '#1D9E75', amber: '#EF9F27', red: '#D85A30', black: '#888780' }
 const HEALTH_LABEL = { green: 'Al día',  amber: 'En riesgo', red: 'Urgente' }
 
-const fmt = n => '$' + n.toLocaleString('es-MX')
-
-function sellerColor(init) {
-  return MOCK_SELLERS.find(s => s.init === init)?.color || '#888780'
-}
-function sellerName(init) {
-  return MOCK_SELLERS.find(s => s.init === init)?.name || init
-}
+const fmt = n => '$' + (n || 0).toLocaleString('es-MX')
 
 // ─── Map canvas (vanilla Leaflet, compatible with React 18) ───────────────────
 function MapCanvas({ prospects, colorBy, selected, setSelected, setHovered }) {
@@ -198,9 +192,15 @@ export default function MapView() {
   const [hovered,      setHovered]      = useState(null)
   const [selected,     setSelected]     = useState(null)
 
-  const sellers = ['Todos', ...MOCK_SELLERS.map(s => s.init)]
+  const { sellers: sellerList } = useSellers()
+  const { prospects: allProspects } = useAdminProspects()
 
-  const prospects = MOCK_PROSPECTS.filter(p => {
+  const sellerColor = init => sellerList.find(s => s.init === init)?.color || '#888780'
+  const sellerName  = init => sellerList.find(s => s.init === init)?.name  || init
+
+  const sellers = ['Todos', ...sellerList.map(s => s.init)]
+
+  const prospects = allProspects.filter(p => {
     if (sellerFilter !== 'Todos' && p.owner !== sellerFilter) return false
     if (healthFilter === 'Al día'    && p.health !== 'green') return false
     if (healthFilter === 'En riesgo' && p.health !== 'amber') return false
@@ -304,7 +304,7 @@ export default function MapView() {
               <span style={{ color: '#555' }}>{STAGE_BY_ID[id].label}</span>
             </div>
           ))}
-          {colorBy === 'seller' && MOCK_SELLERS.map(s => (
+          {colorBy === 'seller' && sellerList.map(s => (
             <div key={s.init} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
               <div style={{ width: 10, height: 10, borderRadius: '50%', background: s.color }} />
               <span style={{ color: '#555' }}>{s.name.split(' ')[0]}</span>
