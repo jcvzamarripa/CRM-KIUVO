@@ -73,101 +73,132 @@ async function fetchSupabaseKPIs() {
     activeRes,
     cierresMesRes,
     cierresPrevRes,
+    salesTotalRes,
+    salesPrevRes,
     cotsPendRes,
     cotsPrevRes,
     convRes,
     cumplRes,
   ] = await Promise.all([
-    // 1. Prospectos activos
+    // 1. Prospectos activos (sin stage 'cierre' ganado)
     supabase
       .from('prospects')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'active'),
+      .select('id', { count: 'exact', head: true }),
 
-    // 2. Cierres este mes
+    // 2. Cierres este mes (desde tabla sales)
     supabase
-      .from('prospects')
-      .select('id, value')
-      .eq('status', 'won')
+      .from('sales')
+      .select('id, amount')
       .gte('closed_at', monthStart),
 
     // 3. Cierres mes anterior (para delta)
     supabase
-      .from('prospects')
+      .from('sales')
       .select('id', { count: 'exact', head: true })
-      .eq('status', 'won')
       .gte('closed_at', prevMonthStart)
       .lt('closed_at', monthStart),
 
-    // 4. Cotizaciones pendientes (enviadas, sin respuesta)
+    // 4. Total ventas acumuladas (all-time) para KPI salesTotal
     supabase
-      .from('quotes')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'sent'),
+      .from('sales')
+      .select('amount'),
 
-    // 5. Cotizaciones pendientes mes anterior (para delta)
+    // 5. Total ventas mes anterior (para delta de salesTotal)
     supabase
-      .from('quotes')
+      .from('sales')
+      .select('amount')
+      .gte('closed_at', prevMonthStart)
+      .lt('closed_at', monthStart),
+
+    // 6. Cotizaciones pendientes (enviadas, sin respuesta)
+    supabase
+      .from('activities')
       .select('id', { count: 'exact', head: true })
-      .eq('status', 'sent')
+      .eq('kind', 'quote'),
+
+    // 7. Cotizaciones mes anterior (para delta)
+    supabase
+      .from('activities')
+      .select('id', { count: 'exact', head: true })
+      .eq('kind', 'quote')
       .gte('created_at', prevMonthStart)
       .lt('created_at', monthStart),
 
     // 6. Todos los cerrados (won/lost) para tasa de conversión
+    // 8. Tasa de conversión: total prospectos vs total sales
     supabase
-      .from('prospects')
-      .select('id, status')
-      .in('status', ['won', 'lost']),
+      .from('sales')
+      .select('id', { count: 'exact', head: true }),
 
-    // 7. Cumplimiento: prospects active con visits >= 1
+    // 9. Cumplimiento: prospects con al menos 1 visita
     supabase
       .from('prospects')
-      .select('id, visits')
-      .eq('status', 'active'),
+      .select('id, visits:visits(count)'),
   ])
 
   // ── Prospectos activos ──────────────────────────────────────────────────────
   const activeCount = activeRes.count ?? 0
 
-  // ── Cierres del mes ─────────────────────────────────────────────────────────
+  // ── Cierres del mes (desde sales) ──────────────────────────────────────────
   const cierresMesData  = cierresMesRes.data || []
   const cierresMesCount = cierresMesData.length
-  const cierresMesValue = cierresMesData.reduce((s, p) => s + (p.value || 0), 0)
+  const cierresMesValue = cierresMesData.reduce((s, p) => s + Number(p.amount || 0), 0)
   const cierresPrevCount= cierresPrevRes.count ?? 0
   const cierresDeltaNum = cierresPrevCount > 0
     ? Math.round(((cierresMesCount - cierresPrevCount) / cierresPrevCount) * 100)
     : null
-  const cierresDelta    = cierresDeltaNum != null
+  const cierresDelta = cierresDeltaNum != null
     ? `${cierresDeltaNum >= 0 ? '+' : ''}${cierresDeltaNum}%`
     : ''
 
-  // ── Cotizaciones pendientes ─────────────────────────────────────────────────
-  const cotsPendCount  = cotsPendRes.count ?? 0
-  const cotsPrevCount  = cotsPrevRes.count ?? 0
-  const cotsDeltaNum   = cotsPrevCount > 0 ? cotsPendCount - cotsPrevCount : null
-  const cotsDelta      = cotsDeltaNum != null
+  // ── Ventas totales acumuladas ───────────────────────────────────────────────
+  const allSalesData   = salesTotalRes.data || []
+  const salesTotalAmt  = allSalesData.reduce((s, r) => s + Number(r.amount || 0), 0)
+  const prevSalesData  = salesPrevRes.data || []
+  const prevSalesAmt   = prevSalesData.reduce((s, r) => s + Number(r.amount || 0), 0)
+  const salesDeltaNum  = prevSalesAmt > 0
+    ? Math.round(((cierresMesValue - prevSalesAmt) / prevSalesAmt) * 100)
+    : null
+  const salesDelta = salesDeltaNum != null
+    ? `${salesDeltaNum >= 0 ? '+' : ''}${salesDeltaNum}%`
+    : ''
+
+  // ── Cotizaciones ────────────────────────────────────────────────────────────
+  const cotsPendCount = cotsPendRes.count ?? 0
+  const cotsPrevCount = cotsPrevRes.count ?? 0
+  const cotsDeltaNum  = cotsPrevCount > 0 ? cotsPendCount - cotsPrevCount : null
+  const cotsDelta     = cotsDeltaNum != null
     ? `${cotsDeltaNum >= 0 ? '+' : ''}${cotsDeltaNum}`
     : ''
 
-  // ── Tasa de conversión ──────────────────────────────────────────────────────
-  const allClosed  = convRes.data || []
-  const wonCount   = allClosed.filter(p => p.status === 'won').length
-  const totalClosed= allClosed.length
-  const tasaNum    = totalClosed > 0 ? ((wonCount / totalClosed) * 100).toFixed(1) : '0.0'
+  // ── Tasa de conversión: ventas / prospectos totales ─────────────────────────
+  const totalWins  = convRes.count ?? 0
+  const tasaNum    = activeCount > 0
+    ? ((totalWins / (activeCount + totalWins)) * 100).toFixed(1)
+    : '0.0'
 
   // ── Ticket promedio ─────────────────────────────────────────────────────────
-  const ticketNum  = cierresMesCount > 0 ? cierresMesValue / cierresMesCount : 0
-  const ticketFmt  = ticketNum > 0 ? `$${(ticketNum / 1000).toFixed(1)}k` : '—'
+  const ticketNum = cierresMesCount > 0 ? cierresMesValue / cierresMesCount : 0
+  const ticketFmt = ticketNum > 0 ? `$${(ticketNum / 1000).toFixed(1)}k` : '—'
 
-  // ── Cumplimiento de seguimiento ─────────────────────────────────────────────
-  const allActive      = cumplRes.data || []
-  const conVisitas     = allActive.filter(p => (p.visits || 0) >= 1).length
-  const cumplimiento   = allActive.length > 0
-    ? Math.round((conVisitas / allActive.length) * 100)
+  // ── Cumplimiento de seguimiento (prospects con ≥1 visita) ──────────────────
+  const allProspects  = cumplRes.data || []
+  const conVisitas    = allProspects.filter(p => (p.visits?.[0]?.count ?? 0) >= 1).length
+  const cumplimiento  = allProspects.length > 0
+    ? Math.round((conVisitas / allProspects.length) * 100)
     : 0
 
+  const fmtTotal = n => n >= 1000000
+    ? `$${(n / 1000000).toFixed(1)}M`
+    : n >= 1000 ? `$${(n / 1000).toFixed(0)}k` : `$${n}`
+
   return {
-    salesTotal: null, // sin tabla de ventas todavía — usa mock
+    salesTotal: {
+      value:     fmtTotal(salesTotalAmt),
+      delta:     salesDelta,
+      deltaKind: salesDeltaNum != null ? (salesDeltaNum >= 0 ? 'good' : 'bad') : '',
+      sub:       `${cierresMesCount} cierre${cierresMesCount !== 1 ? 's' : ''} este mes`,
+    },
     prospectosActivos: {
       value: String(activeCount),
       delta: '',
@@ -178,28 +209,27 @@ async function fetchSupabaseKPIs() {
       value: `${tasaNum}%`,
       delta: '',
       deltaKind: '',
-      sub: 'prospección → cierre',
+      sub: 'prospectos → cierre',
     },
     ticketPromedio: {
       value: ticketFmt,
       delta: '',
       deltaKind: '',
-      sub: 'ticket promedio · ventas ganadas',
+      sub: 'ticket promedio · este mes',
     },
     cierresMes: {
       value: String(cierresMesCount),
       delta: cierresDelta,
       deltaKind: cierresDeltaNum != null ? (cierresDeltaNum >= 0 ? 'good' : 'bad') : '',
       sub: cierresMesValue > 0
-        ? `$${(cierresMesValue / 1000).toFixed(0)}k cerrado este mes`
+        ? `${fmtTotal(cierresMesValue)} cerrado este mes`
         : 'este mes',
     },
     cotizacionesPendientes: {
       value: String(cotsPendCount),
       delta: cotsDelta,
-      // more pending = worse (red), fewer = better (green)
       deltaKind: cotsDeltaNum != null ? (cotsDeltaNum > 0 ? 'bad' : 'good') : '',
-      sub: 'esperando respuesta del cliente',
+      sub: 'cotizaciones enviadas',
     },
     cumplimientoSeguimiento: {
       value: `${cumplimiento}%`,
