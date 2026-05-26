@@ -155,6 +155,8 @@ export default function MobileApp({ dark, onToggleDark }) {
           unreadCount={notifications.unreadCount}
           markRead={notifications.markRead}
           markAll={notifications.markAll}
+          dismiss={notifications.dismiss}
+          dismissRead={notifications.dismissRead}
         />
       )}
       {showQuote         && <QuoteModal        onClose={() => setShowQuote(false)} />}

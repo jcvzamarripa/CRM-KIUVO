@@ -78,14 +78,22 @@ function SkeletonItem() {
   )
 }
 
-export default function NotificationsPanel({ onClose, onNavigate, items, loading, unreadCount, markRead, markAll }) {
+export default function NotificationsPanel({ onClose, onNavigate, items, loading, unreadCount, markRead, markAll, dismiss, dismissRead }) {
   function handleTap(n) {
-    markRead(n.id)
     const action = KIND_ACTION[n.kind]
     if (action) {
+      // Dismiss on tap when there's a navigation action (it's been "attended")
+      dismiss?.(n.id)
       onNavigate?.(action)
       onClose()
+    } else {
+      markRead(n.id)
     }
+  }
+
+  function handleDismiss(e, id) {
+    e.stopPropagation()
+    dismiss?.(id)
   }
 
   return (
@@ -118,6 +126,11 @@ export default function NotificationsPanel({ onClose, onNavigate, items, loading
             {unreadCount > 0 && (
               <button onClick={markAll} style={{ fontSize: 12, color: 'var(--kiuvo-blue)', fontWeight: 500 }}>
                 Marcar todo leído
+              </button>
+            )}
+            {items.some(n => n.read) && (
+              <button onClick={dismissRead} style={{ fontSize: 12, color: 'var(--fg-tertiary)', fontWeight: 500 }}>
+                Limpiar leídas
               </button>
             )}
             <button onClick={onClose} style={{
@@ -168,7 +181,22 @@ export default function NotificationsPanel({ onClose, onNavigate, items, loading
                       <div style={{ fontSize: 13, fontWeight: n.read ? 400 : 600, color: 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {n.title}
                       </div>
-                      <div style={{ fontSize: 10, color: 'var(--fg-tertiary)', flexShrink: 0 }}>{fmtTime(n.created_at)}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                        <div style={{ fontSize: 10, color: 'var(--fg-tertiary)' }}>{fmtTime(n.created_at)}</div>
+                        <button
+                          onClick={e => handleDismiss(e, n.id)}
+                          style={{
+                            width: 18, height: 18, borderRadius: '50%',
+                            background: 'var(--bg-secondary)', border: 'none',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: 'var(--fg-tertiary)', padding: 0, cursor: 'pointer',
+                          }}
+                        >
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--fg-secondary)', lineHeight: 1.4 }}>{n.body}</div>
                     {KIND_ACTION[n.kind] && (
