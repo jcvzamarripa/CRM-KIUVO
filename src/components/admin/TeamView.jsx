@@ -125,7 +125,7 @@ function InviteModal({ onClose }) {
   const [copied, setCopied] = useState(false)
   const backdropRef = useRef(null)
 
-  const link = `https://kiuvo.app/registro?inv=${token}&rol=${role}${name ? '&nombre=' + encodeURIComponent(name) : ''}`
+  const link = `https://crm.kiuvo.org/registro?inv=${token}&rol=${role}${name ? '&nombre=' + encodeURIComponent(name) : ''}`
 
   function copyLink() {
     navigator.clipboard?.writeText(link).catch(() => {})
