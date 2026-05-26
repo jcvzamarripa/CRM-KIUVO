@@ -1,9 +1,76 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import Icon from '../shared/Icon'
 import StageDot from '../shared/StageDot'
 import { STAGES, STAGE_BY_ID } from '../../constants/stages'
 import { useTodayAgenda } from '../../hooks/useAgendaEvents'
 import { useFunnelCounts } from '../../hooks/useFunnelCounts'
+import { supabase } from '../../lib/supabase'
+
+// ── Hook: datos reales del vendedor para el dashboard ─────────────
+function useSellerDashboard(sellerId) {
+  const [data, setData] = useState({
+    monthlySales: 0,
+    goal: 100000,
+    todayVisits: 0,
+    todayQuotes: 0,
+    todayWins: 0,
+    atRiskCount: 0,
+    atRiskProspects: [],
+    inactiveCount: 0,
+  })
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    if (!sellerId || !supabase) { setLoading(false); return }
+
+    const today     = new Date().toISOString().slice(0, 10)
+    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
+    const days60ago  = new Date(Date.now() - 60 * 86400000).toISOString()
+
+    const [profileRes, salesRes, activitiesTodayRes, atRiskRes, inactiveRes] = await Promise.all([
+      // Meta del mes desde perfil
+      supabase.from('profiles').select('goal_amount').eq('id', sellerId).single(),
+      // Ventas del mes
+      supabase.from('sales').select('amount').eq('seller_id', sellerId).gte('closed_at', monthStart),
+      // Actividades de hoy
+      supabase.from('activities').select('kind')
+        .eq('seller_id', sellerId)
+        .gte('created_at', today + 'T00:00:00Z')
+        .lte('created_at', today + 'T23:59:59Z'),
+      // Prospectos en riesgo (amber/red)
+      supabase.from('prospects').select('id, name, stage_id, health, days_in_stage, last_contact_at')
+        .eq('owner_id', sellerId)
+        .in('health', ['amber', 'red'])
+        .order('health', { ascending: true })
+        .limit(5),
+      // Prospectos inactivos +60 días
+      supabase.from('prospects').select('id', { count: 'exact', head: true })
+        .eq('owner_id', sellerId)
+        .lt('last_contact_at', days60ago),
+    ])
+
+    const goal         = profileRes.data?.goal_amount || 100000
+    const salesData    = salesRes.data || []
+    const monthlySales = salesData.reduce((s, r) => s + Number(r.amount || 0), 0)
+    const acts         = activitiesTodayRes.data || []
+    const atRisk       = atRiskRes.data || []
+
+    setData({
+      monthlySales,
+      goal,
+      todayVisits: acts.filter(a => a.kind === 'visit').length,
+      todayQuotes: acts.filter(a => a.kind === 'quote').length,
+      todayWins:   acts.filter(a => a.kind === 'win').length,
+      atRiskCount:     atRisk.length,
+      atRiskProspects: atRisk,
+      inactiveCount:   inactiveRes.count ?? 0,
+    })
+    setLoading(false)
+  }, [sellerId])
+
+  useEffect(() => { load() }, [load])
+  return { ...data, loading }
+}
 
 function BellSvg({ size = 18, color = 'currentColor' }) {
   return (
@@ -140,65 +207,57 @@ function DayStatsSkeleton() {
 }
 
 // ── MetaCard ──────────────────────────────────────────────────────
-function MetaCard({ state = 'mid' }) {
-  const goals = {
-    on:  { current: 92400, pct: 0.92, racha: 8, nivel: 5, tone: 'good' },
-    mid: { current: 68400, pct: 0.68, racha: 5, nivel: 4, tone: 'mid'  },
-    red: { current: 28100, pct: 0.28, racha: 1, nivel: 2, tone: 'bad'  },
-  }
-  const g = goals[state] || goals.mid
-  const goal = 100000
-  const daysLeft = 3
+function MetaCard({ monthlySales = 0, goal = 100000, loading = false }) {
+  const pct  = goal > 0 ? Math.min(monthlySales / goal, 1) : 0
+  const tone = pct >= 0.8 ? 'good' : pct >= 0.4 ? 'mid' : 'bad'
+
+  const now      = new Date()
+  const lastDay  = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
+  const daysLeft = lastDay - now.getDate()
 
   const tones = {
-    good: { bg: 'var(--success-bg)',      fg: 'var(--success-fg)', deep: '#0A4A3B',            mid: '#B8E3D2',              fill: 'var(--success)',     deepText: 'var(--success-fg)' },
-    mid:  { bg: 'var(--kiuvo-blue-soft)', fg: 'var(--kiuvo-blue)', deep: 'var(--kiuvo-blue-deep)', mid: 'var(--kiuvo-blue-mid)', fill: 'var(--kiuvo-blue)', deepText: 'var(--kiuvo-blue-deep)' },
-    bad:  { bg: '#FCEBEB',               fg: '#A32D2D',           deep: '#501313',            mid: '#F0B6B6',              fill: '#A32D2D',           deepText: '#501313' },
+    good: { bg: 'var(--success-bg)',      fg: 'var(--success-fg)', mid: '#B8E3D2',              fill: 'var(--success)',     deepText: 'var(--success-fg)' },
+    mid:  { bg: 'var(--kiuvo-blue-soft)', fg: 'var(--kiuvo-blue)', mid: 'var(--kiuvo-blue-mid)', fill: 'var(--kiuvo-blue)', deepText: 'var(--kiuvo-blue-deep)' },
+    bad:  { bg: '#FCEBEB',               fg: '#A32D2D',           mid: '#F0B6B6',              fill: '#A32D2D',           deepText: '#501313' },
   }
-  const t = tones[g.tone]
+  const t = tones[tone]
+
+  if (loading) return <MetaCardSkeleton />
 
   return (
     <div style={{ margin: '0 16px', padding: '14px 16px', background: t.bg, borderRadius: 'var(--r-lg)' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 }}>
         <div>
-          <div style={{ fontSize: 11, fontWeight: 500, color: t.fg, letterSpacing: 0.4 }}>META SEMANAL</div>
+          <div style={{ fontSize: 11, fontWeight: 500, color: t.fg, letterSpacing: 0.4 }}>META DEL MES</div>
           <div style={{ marginTop: 2, display: 'flex', alignItems: 'baseline', gap: 6 }}>
-            <span style={{ fontSize: 22, fontWeight: 500, color: t.deepText, fontVariantNumeric: 'tabular-nums', letterSpacing: -0.4 }}>{fmt(g.current)}</span>
+            <span style={{ fontSize: 22, fontWeight: 500, color: t.deepText, fontVariantNumeric: 'tabular-nums', letterSpacing: -0.4 }}>{fmt(monthlySales)}</span>
             <span style={{ fontSize: 12, color: t.fg }}>de {fmt(goal)}</span>
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            padding: '4px 9px', borderRadius: 'var(--r-full)',
-            background: t.mid, color: t.deepText, fontSize: 11, fontWeight: 500,
-          }}>
-            <Icon name="flame" size={12} />
-            <span>Nivel {g.nivel}</span>
-          </div>
-          <div style={{ fontSize: 11, color: t.fg, marginTop: 4 }}>Racha: {g.racha} días</div>
+          <div style={{ fontSize: 11, color: t.fg }}>{daysLeft} días restantes</div>
         </div>
       </div>
       <div style={{ marginTop: 10, height: 8, borderRadius: 4, background: t.mid, overflow: 'hidden' }}>
-        <div style={{ width: `${g.pct * 100}%`, height: '100%', background: t.fill, borderRadius: 4, transition: 'width 0.6s ease' }} />
+        <div style={{ width: `${pct * 100}%`, height: '100%', background: t.fill, borderRadius: 4, transition: 'width 0.6s ease' }} />
       </div>
-      <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', fontSize: 11, color: t.fg }}>
-        <span style={{ fontWeight: 500 }}>{Math.round(g.pct * 100)}%</span>
-        <span>{daysLeft} días restantes</span>
+      <div style={{ marginTop: 6, fontSize: 11, color: t.fg, fontWeight: 500 }}>
+        {monthlySales === 0 ? '¡A cerrar el primer trato del mes!' : `${Math.round(pct * 100)}% de la meta`}
       </div>
     </div>
   )
 }
 
 // ── DayStats ──────────────────────────────────────────────────────
-function DayStats() {
+function DayStats({ visits = 0, quotes = 0, wins = 0 }) {
+  const items = [
+    { v: String(visits), l: 'Visitas hoy' },
+    { v: String(quotes), l: 'Cotizaciones' },
+    { v: String(wins),   l: 'Cierres' },
+  ]
   return (
     <div style={{ margin: '0 16px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-      {[
-        { v: '5', l: 'Visitas hoy' },
-        { v: '2', l: 'Cotizaciones' },
-        { v: '1', l: 'Cierres' },
-      ].map(it => (
+      {items.map(it => (
         <div key={it.l} style={{
           background: 'var(--bg-secondary)', borderRadius: 'var(--r-md)',
           padding: '12px 10px', textAlign: 'center',
@@ -212,72 +271,58 @@ function DayStats() {
 }
 
 // ── FollowupAlert ─────────────────────────────────────────────────
-function FollowupAlert({ hero = false, onOpen }) {
-  if (hero) {
-    return (
-      <div style={{ margin: '0 16px', padding: 16, background: 'var(--warning-bg)', border: '0.5px solid var(--warning-border)', borderRadius: 'var(--r-lg)' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-          <div style={{
-            width: 36, height: 36, flexShrink: 0, borderRadius: 'var(--r-md)',
-            background: '#FAC775', color: 'var(--warning-fg)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <Icon name="eye-exclamation" size={20} />
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--warning-fg)' }}>Seguimiento pendiente</div>
-            <div style={{ fontSize: 12, color: 'var(--warning-fg)', opacity: 0.85, marginTop: 2 }}>
-              2 prospectos en riesgo · 1 estancado
-            </div>
-            <div style={{ marginTop: 10, display: 'flex', gap: 6 }}>
-              <button onClick={onOpen} style={{
-                padding: '7px 12px', borderRadius: 'var(--r-md)',
-                background: 'var(--warning-fg)', color: '#FFF8EB',
-                fontSize: 12, fontWeight: 500,
-              }}>Ver lista</button>
-              <button style={{
-                padding: '7px 12px', borderRadius: 'var(--r-md)',
-                border: '0.5px solid var(--warning-border)', color: 'var(--warning-fg)',
-                fontSize: 12, fontWeight: 500,
-              }}>Recordar mañana</button>
-            </div>
-          </div>
-        </div>
-        <div style={{ marginTop: 14, borderTop: '0.5px solid var(--warning-border)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {[
-            { name: 'Refaccionaria El Bajío',    why: '24 días en Presentación',    stage: 'presentacion', kind: 'red' },
-            { name: 'Materiales Pacífico',       why: '11 días sin visita',         stage: 'cotizacion',  kind: 'amber' },
-            { name: 'Plomería Industrial Vega',  why: 'Sin visitas registradas',    stage: 'prospeccion', kind: 'amber' },
-          ].map(p => (
-            <div key={p.name} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: p.kind === 'red' ? 'var(--danger)' : 'var(--warning)', flexShrink: 0 }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--warning-fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
-                <div style={{ fontSize: 11, color: 'var(--warning-fg)', opacity: 0.8 }}>{p.why}</div>
-              </div>
-              <StageDot stage={p.stage} />
-              <Icon name="chevron-right" size={14} color="var(--warning-fg)" style={{ opacity: 0.5 }} />
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
+function FollowupAlert({ atRiskCount = 0, atRiskProspects = [], onOpen }) {
+  if (atRiskCount === 0) return null  // nada pendiente → no mostrar
+
+  const stuckCount = atRiskProspects.filter(p => p.health === 'red').length
+  const riskCount  = atRiskProspects.filter(p => p.health === 'amber').length
+  const subtitle   = [
+    riskCount  > 0 ? `${riskCount} en riesgo`  : null,
+    stuckCount > 0 ? `${stuckCount} estancado${stuckCount > 1 ? 's' : ''}` : null,
+  ].filter(Boolean).join(' · ')
 
   return (
-    <button onClick={onOpen} style={{
-      width: 'calc(100% - 32px)', margin: '0 16px',
-      padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10,
-      background: 'var(--warning-bg)', border: '0.5px solid var(--warning-border)',
-      borderRadius: 'var(--r-lg)', textAlign: 'left',
-    }}>
-      <Icon name="eye-exclamation" size={20} color="var(--warning-fg)" />
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--warning-fg)' }}>Seguimiento pendiente</div>
-        <div style={{ fontSize: 11, color: 'var(--warning-fg)', opacity: 0.85 }}>2 prospectos en riesgo · 1 estancado</div>
+    <div style={{ margin: '0 16px', padding: 16, background: 'var(--warning-bg)', border: '0.5px solid var(--warning-border)', borderRadius: 'var(--r-lg)' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+        <div style={{
+          width: 36, height: 36, flexShrink: 0, borderRadius: 'var(--r-md)',
+          background: '#FAC775', color: 'var(--warning-fg)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Icon name="eye-exclamation" size={20} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--warning-fg)' }}>Seguimiento pendiente</div>
+          <div style={{ fontSize: 12, color: 'var(--warning-fg)', opacity: 0.85, marginTop: 2 }}>{subtitle}</div>
+          <div style={{ marginTop: 10 }}>
+            <button onClick={onOpen} style={{
+              padding: '7px 12px', borderRadius: 'var(--r-md)',
+              background: 'var(--warning-fg)', color: '#FFF8EB',
+              fontSize: 12, fontWeight: 500,
+            }}>Ver lista</button>
+          </div>
+        </div>
       </div>
-      <Icon name="chevron-right" size={18} color="var(--warning-fg)" />
-    </button>
+      {atRiskProspects.length > 0 && (
+        <div style={{ marginTop: 14, borderTop: '0.5px solid var(--warning-border)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {atRiskProspects.slice(0, 3).map(p => {
+            const why = p.health === 'red'
+              ? `${p.days_in_stage ?? '?'} días en ${STAGE_BY_ID[p.stage_id]?.label || p.stage_id}`
+              : 'En seguimiento · requiere contacto'
+            return (
+              <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: p.health === 'red' ? 'var(--danger)' : 'var(--warning)', flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 500, color: 'var(--warning-fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--warning-fg)', opacity: 0.8 }}>{why}</div>
+                </div>
+                <StageDot stage={p.stage_id} />
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -506,7 +551,8 @@ function FunnelSummary({ onOpenKanban }) {
 }
 
 // ── ReactivatorBanner ─────────────────────────────────────────────
-function ReactivatorBanner({ onOpen }) {
+function ReactivatorBanner({ inactiveCount = 0, onOpen }) {
+  if (inactiveCount === 0) return null  // nada inactivo → no mostrar
   return (
     <button onClick={onOpen} style={{
       width: 'calc(100% - 32px)', margin: '0 16px',
@@ -517,7 +563,9 @@ function ReactivatorBanner({ onOpen }) {
       <Icon name="alert-circle" size={20} color="var(--danger)" />
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--danger-fg)' }}>Reactivador</div>
-        <div style={{ fontSize: 11, color: 'var(--danger-fg-mid)' }}>4 clientes sin contacto +60 días</div>
+        <div style={{ fontSize: 11, color: 'var(--danger-fg-mid)' }}>
+          {inactiveCount} cliente{inactiveCount > 1 ? 's' : ''} sin contacto +60 días
+        </div>
       </div>
       <Icon name="chevron-right" size={18} color="var(--danger)" />
     </button>
@@ -525,24 +573,22 @@ function ReactivatorBanner({ onOpen }) {
 }
 
 // ── Dashboard (main export) ───────────────────────────────────────
-export default function Dashboard({ profile, metaState = 'mid', alertHero = false, dark, onToggleDark, onOpenKanban, onRegisterVisit, onNewProspect, onOpenNotifications, onQuote, onWhatsApp, onOpenAgenda, onOpenAgendaEvent, onOpenReactivador, unreadCount = 0 }) {
-  // Brief skeleton on first mount so data sections animate in together
-  const [booting, setBooting] = useState(true)
-  useEffect(() => {
-    const t = setTimeout(() => setBooting(false), 650)
-    return () => clearTimeout(t)
-  }, [])
+export default function Dashboard({ profile, dark, onToggleDark, onOpenKanban, onRegisterVisit, onNewProspect, onOpenNotifications, onQuote, onWhatsApp, onOpenAgenda, onOpenAgendaEvent, onOpenReactivador, unreadCount = 0 }) {
+  const dash = useSellerDashboard(profile?.id)
 
   return (
     <div style={{ paddingBottom: 92, paddingTop: 4, display: 'flex', flexDirection: 'column', gap: 14, background: 'var(--bg)', minHeight: '100%' }}>
       <Header profile={profile} onOpenNotifications={onOpenNotifications} dark={dark} onToggleDark={onToggleDark} unreadCount={unreadCount} />
-      {booting ? <MetaCardSkeleton /> : <MetaCard state={metaState} />}
-      {booting ? <DayStatsSkeleton /> : <DayStats />}
-      {!booting && <FollowupAlert hero={alertHero} onOpen={onOpenKanban} />}
+      <MetaCard monthlySales={dash.monthlySales} goal={dash.goal} loading={dash.loading} />
+      {dash.loading
+        ? <DayStatsSkeleton />
+        : <DayStats visits={dash.todayVisits} quotes={dash.todayQuotes} wins={dash.todayWins} />
+      }
+      <FollowupAlert atRiskCount={dash.atRiskCount} atRiskProspects={dash.atRiskProspects} onOpen={onOpenKanban} />
       <QuickActions onRegisterVisit={onRegisterVisit} onNewProspect={onNewProspect} onQuote={onQuote} onWhatsApp={onWhatsApp} />
       <Agenda sellerId={profile?.id} onOpenAgenda={onOpenAgenda} onOpenEvent={onOpenAgendaEvent} />
       <FunnelSummary onOpenKanban={onOpenKanban} />
-      {!booting && <ReactivatorBanner onOpen={onOpenReactivador} />}
+      <ReactivatorBanner inactiveCount={dash.inactiveCount} onOpen={onOpenReactivador} />
       <div style={{ height: 4 }} />
     </div>
   )
