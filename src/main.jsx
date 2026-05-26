@@ -10,3 +10,13 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <App />
   </React.StrictMode>,
 )
+
+// Registrar Service Worker (solo en producción)
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('/sw.js', { scope: '/' })
+      .then(reg => console.info('[SW] registrado:', reg.scope))
+      .catch(err => console.warn('[SW] error al registrar:', err))
+  })
+}
