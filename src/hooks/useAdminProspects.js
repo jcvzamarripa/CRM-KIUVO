@@ -1,10 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
-import { MOCK_PROSPECTS } from '../constants/mockData'
 
 /**
  * Hook para obtener prospectos en el panel admin (todos los vendedores).
- * Retorna prospects con shape compatible con MOCK_PROSPECTS.
  */
 export function useAdminProspects() {
   const [prospects, setProspects] = useState([])
@@ -12,7 +10,7 @@ export function useAdminProspects() {
 
   const fetch = useCallback(async () => {
     if (!isSupabaseConfigured) {
-      setProspects(MOCK_PROSPECTS)
+      setProspects([])
       setLoading(false)
       return
     }
@@ -28,13 +26,13 @@ export function useAdminProspects() {
         created_at, updated_at,
         owner:profiles!owner_id (
           id, full_name, initials, avatar_color
-        ),
-        visits:visits(count)
+        )
       `)
       .order('created_at', { ascending: false })
 
     if (error || !data) {
-      setProspects(MOCK_PROSPECTS)
+      console.warn('[useAdminProspects]', error?.message)
+      setProspects([])
       setLoading(false)
       return
     }
@@ -62,8 +60,8 @@ export function useAdminProspects() {
       owner_id:    p.owner?.id        || null,
       owner_name:  p.owner?.full_name || 'Sin asignar',
       owner_color: p.owner?.avatar_color || '#888',
-      // Visit count
-      visits: p.visits?.[0]?.count ?? 0,
+      // Visit count (no visits table dependency)
+      visits: 0,
     }))
 
     setProspects(mapped)

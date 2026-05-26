@@ -1,63 +1,49 @@
 import { useState, useEffect } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
-import { MOCK_PROSPECTS, MOCK_SELLERS } from '../constants/mockData'
 
-// ─── Mock fallback: compute KPIs from local mock data ─────────────────────────
-function computeMockKPIs() {
-  const active           = MOCK_PROSPECTS.length
-  const cierreProspects  = MOCK_PROSPECTS.filter(p => p.stage === 'cierre')
-  const cierresMesCount  = cierreProspects.length
-  const cierresMesValue  = cierreProspects.reduce((s, p) => s + (p.value || 0), 0)
-  const cotsPend         = MOCK_PROSPECTS.filter(p => p.stage === 'cotizacion').length
-  const conVisitas       = MOCK_PROSPECTS.filter(p => p.visits >= 1).length
-  const cumplimiento     = Math.round((conVisitas / MOCK_PROSPECTS.length) * 100)
-
-  const totalWon = MOCK_SELLERS.reduce((s, v) => s + v.won, 0)
-
-  const ticketNum  = cierresMesCount > 0 ? cierresMesValue / cierresMesCount : 0
-  const ticketFmt  = ticketNum > 0 ? `$${(ticketNum / 1000).toFixed(1)}k` : '—'
-
+// ─── Empty KPIs placeholder ────────────────────────────────────────────────────
+function emptyKPIs() {
   return {
     salesTotal: {
-      value: `$${(totalWon / 1000).toFixed(0)}k`,
-      delta: '+12%',
-      deltaKind: 'good',
-      sub: 'vs semana anterior',
+      value: '$0',
+      delta: '',
+      deltaKind: '',
+      sub: 'sin ventas registradas',
     },
     prospectosActivos: {
-      value: String(active),
-      delta: '+8',
-      deltaKind: 'good',
-      sub: '34 nuevos esta semana',
+      value: '0',
+      delta: '',
+      deltaKind: '',
+      sub: 'en seguimiento activo',
     },
     tasaConversion: {
-      value: '18.4%',
-      delta: '+2.1pp',
-      deltaKind: 'good',
-      sub: 'prospección → cierre',
+      value: '0.0%',
+      delta: '',
+      deltaKind: '',
+      sub: 'prospectos → cierre',
     },
     ticketPromedio: {
-      value: ticketFmt,
-      delta: '-3%',
-      deltaKind: 'bad',
-      sub: 'ventas ganadas',
+      value: '—',
+      delta: '',
+      deltaKind: '',
+      sub: 'ticket promedio · este mes',
     },
     cierresMes: {
-      value: String(cierresMesCount),
-      delta: '+2',
-      deltaKind: 'good',
-      sub: cierresMesValue > 0 ? `$${(cierresMesValue / 1000).toFixed(0)}k cerrado este mes` : 'este mes',
+      value: '0',
+      delta: '',
+      deltaKind: '',
+      sub: 'este mes',
     },
     cotizacionesPendientes: {
-      value: String(cotsPend),
-      delta: '-1',
-      deltaKind: 'bad',
-      sub: 'esperando respuesta del cliente',
+      value: '0',
+      delta: '',
+      deltaKind: '',
+      sub: 'cotizaciones enviadas',
     },
     cumplimientoSeguimiento: {
-      value: `${cumplimiento}%`,
-      delta: '+4pp',
-      deltaKind: 'good',
+      value: '0%',
+      delta: '',
+      deltaKind: '',
       sub: 'prospectos con ≥ 1 visita',
     },
   }
@@ -65,9 +51,9 @@ function computeMockKPIs() {
 
 // ─── Supabase live queries ─────────────────────────────────────────────────────
 async function fetchSupabaseKPIs() {
-  const now           = new Date()
-  const monthStart    = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-  const prevMonthStart= new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString()
+  const now            = new Date()
+  const monthStart     = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+  const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString()
 
   const [
     activeRes,
@@ -78,9 +64,8 @@ async function fetchSupabaseKPIs() {
     cotsPendRes,
     cotsPrevRes,
     convRes,
-    cumplRes,
   ] = await Promise.all([
-    // 1. Prospectos activos (sin stage 'cierre' ganado)
+    // 1. Prospectos activos
     supabase
       .from('prospects')
       .select('id', { count: 'exact', head: true }),
@@ -98,25 +83,25 @@ async function fetchSupabaseKPIs() {
       .gte('closed_at', prevMonthStart)
       .lt('closed_at', monthStart),
 
-    // 4. Total ventas acumuladas (all-time) para KPI salesTotal
+    // 4. Total ventas acumuladas (all-time)
     supabase
       .from('sales')
       .select('amount'),
 
-    // 5. Total ventas mes anterior (para delta de salesTotal)
+    // 5. Total ventas mes anterior (para delta)
     supabase
       .from('sales')
       .select('amount')
       .gte('closed_at', prevMonthStart)
       .lt('closed_at', monthStart),
 
-    // 6. Cotizaciones pendientes (enviadas, sin respuesta)
+    // 6. Cotizaciones enviadas
     supabase
       .from('activities')
       .select('id', { count: 'exact', head: true })
       .eq('kind', 'quote'),
 
-    // 7. Cotizaciones mes anterior (para delta)
+    // 7. Cotizaciones mes anterior
     supabase
       .from('activities')
       .select('id', { count: 'exact', head: true })
@@ -124,22 +109,16 @@ async function fetchSupabaseKPIs() {
       .gte('created_at', prevMonthStart)
       .lt('created_at', monthStart),
 
-    // 6. Todos los cerrados (won/lost) para tasa de conversión
-    // 8. Tasa de conversión: total prospectos vs total sales
+    // 8. Total ventas ganadas (para tasa conversión)
     supabase
       .from('sales')
       .select('id', { count: 'exact', head: true }),
-
-    // 9. Cumplimiento: prospects con al menos 1 visita
-    supabase
-      .from('prospects')
-      .select('id, visits:visits(count)'),
   ])
 
   // ── Prospectos activos ──────────────────────────────────────────────────────
   const activeCount = activeRes.count ?? 0
 
-  // ── Cierres del mes (desde sales) ──────────────────────────────────────────
+  // ── Cierres del mes ─────────────────────────────────────────────────────────
   const cierresMesData  = cierresMesRes.data || []
   const cierresMesCount = cierresMesData.length
   const cierresMesValue = cierresMesData.reduce((s, p) => s + Number(p.amount || 0), 0)
@@ -151,7 +130,7 @@ async function fetchSupabaseKPIs() {
     ? `${cierresDeltaNum >= 0 ? '+' : ''}${cierresDeltaNum}%`
     : ''
 
-  // ── Ventas totales acumuladas ───────────────────────────────────────────────
+  // ── Ventas totales acumuladas ────────────────────────────────────────────────
   const allSalesData   = salesTotalRes.data || []
   const salesTotalAmt  = allSalesData.reduce((s, r) => s + Number(r.amount || 0), 0)
   const prevSalesData  = salesPrevRes.data || []
@@ -163,7 +142,7 @@ async function fetchSupabaseKPIs() {
     ? `${salesDeltaNum >= 0 ? '+' : ''}${salesDeltaNum}%`
     : ''
 
-  // ── Cotizaciones ────────────────────────────────────────────────────────────
+  // ── Cotizaciones ─────────────────────────────────────────────────────────────
   const cotsPendCount = cotsPendRes.count ?? 0
   const cotsPrevCount = cotsPrevRes.count ?? 0
   const cotsDeltaNum  = cotsPrevCount > 0 ? cotsPendCount - cotsPrevCount : null
@@ -171,22 +150,15 @@ async function fetchSupabaseKPIs() {
     ? `${cotsDeltaNum >= 0 ? '+' : ''}${cotsDeltaNum}`
     : ''
 
-  // ── Tasa de conversión: ventas / prospectos totales ─────────────────────────
-  const totalWins  = convRes.count ?? 0
-  const tasaNum    = activeCount > 0
+  // ── Tasa de conversión ───────────────────────────────────────────────────────
+  const totalWins = convRes.count ?? 0
+  const tasaNum   = activeCount > 0
     ? ((totalWins / (activeCount + totalWins)) * 100).toFixed(1)
     : '0.0'
 
-  // ── Ticket promedio ─────────────────────────────────────────────────────────
+  // ── Ticket promedio ──────────────────────────────────────────────────────────
   const ticketNum = cierresMesCount > 0 ? cierresMesValue / cierresMesCount : 0
   const ticketFmt = ticketNum > 0 ? `$${(ticketNum / 1000).toFixed(1)}k` : '—'
-
-  // ── Cumplimiento de seguimiento (prospects con ≥1 visita) ──────────────────
-  const allProspects  = cumplRes.data || []
-  const conVisitas    = allProspects.filter(p => (p.visits?.[0]?.count ?? 0) >= 1).length
-  const cumplimiento  = allProspects.length > 0
-    ? Math.round((conVisitas / allProspects.length) * 100)
-    : 0
 
   const fmtTotal = n => n >= 1000000
     ? `$${(n / 1000000).toFixed(1)}M`
@@ -232,7 +204,7 @@ async function fetchSupabaseKPIs() {
       sub: 'cotizaciones enviadas',
     },
     cumplimientoSeguimiento: {
-      value: `${cumplimiento}%`,
+      value: `0%`,
       delta: '',
       deltaKind: '',
       sub: 'prospectos con ≥ 1 visita',
@@ -248,27 +220,20 @@ export default function useDashboardKPIs() {
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
-      // No Supabase credentials → use mock immediately
-      setKpis(computeMockKPIs())
+      setKpis(emptyKPIs())
       setLoading(false)
       return
     }
 
     fetchSupabaseKPIs()
       .then(liveData => {
-        // Merge: null fields from Supabase fall back to mock values
-        const mock = computeMockKPIs()
-        const merged = { ...mock }
-        for (const [key, val] of Object.entries(liveData)) {
-          if (val !== null) merged[key] = val
-        }
-        setKpis(merged)
+        setKpis(liveData)
         setLoading(false)
       })
       .catch(err => {
         console.error('[useDashboardKPIs]', err)
         setError(err)
-        setKpis(computeMockKPIs())
+        setKpis(emptyKPIs())
         setLoading(false)
       })
   }, [])

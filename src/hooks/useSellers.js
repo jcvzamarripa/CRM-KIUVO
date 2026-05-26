@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
-import { MOCK_SELLERS } from '../constants/mockData'
 
 // Paleta de colores para asignar automáticamente
 const COLORS = ['#185FA5', '#378ADD', '#D85A30', '#1D9E75', '#EF9F27', '#9B59B6', '#E74C3C', '#2ECC71']
 
 /**
  * Hook para obtener la lista de vendedores desde Supabase.
- * Retorna sellers con el mismo shape que MOCK_SELLERS para compatibilidad.
  */
 export function useSellers() {
   const [sellers,  setSellers]  = useState([])
@@ -15,7 +13,7 @@ export function useSellers() {
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
-      setSellers(MOCK_SELLERS)
+      setSellers([])
       setLoading(false)
       return
     }
@@ -33,7 +31,8 @@ export function useSellers() {
       .order('full_name')
 
     if (error || !profiles) {
-      setSellers(MOCK_SELLERS)
+      console.warn('[useSellers] profiles error:', error?.message)
+      setSellers([])
       setLoading(false)
       return
     }
@@ -43,7 +42,7 @@ export function useSellers() {
       .from('prospects')
       .select('owner_id')
 
-    // Ventas totales (all-time) por vendedor
+    // Ventas totales (all-time) por vendedor — tabla sales puede no existir aún
     const { data: allSales } = await supabase
       .from('sales')
       .select('seller_id, amount')

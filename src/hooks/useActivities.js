@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
-import { MOCK_ACTIVITY } from '../constants/mockData'
 
 function fmtTime(ts) {
   if (!ts) return ''
@@ -27,7 +26,7 @@ export function useActivities({ limit = 50 } = {}) {
 
   const fetch = useCallback(async () => {
     if (!isSupabaseConfigured) {
-      setActivities(MOCK_ACTIVITY)
+      setActivities([])
       setLoading(false)
       return
     }
@@ -44,7 +43,8 @@ export function useActivities({ limit = 50 } = {}) {
       .limit(limit)
 
     if (error || !data) {
-      setActivities(MOCK_ACTIVITY)
+      console.warn('[useActivities]', error?.message)
+      setActivities([])
       setLoading(false)
       return
     }
@@ -100,7 +100,7 @@ export function useActivities({ limit = 50 } = {}) {
     const ch = supabase
       .channel('activities-admin')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activities' },
-        () => fetch()  // reload on new activity
+        () => fetch()
       )
       .subscribe()
     return () => supabase.removeChannel(ch)

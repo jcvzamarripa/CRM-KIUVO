@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
-import { MOCK_SELLERS } from '../constants/mockData'
 
 /**
  * Hook para consultar ventas cerradas desde la tabla `sales`.
@@ -18,10 +17,8 @@ export function useSales({ sellerId, dateFrom, dateTo, limit = 500 } = {}) {
 
   const fetch = useCallback(async () => {
     if (!isSupabaseConfigured) {
-      // Fallback mock: totals derivados de MOCK_SELLERS
-      const mockAmount = MOCK_SELLERS.reduce((s, v) => s + v.won, 0)
-      setTotals({ count: MOCK_SELLERS.length * 3, amount: mockAmount })
       setSales([])
+      setTotals({ count: 0, amount: 0 })
       setLoading(false)
       return
     }
@@ -44,6 +41,8 @@ export function useSales({ sellerId, dateFrom, dateTo, limit = 500 } = {}) {
     const { data, error } = await q
     if (error || !data) {
       console.warn('[useSales]', error?.message)
+      setSales([])
+      setTotals({ count: 0, amount: 0 })
       setLoading(false)
       return
     }

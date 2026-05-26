@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
-import { MOCK_AGENDA_EVENTS } from '../constants/mockData'
 
 // ── Shape mapper ──────────────────────────────────────────────────────────────
 function mapEvent(ev) {
@@ -36,12 +35,7 @@ export function useAgendaEvents({ sellerId, dateFrom, dateTo, limit = 200 } = {}
 
   const fetch = useCallback(async () => {
     if (!isSupabaseConfigured) {
-      // Fallback: filter mock events
-      let mock = [...MOCK_AGENDA_EVENTS]
-      if (sellerId) mock = mock.filter(e => e.owner === sellerId) // rough match for demo
-      if (dateFrom) mock = mock.filter(e => e.date >= dateFrom)
-      if (dateTo)   mock = mock.filter(e => e.date <= dateTo)
-      setEvents(mock)
+      setEvents([])
       setLoading(false)
       return
     }
@@ -66,7 +60,7 @@ export function useAgendaEvents({ sellerId, dateFrom, dateTo, limit = 200 } = {}
 
     if (error || !data) {
       console.warn('[useAgendaEvents]', error?.message)
-      setEvents(MOCK_AGENDA_EVENTS)
+      setEvents([])
       setLoading(false)
       return
     }
