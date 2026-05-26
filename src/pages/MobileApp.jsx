@@ -66,7 +66,6 @@ export default function MobileApp({ dark, onToggleDark }) {
       profile={profile}
       dark={dark}
       onToggleDark={onToggleDark}
-      alertHero={false}
       onOpenKanban={goKanban}
       onRegisterVisit={() => setShowVisitModal(true)}
       onNewProspect={() => setShowNewProspect(true)}
