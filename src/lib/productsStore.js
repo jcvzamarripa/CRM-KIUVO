@@ -6,12 +6,11 @@
  *
  * Tier shape:  { id: string, minQty: number, discountPct: number }
  */
-import { MOCK_PRODUCTS } from '../constants/mockData'
-
-const KEY = 'kiuvo_products_v2'
+// v3 key — forces a fresh start (clears any cached mock products from v2)
+const KEY = 'kiuvo_products_v3'
 
 function defaults() {
-  return MOCK_PRODUCTS.map(p => ({ ...p, tiers: [] }))
+  return []
 }
 
 export function getProducts() {

@@ -1,7 +1,9 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import Icon from '../shared/Icon'
 import { useSellers } from '../../hooks/useSellers'
 import { useActivities } from '../../hooks/useActivities'
+import { supabase, isSupabaseConfigured } from '../../lib/supabase'
+import { STAGES } from '../../constants/stages'
 
 // ─── Períodos disponibles (calculados dinámicamente) ─────────────────────────
 function buildPeriods() {
@@ -23,22 +25,71 @@ const fmt    = n  => '$' + Math.round(n).toLocaleString('es-MX')
 const pctFmt = n  => `${n}%`
 const parseAmount = str => parseInt((str || '').replace(/[$,]/g, ''), 10) || 0
 
-// Datos de gráfica hardcoded (no cambian con el período en demo)
-const WEEKLY_CHART = [
-  { d: 'L', v: 42000 }, { d: 'M', v: 38000 }, { d: 'X', v: 51000 },
-  { d: 'J', v: 29000 }, { d: 'V', v: 64000 }, { d: 'S', v: 22000 }, { d: 'D', v: 12000 },
-]
-const MONTHLY_CHART = [
-  { d: 'Ene', v: 210000 }, { d: 'Feb', v: 185000 }, { d: 'Mar', v: 248000 },
-  { d: 'Abr', v: 192000 }, { d: 'May', v: 231000 },
-]
-const STAGE_DATA = [
-  { label: 'Prospección',  count: 142, color: '#888780' },
-  { label: 'Presentación', count: 86,  color: '#378ADD' },
-  { label: 'Cotización',   count: 48,  color: '#EF9F27' },
-  { label: 'Negociación',  count: 27,  color: '#D85A30' },
-  { label: 'Cierre',       count: 12,  color: '#1D9E75' },
-]
+// ─── Hook: gráficas de tendencias desde Supabase ─────────────────────────────
+const WEEK_DAYS  = ['L','M','X','J','V','S','D']
+const MONTH_ABBR = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+
+function useReportCharts() {
+  const [weeklyChart,  setWeeklyChart]  = useState(WEEK_DAYS.map(d  => ({ d, v: 0 })))
+  const [monthlyChart, setMonthlyChart] = useState([])
+  const [stageData,    setStageData]    = useState(STAGES.map(s => ({ label: s.label, count: 0, color: s.color })))
+  const [loading,      setLoading]      = useState(true)
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) { setLoading(false); return }
+
+    async function load() {
+      const today   = new Date()
+      const year    = today.getFullYear()
+      const dow     = today.getDay()
+      const mon     = new Date(today)
+      mon.setDate(today.getDate() - (dow === 0 ? 6 : dow - 1))
+      mon.setHours(0, 0, 0, 0)
+      const weekFrom  = mon.toISOString().slice(0, 10)
+      const yearFrom  = `${year}-01-01`
+      const todayISO  = today.toISOString().slice(0, 10)
+
+      // 1. Ventas esta semana → por día
+      const { data: weekSales } = await supabase
+        .from('sales').select('amount, closed_at')
+        .gte('closed_at', weekFrom).lte('closed_at', todayISO + 'T23:59:59Z')
+
+      const byDay = [0,0,0,0,0,0,0]
+      ;(weekSales || []).forEach(s => {
+        const d = new Date(s.closed_at).getDay()
+        byDay[d === 0 ? 6 : d - 1] += Number(s.amount) || 0
+      })
+      setWeeklyChart(WEEK_DAYS.map((d, i) => ({ d, v: byDay[i] })))
+
+      // 2. Ventas este año → por mes
+      const { data: yearSales } = await supabase
+        .from('sales').select('amount, closed_at')
+        .gte('closed_at', yearFrom).lte('closed_at', todayISO + 'T23:59:59Z')
+
+      const byMonth = Array(12).fill(0)
+      ;(yearSales || []).forEach(s => {
+        byMonth[new Date(s.closed_at).getMonth()] += Number(s.amount) || 0
+      })
+      const currentMonth = today.getMonth()
+      setMonthlyChart(
+        byMonth.slice(0, currentMonth + 1).map((v, i) => ({ d: MONTH_ABBR[i], v }))
+      )
+
+      // 3. Prospectos por etapa
+      const { data: prox } = await supabase.from('prospects').select('stage_id')
+      const map = {}
+      STAGES.forEach(s => { map[s.id] = 0 })
+      ;(prox || []).forEach(p => { if (map[p.stage_id] !== undefined) map[p.stage_id]++ })
+      setStageData(STAGES.map(s => ({ label: s.label, count: map[s.id], color: s.color })))
+
+      setLoading(false)
+    }
+
+    load()
+  }, [])
+
+  return { weeklyChart, monthlyChart, stageData, loading }
+}
 
 // ─── Cálculo de estadísticas por vendedor ────────────────────────────────────
 function computeSellerStats(sellers, activities, from, to) {
@@ -386,64 +437,75 @@ function SellerReportTab({ stats, period, onExportCSV, onExportXLS, csvLabel, xl
 }
 
 // ─── Tab: Ventas ──────────────────────────────────────────────────────────────
-function VentasTab() {
+function VentasTab({ weeklyChart = [], monthlyChart = [] }) {
+  const year = new Date().getFullYear()
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
       <div style={{ padding: '18px 20px', background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 'var(--r-lg)' }}>
         <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg)', marginBottom: 2 }}>Ventas por día</div>
         <div style={{ fontSize: 11, color: 'var(--fg-secondary)', marginBottom: 14 }}>Semana actual · Cierres ganados</div>
-        <BarChart data={WEEKLY_CHART} color="var(--kiuvo-blue)" height={160} />
+        <BarChart data={weeklyChart} color="var(--kiuvo-blue)" height={160} />
       </div>
       <div style={{ padding: '18px 20px', background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 'var(--r-lg)' }}>
         <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg)', marginBottom: 2 }}>Ventas por mes</div>
-        <div style={{ fontSize: 11, color: 'var(--fg-secondary)', marginBottom: 14 }}>Año 2026 · acumulado</div>
-        <BarChart data={MONTHLY_CHART} color="var(--success)" height={160} maxVal={300000} />
+        <div style={{ fontSize: 11, color: 'var(--fg-secondary)', marginBottom: 14 }}>{year} · acumulado</div>
+        <BarChart data={monthlyChart} color="var(--success)" height={160} />
       </div>
     </div>
   )
 }
 
 // ─── Tab: Embudo ──────────────────────────────────────────────────────────────
-function EmbudoTab() {
+function EmbudoTab({ stageData = [] }) {
+  const maxCount = Math.max(...stageData.map(s => s.count), 1)
+  const hasData  = stageData.some(s => s.count > 0)
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
       <div style={{ padding: '18px 20px', background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 'var(--r-lg)' }}>
         <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg)', marginBottom: 2 }}>Distribución del pipeline</div>
         <div style={{ fontSize: 11, color: 'var(--fg-secondary)', marginBottom: 18 }}>Prospectos por etapa</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {STAGE_DATA.map(s => (
-            <div key={s.label}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 5 }}>
-                <span style={{ color: 'var(--fg)' }}>{s.label}</span>
-                <span style={{ fontWeight: 500, color: 'var(--fg)', fontVariantNumeric: 'tabular-nums' }}>{s.count}</span>
+        {!hasData ? (
+          <div style={{ textAlign: 'center', color: 'var(--fg-tertiary)', fontSize: 13, padding: '20px 0' }}>Sin prospectos aún</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {stageData.map(s => (
+              <div key={s.label}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 5 }}>
+                  <span style={{ color: 'var(--fg)' }}>{s.label}</span>
+                  <span style={{ fontWeight: 500, color: 'var(--fg)', fontVariantNumeric: 'tabular-nums' }}>{s.count}</span>
+                </div>
+                <div style={{ height: 8, background: 'var(--bg-tertiary)', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{ width: `${(s.count / maxCount) * 100}%`, height: '100%', background: s.color, borderRadius: 4, transition: 'width 0.4s' }} />
+                </div>
               </div>
-              <div style={{ height: 8, background: 'var(--bg-tertiary)', borderRadius: 4, overflow: 'hidden' }}>
-                <div style={{ width: `${(s.count / STAGE_DATA[0].count) * 100}%`, height: '100%', background: s.color, borderRadius: 4, transition: 'width 0.4s' }} />
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
       <div style={{ padding: '18px 20px', background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 'var(--r-lg)' }}>
         <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg)', marginBottom: 2 }}>Tasas de conversión</div>
         <div style={{ fontSize: 11, color: 'var(--fg-secondary)', marginBottom: 18 }}>Entre etapas consecutivas</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {STAGE_DATA.slice(0, -1).map((s, i) => {
-            const next = STAGE_DATA[i + 1]
-            const rate = Math.round((next.count / s.count) * 100)
-            return (
-              <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 80, fontSize: 11, color: 'var(--fg-secondary)', textAlign: 'right' }}>{s.label}</div>
-                <Icon name="arrow-right" size={12} color="var(--fg-tertiary)" />
-                <div style={{ width: 80, fontSize: 11, color: 'var(--fg-secondary)' }}>{next.label}</div>
-                <div style={{ flex: 1, height: 6, background: 'var(--bg-tertiary)', borderRadius: 3, overflow: 'hidden' }}>
-                  <div style={{ width: `${rate}%`, height: '100%', background: next.color, borderRadius: 3 }} />
+        {!hasData ? (
+          <div style={{ textAlign: 'center', color: 'var(--fg-tertiary)', fontSize: 13, padding: '20px 0' }}>Sin datos suficientes</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {stageData.slice(0, -1).map((s, i) => {
+              const next = stageData[i + 1]
+              const rate = s.count > 0 ? Math.round((next.count / s.count) * 100) : 0
+              return (
+                <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 80, fontSize: 11, color: 'var(--fg-secondary)', textAlign: 'right' }}>{s.label}</div>
+                  <Icon name="arrow-right" size={12} color="var(--fg-tertiary)" />
+                  <div style={{ width: 80, fontSize: 11, color: 'var(--fg-secondary)' }}>{next.label}</div>
+                  <div style={{ flex: 1, height: 6, background: 'var(--bg-tertiary)', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{ width: `${rate}%`, height: '100%', background: next.color, borderRadius: 3 }} />
+                  </div>
+                  <div style={{ width: 36, fontSize: 12, fontWeight: 500, color: 'var(--fg)', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{rate}%</div>
                 </div>
-                <div style={{ width: 36, fontSize: 12, fontWeight: 500, color: 'var(--fg)', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{rate}%</div>
-              </div>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -451,8 +513,9 @@ function EmbudoTab() {
 
 // ─── Main view ────────────────────────────────────────────────────────────────
 export default function ReportsView() {
-  const { sellers }              = useSellers()
-  const { activities }           = useActivities({ limit: 500 })
+  const { sellers }                              = useSellers()
+  const { activities }                           = useActivities({ limit: 500 })
+  const { weeklyChart, monthlyChart, stageData } = useReportCharts()
   const [tab,      setTab]      = useState('sellers')
   const [periodId, setPeriodId] = useState('week')
   const [csvFlash, setCsvFlash] = useState(false)
@@ -554,8 +617,8 @@ export default function ReportsView() {
           xlsLabel={xlsFlash ? '✓ Descargado' : 'Exportar Excel (.xls)'}
         />
       )}
-      {tab === 'ventas' && <VentasTab />}
-      {tab === 'embudo' && <EmbudoTab />}
+      {tab === 'ventas' && <VentasTab weeklyChart={weeklyChart} monthlyChart={monthlyChart} />}
+      {tab === 'embudo' && <EmbudoTab stageData={stageData} />}
     </div>
   )
 }

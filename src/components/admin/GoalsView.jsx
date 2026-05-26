@@ -25,12 +25,8 @@ const BADGES_CATALOG = [
   { id: 'mejor-conv',    emoji: '🚀', label: 'Mejor Conversión', color: '#D85A30', desc: 'Mayor tasa de conversión del equipo'},
 ]
 
-const CHALLENGES = [
-  { id: 1, title: 'Semana de Fuego',     desc: 'Cierra 3 ventas antes del viernes',    prog: 1, total: 3,   reward: 200, days: 3, icon: 'flame',   color: '#E24B4A' },
-  { id: 2, title: 'Visitador Estrella',  desc: 'Registra 10 visitas en los próximos 5 días', prog: 7, total: 10, reward: 150, days: 5, icon: 'map-pin', color: '#185FA5' },
-  { id: 3, title: 'Meta del Mes',        desc: 'Alcanza el 100% de tu meta mensual',   prog: 82, total: 100, reward: 500, days: 9, icon: 'target',  color: '#1D9E75' },
-  { id: 4, title: 'Maestro del Pipeline',desc: 'Avanza 5 prospectos de etapa',         prog: 2, total: 5,   reward: 120, days: 7, icon: 'layout-kanban', color: '#7C5CBF' },
-]
+// Challenges start empty — to be created by the admin in the UI
+const CHALLENGES = []
 
 const POINTS_RULES = [
   { action: 'Visita registrada',     pts: 10,  icon: 'map-pin',      color: '#185FA5' },
@@ -517,10 +513,10 @@ function GameTab({ sellers = [] }) {
   const [challenges,    setChallenges]    = useState(CHALLENGES)
 
   const ranked = [...sellers].sort((a, b) => gameOf(b.init).pts - gameOf(a.init).pts)
-  const top3   = ranked.slice(0, 3)
 
-  // Podium order: 2nd, 1st, 3rd
-  const podiumOrder = [ranked[1], ranked[0], ranked[2]]
+  // Podium order: 2nd, 1st, 3rd — only render positions that exist
+  const podiumSlots = [ranked[1], ranked[0], ranked[2]].filter(Boolean)
+  const podiumPos   = sellers.length >= 3 ? [2, 1, 3] : sellers.length === 2 ? [2, 1] : [1]
 
   function removeChallenge(id) {
     setChallenges(c => c.filter(ch => ch.id !== id))
@@ -541,15 +537,22 @@ function GameTab({ sellers = [] }) {
           }}>
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
               <div style={{ fontSize:14, fontWeight:600, color:'var(--fg)' }}>🏆 Ranking del período</div>
-              <span style={{ fontSize:11, color:'var(--fg-tertiary)' }}>Mayo 2026</span>
+              <span style={{ fontSize:11, color:'var(--fg-tertiary)' }}>
+                {new Date().toLocaleDateString('es-MX', { month: 'long', year: 'numeric' })}
+              </span>
             </div>
 
-            <div style={{ display:'flex', alignItems:'flex-end', gap:8 }}>
-              {podiumOrder.map((sl, i) => {
-                const pos = i === 0 ? 2 : i === 1 ? 1 : 3
-                return <PodiumCard key={sl.init} seller={sl} game={gameOf(sl.init)} pos={pos} sellers={sellers} />
-              })}
-            </div>
+            {ranked.length === 0 ? (
+              <div style={{ padding:'24px 0', textAlign:'center', color:'var(--fg-tertiary)', fontSize:13 }}>
+                Sin vendedores en el equipo aún.
+              </div>
+            ) : (
+              <div style={{ display:'flex', alignItems:'flex-end', gap:8 }}>
+                {podiumSlots.map((sl, i) => (
+                  <PodiumCard key={sl.init} seller={sl} game={gameOf(sl.init)} pos={podiumPos[i]} sellers={sellers} />
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Full ranking table */}
