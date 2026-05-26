@@ -47,14 +47,18 @@ function AppRoutes() {
           <Navigate to="/app" replace />
         } />
         <Route path="/app" element={
-          !user ? <Navigate to="/login" replace /> : (
+          !user                        ? <Navigate to="/login" replace /> :
+          profile?.role === 'admin'    ? <Navigate to="/admin" replace /> :
+          (
             <div style={{ height: '100vh' }}>
               <MobileApp dark={dark} onToggleDark={() => setDark(d => !d)} />
             </div>
           )
         } />
         <Route path="/admin" element={
-          !user ? <Navigate to="/login" replace /> : (
+          !user                        ? <Navigate to="/login" replace /> :
+          profile?.role !== 'admin'    ? <Navigate to="/app"   replace /> :
+          (
             <div style={{ height: '100vh' }}>
               <AdminApp dark={dark} onToggleDark={() => setDark(d => !d)} />
             </div>
