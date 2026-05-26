@@ -1,14 +1,22 @@
 import React, { useState, useMemo } from 'react'
 import Icon from '../shared/Icon'
-import { MOCK_SELLERS } from '../../constants/mockData'
-import { MOCK_ACTIVITIES } from '../../constants/mockActivities'
+import { useSellers } from '../../hooks/useSellers'
+import { useActivities } from '../../hooks/useActivities'
 
-// ─── Períodos disponibles ─────────────────────────────────────────────────────
-const PERIODS = [
-  { id: 'week',  label: 'Esta semana',    from: '2026-05-18', to: '2026-05-22' },
-  { id: 'month', label: 'Este mes',       from: '2026-05-01', to: '2026-05-22' },
-  { id: 'last30',label: 'Últimos 30 días',from: '2026-04-22', to: '2026-05-22' },
-]
+// ─── Períodos disponibles (calculados dinámicamente) ─────────────────────────
+function buildPeriods() {
+  const today  = new Date()
+  const toISO  = d => d.toISOString().slice(0, 10)
+  const todayS = toISO(today)
+  const monday = new Date(today); monday.setDate(today.getDate() - ((today.getDay() + 6) % 7))
+  const last30 = new Date(today); last30.setDate(today.getDate() - 30)
+  return [
+    { id: 'week',   label: 'Esta semana',     from: toISO(monday), to: todayS },
+    { id: 'month',  label: 'Este mes',        from: todayS.slice(0, 8) + '01', to: todayS },
+    { id: 'last30', label: 'Últimos 30 días', from: toISO(last30), to: todayS },
+  ]
+}
+const PERIODS = buildPeriods()
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const fmt    = n  => '$' + Math.round(n).toLocaleString('es-MX')
@@ -33,10 +41,10 @@ const STAGE_DATA = [
 ]
 
 // ─── Cálculo de estadísticas por vendedor ────────────────────────────────────
-function computeSellerStats(from, to) {
-  const inPeriod = MOCK_ACTIVITIES.filter(a => a.date >= from && a.date <= to)
+function computeSellerStats(sellers, activities, from, to) {
+  const inPeriod = activities.filter(a => a.date >= from && a.date <= to)
 
-  return MOCK_SELLERS.map(seller => {
+  return sellers.map(seller => {
     const acts = inPeriod.filter(a => a.sellerInit === seller.init)
     const visits    = acts.filter(a => a.kind === 'visit').length
     const calls     = acts.filter(a => a.kind === 'call').length
@@ -443,6 +451,8 @@ function EmbudoTab() {
 
 // ─── Main view ────────────────────────────────────────────────────────────────
 export default function ReportsView() {
+  const { sellers }              = useSellers()
+  const { activities }           = useActivities({ limit: 500 })
   const [tab,      setTab]      = useState('sellers')
   const [periodId, setPeriodId] = useState('week')
   const [csvFlash, setCsvFlash] = useState(false)
@@ -451,14 +461,14 @@ export default function ReportsView() {
   const period = PERIODS.find(p => p.id === periodId) || PERIODS[0]
 
   const stats = useMemo(
-    () => computeSellerStats(period.from, period.to),
-    [period.from, period.to]
+    () => computeSellerStats(sellers, activities, period.from, period.to),
+    [sellers, activities, period.from, period.to]
   )
 
-  const totalWon      = MOCK_SELLERS.reduce((s, r) => s + r.won, 0)
-  const totalGoal     = MOCK_SELLERS.reduce((s, r) => s + r.goal, 0)
-  const avgCompliance = Math.round(MOCK_SELLERS.reduce((s, r) => s + r.compliance, 0) / MOCK_SELLERS.length)
-  const totalProspects= MOCK_SELLERS.reduce((s, r) => s + r.prospects, 0)
+  const totalWon      = sellers.reduce((s, r) => s + (r.won || 0), 0)
+  const totalGoal     = sellers.reduce((s, r) => s + (r.goal || 100000), 0)
+  const avgCompliance = sellers.length ? Math.round(sellers.reduce((s, r) => s + (r.compliance || 0), 0) / sellers.length) : 0
+  const totalProspects= sellers.reduce((s, r) => s + (r.prospects || 0), 0)
 
   function handleCSV() {
     exportSellerCSV(stats, period.label)

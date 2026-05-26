@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react'
 import Icon from '../shared/Icon'
-import { MOCK_SELLERS, MOCK_PROSPECTS, MOCK_PRODUCTS } from '../../constants/mockData'
+import { useSellers } from '../../hooks/useSellers'
+import { useAdminProspects } from '../../hooks/useAdminProspects'
+import { getProducts } from '../../lib/productsStore'
 import { rules } from '../../lib/validation'
 
 const MOCK_QUOTES = [
@@ -22,13 +24,13 @@ const STATUS = {
 }
 
 const fmt = n => '$' + n.toLocaleString('es-MX')
-const sellerName = init => MOCK_SELLERS.find(s => s.init === init)?.name || init
-const sellerColor = init => MOCK_SELLERS.find(s => s.init === init)?.color || '#888'
+const sellerName  = (sellers, init) => sellers.find(s => s.init === init)?.name  || init
+const sellerColor = (sellers, init) => sellers.find(s => s.init === init)?.color || '#888'
 
 // ─── New Quote Panel ──────────────────────────────────────────────────────────
-function NewQuotePanel({ onClose, onSave, nextId }) {
+function NewQuotePanel({ onClose, onSave, nextId, sellers = [], prospects = [], products = [] }) {
   const [prospect,    setProspect]    = useState('')
-  const [seller,      setSeller]      = useState(MOCK_SELLERS[0].init)
+  const [seller,      setSeller]      = useState(sellers[0]?.init || '')
   const [items,       setItems]       = useState([])
   const [daysValid,   setDaysValid]   = useState('15')
   const [daysError,   setDaysError]   = useState(null)
@@ -46,7 +48,7 @@ function NewQuotePanel({ onClose, onSave, nextId }) {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const filteredProducts = MOCK_PRODUCTS.filter(p =>
+  const filteredProducts = products.filter(p =>
     search.length > 0 &&
     (p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase()))
   ).slice(0, 6)
@@ -140,7 +142,7 @@ function NewQuotePanel({ onClose, onSave, nextId }) {
             }}
           >
             <option value="">— Seleccionar prospecto —</option>
-            {MOCK_PROSPECTS.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+            {prospects.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
           </select>
         </div>
 
@@ -150,7 +152,7 @@ function NewQuotePanel({ onClose, onSave, nextId }) {
             VENDEDOR
           </label>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {MOCK_SELLERS.map(s => (
+            {sellers.map(s => (
               <button
                 key={s.init}
                 onClick={() => setSeller(s.init)}
@@ -340,7 +342,7 @@ function NewQuotePanel({ onClose, onSave, nextId }) {
           <div>
             <label style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', display: 'block', marginBottom: 5 }}>VENDEDOR ASIGNADO</label>
             <div style={{ padding: '8px 10px', fontSize: 13, border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)', background: 'var(--bg)', color: 'var(--fg)' }}>
-              {MOCK_SELLERS.find(s => s.init === seller)?.name.split(' ')[0] || seller}
+              {sellers.find(s => s.init === seller)?.name.split(' ')[0] || seller}
             </div>
           </div>
         </div>
@@ -418,6 +420,9 @@ function NewQuotePanel({ onClose, onSave, nextId }) {
 
 // ─── Main QuotesView ──────────────────────────────────────────────────────────
 export default function QuotesView() {
+  const { sellers }    = useSellers()
+  const { prospects }  = useAdminProspects()
+  const products       = getProducts()
   const [filter,    setFilter]    = useState('all')
   const [selected,  setSelected]  = useState(null)
   const [showNew,   setShowNew]   = useState(false)
@@ -532,10 +537,10 @@ export default function QuotesView() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <div style={{
                           width: 24, height: 24, borderRadius: '50%',
-                          background: sellerColor(q.seller) + '22', color: sellerColor(q.seller),
+                          background: sellerColor(sellers, q.seller) + '22', color: sellerColor(sellers, q.seller),
                           display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 500,
                         }}>{q.seller}</div>
-                        <span style={{ fontSize: 12, color: 'var(--fg-secondary)' }}>{sellerName(q.seller)}</span>
+                        <span style={{ fontSize: 12, color: 'var(--fg-secondary)' }}>{sellerName(sellers, q.seller)}</span>
                       </div>
                     </td>
                     <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', fontWeight: 500, color: 'var(--fg)', fontVariantNumeric: 'tabular-nums' }}>
@@ -574,6 +579,9 @@ export default function QuotesView() {
           nextId={nextId}
           onClose={() => setShowNew(false)}
           onSave={handleNewQuote}
+          sellers={sellers}
+          prospects={prospects}
+          products={products}
         />
       )}
 
@@ -597,7 +605,7 @@ export default function QuotesView() {
             }}>{STATUS[selected.status].label}</span>
             <div>
               <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--fg)' }}>{selected.prospect}</div>
-              <div style={{ fontSize: 12, color: 'var(--fg-secondary)', marginTop: 2 }}>{sellerName(selected.seller)}</div>
+              <div style={{ fontSize: 12, color: 'var(--fg-secondary)', marginTop: 2 }}>{sellerName(sellers, selected.seller)}</div>
             </div>
             {[
               { label: 'Total',       value: fmt(selected.total) },

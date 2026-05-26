@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import Icon from '../shared/Icon'
-import { MOCK_SELLERS, MOCK_ACTIVITY } from '../../constants/mockData'
+import { useSellers } from '../../hooks/useSellers'
 
 // ─── Extended seller data ─────────────────────────────────────────────────────
 const INIT_EXT = {
@@ -671,6 +671,7 @@ function Section({ label, children }) {
 
 // ─── Main view ────────────────────────────────────────────────────────────────
 export default function TeamView() {
+  const { sellers: sellerList } = useSellers()
   const [exts,        setExts]        = useState(INIT_EXT)
   const [search,      setSearch]      = useState('')
   const [roleFilter,  setRoleFilter]  = useState('all')
@@ -679,7 +680,7 @@ export default function TeamView() {
   const [showInvite,  setShowInvite]  = useState(false)
   const [roleDropFor, setRoleDropFor] = useState(null) // init of seller with open dropdown
 
-  const sellers = MOCK_SELLERS.map(s => ({
+  const sellers = sellerList.map(s => ({
     ...s,
     ext: exts[s.init] || { role: 'seller', status: 'active', zone: '—', email: '', lastSeen: '—', meta: s.goal },
   }))

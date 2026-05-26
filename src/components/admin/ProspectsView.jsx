@@ -9,7 +9,7 @@ const HEALTH_COLOR = { green: 'var(--success)', amber: 'var(--warning)', red: 'v
 const fmt = n => '$' + n.toLocaleString('es-MX')
 
 // ─── New Prospect Panel ───────────────────────────────────────────────────────
-function NewProspectPanel({ stages, onSave, onClose }) {
+function NewProspectPanel({ stages, sellers = [], onSave, onClose }) {
   const [form, setForm] = useState({
     name:    '',
     contact: '',
@@ -160,7 +160,7 @@ function NewProspectPanel({ stages, onSave, onClose }) {
         {/* Vendedor */}
         <Field label="Vendedor asignado">
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {MOCK_SELLERS.map(s => {
+            {sellers.map(s => {
               const active = form.owner === s.init
               return (
                 <button
@@ -227,9 +227,9 @@ function NewProspectPanel({ stages, onSave, onClose }) {
 }
 
 // ─── Detail Panel ─────────────────────────────────────────────────────────────
-function DetailPanel({ p, stageById, onClose }) {
+function DetailPanel({ p, stageById, sellers = [], onClose }) {
   const stage = stageById[p.stage] || {}
-  const seller = MOCK_SELLERS.find(s => s.init === p.owner)
+  const seller = sellers.find(s => s.init === p.owner)
 
   return (
     <div style={{
@@ -356,9 +356,9 @@ export default function ProspectsView() {
 
   // Right panel: new form takes priority over detail
   const rightPanel = showNew
-    ? <NewProspectPanel stages={stages} onSave={handleNewProspect} onClose={() => setShowNew(false)} />
+    ? <NewProspectPanel stages={stages} sellers={sellers} onSave={handleNewProspect} onClose={() => setShowNew(false)} />
     : selected
-      ? <DetailPanel p={selected} stageById={stageById} onClose={() => setSelected(null)} />
+      ? <DetailPanel p={selected} stageById={stageById} sellers={sellers} onClose={() => setSelected(null)} />
       : null
 
   return (

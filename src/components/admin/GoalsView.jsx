@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import Icon from '../shared/Icon'
-import { MOCK_SELLERS } from '../../constants/mockData'
+import { useSellers } from '../../hooks/useSellers'
 
 // ─── Gamification data ────────────────────────────────────────────────────────
 const SELLER_GAME = {
@@ -66,8 +66,13 @@ const ACTUALS = {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmt  = n => '$' + n.toLocaleString('es-MX')
 const pct  = (a, b) => Math.round((a / b) * 100)
-const sellerColor = init => MOCK_SELLERS.find(s => s.init === init)?.color || '#888'
-const sellerName  = init => MOCK_SELLERS.find(s => s.init === init)?.name  || init
+// sellerColor / sellerName receive the sellers list from the enclosing component
+const sellerColor = (sellers, init) => sellers.find(s => s.init === init)?.color || '#888'
+const sellerName  = (sellers, init) => sellers.find(s => s.init === init)?.name  || init
+// Safe lookup into hardcoded gamification maps
+const gameOf = init => SELLER_GAME[init] || { pts: 0, level: 'Bronce', rank: 99, prev: 99, streak: 0, xpNext: 500, badges: [] }
+const metaOf = init => DEFAULT_METAS[init] || { ventas: 80000, prospectos: 20, visitas: 25 }
+const actualOf = init => ACTUALS[init]     || { ventas: 0,     prospectos: 0,  visitas: 0  }
 
 // ─── Editable cell ────────────────────────────────────────────────────────────
 function EditableCell({ value, onSave, format = 'number', prefix = '' }) {
@@ -139,7 +144,7 @@ function ProgBar({ value, max, color = 'var(--kiuvo-blue)', h = 5 }) {
 }
 
 // ─── Metas Tab ────────────────────────────────────────────────────────────────
-function MetasTab() {
+function MetasTab({ sellers = [] }) {
   const [period,        setPeriod]        = useState('Mes')
   const [metas,         setMetas]         = useState(DEFAULT_METAS)
   const [dirty,         setDirty]         = useState(false)
@@ -179,16 +184,19 @@ function MetasTab() {
     setEditingTeam(false)
   }
 
-  const sorted = [...MOCK_SELLERS].sort((a, b) => {
-    const pa = pct(ACTUALS[a.init].ventas, metas[a.init].ventas)
-    const pb = pct(ACTUALS[b.init].ventas, metas[b.init].ventas)
+  const sorted = [...sellers].sort((a, b) => {
+    const pa = pct(actualOf(a.init).ventas, metas[a.init]?.ventas || metaOf(a.init).ventas)
+    const pb = pct(actualOf(b.init).ventas, metas[b.init]?.ventas || metaOf(b.init).ventas)
     return pb - pa
   })
 
-  const sumIndividual = Object.values(metas).reduce((s, m) => s + m.ventas, 0)
+  const sumIndividual = sellers.reduce((s, sl) => s + (metas[sl.init]?.ventas || metaOf(sl.init).ventas), 0)
   const teamGoal      = teamGoalCustom ?? sumIndividual
-  const teamActual    = Object.values(ACTUALS).reduce((s, a) => s + a.ventas, 0)
-  const avgCompl    = Math.round(sorted.reduce((s, sl) => s + pct(ACTUALS[sl.init].ventas, metas[sl.init].ventas), 0) / sorted.length)
+  const teamActual    = sellers.reduce((s, sl) => s + actualOf(sl.init).ventas, 0)
+  const avgCompl    = sorted.length ? Math.round(sorted.reduce((s, sl) => {
+    const m = metas[sl.init]?.ventas || metaOf(sl.init).ventas
+    return s + pct(actualOf(sl.init).ventas, m)
+  }, 0) / sorted.length) : 0
   const topSeller   = sorted[0]
 
   return (
@@ -318,7 +326,7 @@ function MetasTab() {
           {[
             { label:'Alcanzado hasta hoy',   value: fmt(teamActual),  sub: `${pct(teamActual, teamGoal)}% del objetivo`, icon:'trending-up', color:'var(--success)' },
             { label:'Cumplimiento promedio', value: `${avgCompl}%`,   sub: 'del equipo · este mes', icon:'chart-bar', color: avgCompl >= 80 ? 'var(--success)' : avgCompl >= 60 ? 'var(--warning)' : 'var(--danger)' },
-            { label:'Mejor vendedor',        value: sellerName(topSeller.init).split(' ')[0], sub: `${pct(ACTUALS[topSeller.init].ventas, metas[topSeller.init].ventas)}% de cumplimiento`, icon:'trophy', color:'#EF9F27' },
+            { label:'Mejor vendedor',        value: topSeller ? sellerName(sellers, topSeller.init).split(' ')[0] : '—', sub: topSeller ? `${pct(actualOf(topSeller.init).ventas, metas[topSeller.init]?.ventas || metaOf(topSeller.init).ventas)}% de cumplimiento` : '', icon:'trophy', color:'#EF9F27' },
           ].map(c => (
             <div key={c.label} style={{
               background:'var(--surface)', border:'0.5px solid var(--border)',
@@ -361,9 +369,9 @@ function MetasTab() {
 
           {/* Rows */}
           {sorted.map((sl, i) => {
-            const g  = metas[sl.init]
-            const a  = ACTUALS[sl.init]
-            const sclr = sellerColor(sl.init)
+            const g  = { ...metaOf(sl.init), ...metas[sl.init] }
+            const a  = actualOf(sl.init)
+            const sclr = sellerColor(sellers, sl.init)
             const ventasPct = pct(a.ventas, g.ventas)
 
             return (
@@ -433,8 +441,8 @@ function MetasTab() {
 }
 
 // ─── Podium card ──────────────────────────────────────────────────────────────
-function PodiumCard({ seller, game, pos }) {
-  const sclr  = sellerColor(seller.init)
+function PodiumCard({ seller, game, pos, sellers = [] }) {
+  const sclr  = sellerColor(sellers, seller.init)
   const lcfg  = LEVEL_CFG[game.level]
   const heights = { 1: 90, 2: 70, 3: 56 }
   const medals  = { 1: '🥇', 2: '🥈', 3: '🥉' }
@@ -492,13 +500,13 @@ function PodiumCard({ seller, game, pos }) {
 }
 
 // ─── Gamification Tab ─────────────────────────────────────────────────────────
-function GameTab() {
+function GameTab({ sellers = [] }) {
   const [showRules,     setShowRules]     = useState(false)
   const [newChallenge,  setNewChallenge]  = useState(false)
   const [bonusSeller,   setBonusSeller]   = useState(null)
   const [challenges,    setChallenges]    = useState(CHALLENGES)
 
-  const ranked = [...MOCK_SELLERS].sort((a, b) => SELLER_GAME[b.init].pts - SELLER_GAME[a.init].pts)
+  const ranked = [...sellers].sort((a, b) => gameOf(b.init).pts - gameOf(a.init).pts)
   const top3   = ranked.slice(0, 3)
 
   // Podium order: 2nd, 1st, 3rd
@@ -529,7 +537,7 @@ function GameTab() {
             <div style={{ display:'flex', alignItems:'flex-end', gap:8 }}>
               {podiumOrder.map((sl, i) => {
                 const pos = i === 0 ? 2 : i === 1 ? 1 : 3
-                return <PodiumCard key={sl.init} seller={sl} game={SELLER_GAME[sl.init]} pos={pos} />
+                return <PodiumCard key={sl.init} seller={sl} game={gameOf(sl.init)} pos={pos} sellers={sellers} />
               })}
             </div>
           </div>
@@ -546,9 +554,9 @@ function GameTab() {
             </div>
 
             {ranked.map((sl, i) => {
-              const g    = SELLER_GAME[sl.init]
-              const lcfg = LEVEL_CFG[g.level]
-              const sclr = sellerColor(sl.init)
+              const g    = gameOf(sl.init)
+              const lcfg = LEVEL_CFG[g.level] || LEVEL_CFG.Bronce
+              const sclr = sellerColor(sellers, sl.init)
               const delta = g.prev - g.rank  // positive = moved up
               const xpPct = Math.round((g.pts / g.xpNext) * 100)
 
@@ -780,7 +788,7 @@ function GameTab() {
 
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
               {BADGES_CATALOG.map(b => {
-                const earnedBy = MOCK_SELLERS.filter(s => SELLER_GAME[s.init].badges.includes(b.id))
+                const earnedBy = sellers.filter(s => gameOf(s.init).badges.includes(b.id))
                 return (
                   <div key={b.id} style={{
                     background:'var(--surface)', border:'0.5px solid var(--border)',
@@ -803,7 +811,7 @@ function GameTab() {
                           {earnedBy.map(s => (
                             <div key={s.init} style={{
                               width:16, height:16, borderRadius:'50%',
-                              background: sellerColor(s.init) + '30', color: sellerColor(s.init),
+                              background: sellerColor(sellers, s.init) + '30', color: sellerColor(sellers, s.init),
                               fontSize:7, fontWeight:700,
                               display:'flex', alignItems:'center', justifyContent:'center',
                             }}>{s.init}</div>
@@ -919,6 +927,7 @@ function NewChallengeForm({ onSave, onCancel }) {
 
 // ─── Main GoalsView ───────────────────────────────────────────────────────────
 export default function GoalsView() {
+  const { sellers } = useSellers()
   const [tab, setTab] = useState('metas')
 
   return (
@@ -953,8 +962,8 @@ export default function GoalsView() {
         ))}
       </div>
 
-      {tab === 'metas'        && <MetasTab />}
-      {tab === 'gamificacion' && <GameTab />}
+      {tab === 'metas'        && <MetasTab sellers={sellers} />}
+      {tab === 'gamificacion' && <GameTab  sellers={sellers} />}
     </div>
   )
 }

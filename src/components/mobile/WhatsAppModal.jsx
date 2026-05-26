@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import Icon from '../shared/Icon'
-import { MOCK_PROSPECTS } from '../../constants/mockData'
+import { useAdminProspects } from '../../hooks/useAdminProspects'
 import { STAGE_BY_ID } from '../../constants/stages'
 
 // ── Inline SVGs ───────────────────────────────────────────────────
@@ -64,19 +64,20 @@ const TEMPLATES = [
 
 // ── Main ──────────────────────────────────────────────────────────
 export default function WhatsAppModal({ onClose }) {
+  const { prospects } = useAdminProspects()
   const [search, setSearch]         = useState('')
   const [selected, setSelected]     = useState(null)   // prospect id
   const [templateId, setTemplateId] = useState('followup')
   const [message, setMessage]       = useState('')
   const [sent, setSent]             = useState(false)
 
-  const prospect  = MOCK_PROSPECTS.find(p => p.id === selected)
+  const prospect  = prospects.find(p => p.id === selected)
   const stage     = prospect ? STAGE_BY_ID[prospect.stage] : null
   const template  = TEMPLATES.find(t => t.id === templateId)
 
-  const filtered = MOCK_PROSPECTS.filter(p =>
+  const filtered = prospects.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.contact.toLowerCase().includes(search.toLowerCase())
+    (p.contact || '').toLowerCase().includes(search.toLowerCase())
   )
 
   const selectProspect = (p) => {

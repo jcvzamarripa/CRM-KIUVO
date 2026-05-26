@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import Icon from '../shared/Icon'
-import { MOCK_AGENDA_EVENTS, MOCK_SELLERS } from '../../constants/mockData'
+import { MOCK_AGENDA_EVENTS } from '../../constants/mockData'
+import { useSellers } from '../../hooks/useSellers'
 import { STAGE_BY_ID } from '../../constants/stages'
 
 // ─── Config ───────────────────────────────────────────────────────────────────
@@ -177,8 +178,8 @@ function layoutEvents(events) {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const sellerColor = init => MOCK_SELLERS.find(s => s.init === init)?.color || '#888'
-const sellerName  = init => MOCK_SELLERS.find(s => s.init === init)?.name  || init
+const sellerColor = (sellers, init) => sellers.find(s => s.init === init)?.color || '#888'
+const sellerName  = (sellers, init) => sellers.find(s => s.init === init)?.name  || init
 
 const fmt12 = t => {
   const [h,m] = t.split(':').map(Number)
@@ -188,7 +189,7 @@ const fmt12 = t => {
 }
 
 // ─── Event card (inside week grid) ────────────────────────────────────────────
-function EventCard({ ev, onSelect, selected }) {
+function EventCard({ ev, onSelect, selected, sellers = [] }) {
   const cfg     = TYPE_CFG[ev.type] || TYPE_CFG.visita
   const startM  = timeToMin(ev.start)
   const endM    = timeToMin(ev.end)
@@ -198,7 +199,7 @@ function EventCard({ ev, onSelect, selected }) {
   const left    = ev.colIdx * colW
   const isSel   = selected?.id === ev.id
   const short   = height < 40
-  const scolor  = sellerColor(ev.owner)
+  const scolor  = sellerColor(sellers, ev.owner)
 
   return (
     <div
@@ -256,7 +257,7 @@ function EventCard({ ev, onSelect, selected }) {
 }
 
 // ─── Week column ──────────────────────────────────────────────────────────────
-function DayColumn({ date, isoDate, events, isToday, onSelect, selected, nowMin }) {
+function DayColumn({ date, isoDate, events, isToday, onSelect, selected, nowMin, sellers = [] }) {
   const laid = layoutEvents(events)
 
   return (
@@ -282,7 +283,7 @@ function DayColumn({ date, isoDate, events, isToday, onSelect, selected, nowMin 
 
       {/* Events */}
       {laid.map(ev => (
-        <EventCard key={ev.id} ev={ev} onSelect={onSelect} selected={selected} />
+        <EventCard key={ev.id} ev={ev} onSelect={onSelect} selected={selected} sellers={sellers} />
       ))}
 
       {/* Empty state */}
@@ -296,11 +297,11 @@ function DayColumn({ date, isoDate, events, isToday, onSelect, selected, nowMin 
 }
 
 // ─── Detail panel ─────────────────────────────────────────────────────────────
-function DetailPanel({ ev, onClose }) {
+function DetailPanel({ ev, onClose, sellers = [] }) {
   const cfg   = TYPE_CFG[ev.type] || TYPE_CFG.visita
   const stage = ev.stage ? STAGE_BY_ID[ev.stage] : null
-  const sname = sellerName(ev.owner)
-  const sclr  = sellerColor(ev.owner)
+  const sname = sellerName(sellers, ev.owner)
+  const sclr  = sellerColor(sellers, ev.owner)
   const d     = parseDate(ev.date)
 
   return (
@@ -428,7 +429,7 @@ function DetailPanel({ ev, onClose }) {
 }
 
 // ─── List view ────────────────────────────────────────────────────────────────
-function ListView({ events, onSelect, selected }) {
+function ListView({ events, onSelect, selected, sellers = [] }) {
   const grouped = events.reduce((acc, ev) => {
     if (!acc[ev.date]) acc[ev.date] = []
     acc[ev.date].push(ev)
@@ -486,7 +487,7 @@ function ListView({ events, onSelect, selected }) {
               {dayEvs.map(ev => {
                 const cfg   = TYPE_CFG[ev.type] || TYPE_CFG.visita
                 const isSel = selected?.id === ev.id
-                const sclr  = sellerColor(ev.owner)
+                const sclr  = sellerColor(sellers, ev.owner)
 
                 return (
                   <div key={ev.id} onClick={() => onSelect(isSel ? null : ev)} style={{
@@ -544,6 +545,7 @@ function ListView({ events, onSelect, selected }) {
 
 // ─── Main AgendaView ──────────────────────────────────────────────────────────
 export default function AgendaView() {
+  const { sellers } = useSellers()
   const [view,         setView]         = useState('semana')
   const [weekOffset,   setWeekOffset]   = useState(0)
   const [sellerFilter, setSellerFilter] = useState('Todos')
@@ -570,7 +572,7 @@ export default function AgendaView() {
     return `${ES_MONTHS[m1.getMonth()].slice(0,3)} – ${ES_MONTHS[m2.getMonth()].slice(0,3)} ${m2.getFullYear()}`
   })()
 
-  const sellers = ['Todos', ...MOCK_SELLERS.map(s => s.init)]
+  const sellerInits = ['Todos', ...sellers.map(s => s.init)]
   const types   = ['Todos', 'visita', 'llamada', 'cotizacion', 'cierre', 'reunion']
 
   // Current time in minutes (for red line)
@@ -715,8 +717,8 @@ export default function AgendaView() {
           border:'0.5px solid var(--border)', borderRadius:'var(--r-md)',
           background:'var(--surface)', color:'var(--fg)',
         }}>
-          {sellers.map(s => (
-            <option key={s} value={s}>{s === 'Todos' ? 'Todos los vendedores' : sellerName(s)}</option>
+          {sellerInits.map(s => (
+            <option key={s} value={s}>{s === 'Todos' ? 'Todos los vendedores' : sellerName(sellers, s)}</option>
           ))}
         </select>
 
@@ -816,6 +818,7 @@ export default function AgendaView() {
                       onSelect={setSelected}
                       selected={selected}
                       nowMin={nowMin}
+                      sellers={sellers}
                     />
                   )
                 })}
@@ -825,11 +828,11 @@ export default function AgendaView() {
             </div>
           </div>
         ) : (
-          <ListView events={filteredEvents} onSelect={setSelected} selected={selected} />
+          <ListView events={filteredEvents} onSelect={setSelected} selected={selected} sellers={sellers} />
         )}
 
         {/* Detail panel */}
-        {selected && <DetailPanel ev={selected} onClose={() => setSelected(null)} />}
+        {selected && <DetailPanel ev={selected} onClose={() => setSelected(null)} sellers={sellers} />}
       </div>
 
       <style>{`

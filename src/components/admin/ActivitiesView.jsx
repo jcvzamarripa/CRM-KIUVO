@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react'
 import Icon from '../shared/Icon'
-import { MOCK_SELLERS } from '../../constants/mockData'
-import { MOCK_ACTIVITIES } from '../../constants/mockActivities'
+import { useActivities } from '../../hooks/useActivities'
+import { useSellers } from '../../hooks/useSellers'
 
 // ─── Configuración de tipos ───────────────────────────────────────────────────
 const KIND_CFG = {
@@ -21,7 +21,7 @@ const fmtDate = iso => {
   const d = new Date(iso + 'T12:00:00')
   return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
 }
-const sellerColor = init => MOCK_SELLERS.find(s => s.init === init)?.color || '#888'
+// sellerColor se pasa como prop desde el componente principal
 
 function exportCSV(rows) {
   const header = ['Fecha', 'Hora', 'Vendedor', 'Prospecto', 'Tipo', 'Detalle', 'Monto']
@@ -79,7 +79,7 @@ function SellerAvatar({ init, name }) {
 }
 
 // ─── Filter dropdown (vendedor) ───────────────────────────────────────────────
-function SellerDropdown({ value, onChange }) {
+function SellerDropdown({ value, onChange, sellers = [] }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   useEffect(() => {
@@ -88,7 +88,7 @@ function SellerDropdown({ value, onChange }) {
     return () => document.removeEventListener('mousedown', h)
   }, [])
 
-  const label = value ? MOCK_SELLERS.find(s => s.init === value)?.name || value : 'Todos los vendedores'
+  const label = value ? (sellers.find(s => s.init === value)?.name || value) : 'Todos los vendedores'
 
   return (
     <div ref={ref} style={{ position: 'relative' }}>
@@ -113,7 +113,7 @@ function SellerDropdown({ value, onChange }) {
           borderRadius: 'var(--r-md)', boxShadow: '0 8px 24px #0002', minWidth: 180,
           overflow: 'hidden',
         }}>
-          {[{ init: '', name: 'Todos los vendedores' }, ...MOCK_SELLERS].map(s => (
+          {[{ init: '', name: 'Todos los vendedores' }, ...sellers].map(s => (
             <button
               key={s.init}
               onClick={() => { onChange(s.init); setOpen(false) }}
@@ -127,7 +127,7 @@ function SellerDropdown({ value, onChange }) {
               {s.init ? (
                 <div style={{
                   width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
-                  background: sellerColor(s.init) + '22', color: sellerColor(s.init),
+                  background: (sellers.find(x => x.init === s.init)?.color || '#888') + '22', color: sellers.find(x => x.init === s.init)?.color || '#888',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 9, fontWeight: 700,
                 }}>{s.init}</div>
@@ -228,6 +228,9 @@ function DateGroupRow({ dateLabel }) {
 const PAGE_SIZE = 30
 
 export default function ActivitiesView() {
+  const { activities, loading } = useActivities({ limit: 200 })
+  const { sellers }             = useSellers()
+
   const [seller,      setSeller]      = useState('')
   const [kinds,       setKinds]       = useState([])
   const [prospect,    setProspect]    = useState('')
@@ -237,14 +240,14 @@ export default function ActivitiesView() {
   const [page,        setPage]        = useState(1)
   const [exported,    setExported]    = useState(false)
 
-  const filtered = useMemo(() => MOCK_ACTIVITIES.filter(a => {
+  const filtered = useMemo(() => activities.filter(a => {
     if (seller   && a.sellerInit !== seller) return false
     if (kinds.length > 0 && !kinds.includes(a.kind)) return false
     if (prospect && !a.prospect.toLowerCase().includes(prospect.toLowerCase())) return false
     if (dateFrom && a.date < dateFrom) return false
     if (dateTo   && a.date > dateTo)   return false
     return true
-  }), [seller, kinds, prospect, dateFrom, dateTo])
+  }), [activities, seller, kinds, prospect, dateFrom, dateTo])
 
   useEffect(() => setPage(1), [seller, kinds, prospect, dateFrom, dateTo])
 
@@ -252,7 +255,9 @@ export default function ActivitiesView() {
   const hasMore = visible.length < filtered.length
 
   const grouped = useMemo(() => {
-    const TODAY = '2026-05-22', YESTERDAY = '2026-05-21'
+    const TODAY     = new Date().toISOString().slice(0, 10)
+    const yesterday = new Date(Date.now() - 86400000)
+    const YESTERDAY = yesterday.toISOString().slice(0, 10)
     const groups = []
     let lastDate = null
     for (const row of visible) {
@@ -316,7 +321,7 @@ export default function ActivitiesView() {
       {showFilters && (
         <div style={{ padding: '12px 24px', borderBottom: '0.5px solid var(--border)', background: 'var(--surface)', display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-            <SellerDropdown value={seller} onChange={setSeller} />
+            <SellerDropdown value={seller} onChange={setSeller} sellers={sellers} />
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <Icon name="search" size={13} color="var(--fg-tertiary)" style={{ position: 'absolute', left: 9, pointerEvents: 'none' }} />
               <input placeholder="Buscar prospecto…" value={prospect} onChange={e => setProspect(e.target.value)} style={{ paddingLeft: 28, paddingRight: 10, height: 32, borderRadius: 'var(--r-md)', border: '0.5px solid var(--border)', background: 'var(--bg)', color: 'var(--fg)', fontSize: 12, width: 180, outline: 'none' }} />
@@ -330,11 +335,17 @@ export default function ActivitiesView() {
               <span style={{ fontSize: 11, color: 'var(--fg-tertiary)', whiteSpace: 'nowrap' }}>Hasta</span>
               <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ height: 32, padding: '0 8px', borderRadius: 'var(--r-md)', border: '0.5px solid var(--border)', background: 'var(--bg)', color: 'var(--fg)', fontSize: 12, outline: 'none' }} />
             </div>
-            {[
-              { label: 'Hoy',         from: '2026-05-22', to: '2026-05-22' },
-              { label: 'Esta semana', from: '2026-05-18', to: '2026-05-22' },
-              { label: 'Este mes',    from: '2026-05-01', to: '2026-05-22' },
-            ].map(p => (
+            {(() => {
+              const todayISO  = new Date().toISOString().slice(0, 10)
+              const monday    = new Date(); monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7))
+              const mondayISO = monday.toISOString().slice(0, 10)
+              const month1ISO = todayISO.slice(0, 8) + '01'
+              return [
+                { label: 'Hoy',         from: todayISO,  to: todayISO  },
+                { label: 'Esta semana', from: mondayISO, to: todayISO  },
+                { label: 'Este mes',    from: month1ISO, to: todayISO  },
+              ]
+            })().map(p => (
               <button key={p.label} onClick={() => { setDateFrom(p.from); setDateTo(p.to) }} style={{ padding: '4px 10px', borderRadius: 20, fontSize: 11, border: '0.5px solid var(--border)', background: 'transparent', color: 'var(--fg-secondary)', cursor: 'pointer' }}>
                 {p.label}
               </button>
@@ -365,7 +376,9 @@ export default function ActivitiesView() {
 
       {/* ── Table ── */}
       <div style={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }}>
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--fg-tertiary)', fontSize: 13 }}>Cargando actividades…</div>
+        ) : filtered.length === 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 200, gap: 10, color: 'var(--fg-tertiary)' }}>
             <Icon name="history" size={28} />
             <div style={{ fontSize: 13 }}>Sin actividades con los filtros seleccionados</div>
