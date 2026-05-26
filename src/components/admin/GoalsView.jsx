@@ -3,13 +3,8 @@ import Icon from '../shared/Icon'
 import { useSellers } from '../../hooks/useSellers'
 
 // ─── Gamification data ────────────────────────────────────────────────────────
-const SELLER_GAME = {
-  LR: { pts: 1840, level: 'Oro',     rank: 2, prev: 3, streak: 12, xpNext: 2000, badges: ['primer-cierre','7-dias','meta-mensual','visitador'] },
-  MS: { pts: 2640, level: 'Platino', rank: 1, prev: 1, streak: 21, xpNext: 5000, badges: ['primer-cierre','10-cierres','top-mes','meta-mensual','mejor-semana','visitador'] },
-  JT: { pts:  720, level: 'Plata',   rank: 4, prev: 3, streak:  0, xpNext: 1000, badges: ['primer-cierre'] },
-  AD: { pts: 1290, level: 'Oro',     rank: 3, prev: 4, streak:  5, xpNext: 2000, badges: ['primer-cierre','meta-mensual','visitador'] },
-  RC: { pts:  680, level: 'Plata',   rank: 5, prev: 5, streak:  3, xpNext: 1000, badges: ['primer-cierre'] },
-}
+// Starts empty — will be populated from DB when gamification table is built.
+const SELLER_GAME = {}
 
 const LEVEL_CFG = {
   Bronce:  { color: '#CD7F32', bg: '#CD7F3218', next: 500  },
@@ -47,21 +42,9 @@ const POINTS_RULES = [
   { action: 'Meta mensual alcanzada',pts: 500, icon: 'target',       color: '#EF9F27' },
 ]
 
-const DEFAULT_METAS = {
-  LR: { ventas: 100000, prospectos: 32, visitas: 40 },
-  MS: { ventas: 120000, prospectos: 28, visitas: 35 },
-  JT: { ventas:  80000, prospectos: 24, visitas: 30 },
-  AD: { ventas: 100000, prospectos: 30, visitas: 38 },
-  RC: { ventas:  90000, prospectos: 26, visitas: 32 },
-}
-
-const ACTUALS = {
-  LR: { ventas:  68400, prospectos: 27, visitas: 34 },
-  MS: { ventas:  91200, prospectos: 26, visitas: 32 },
-  JT: { ventas:  38900, prospectos: 17, visitas: 21 },
-  AD: { ventas:  84600, prospectos: 24, visitas: 30 },
-  RC: { ventas:  51200, prospectos: 20, visitas: 25 },
-}
+// Metas y actuals por vendedor — starts empty, populated from DB.
+const DEFAULT_METAS = {}
+const ACTUALS = {}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmt  = n => '$' + n.toLocaleString('es-MX')
@@ -70,9 +53,17 @@ const pct  = (a, b) => Math.round((a / b) * 100)
 const sellerColor = (sellers, init) => sellers.find(s => s.init === init)?.color || '#888'
 const sellerName  = (sellers, init) => sellers.find(s => s.init === init)?.name  || init
 // Safe lookup into hardcoded gamification maps
-const gameOf = init => SELLER_GAME[init] || { pts: 0, level: 'Bronce', rank: 99, prev: 99, streak: 0, xpNext: 500, badges: [] }
-const metaOf = init => DEFAULT_METAS[init] || { ventas: 80000, prospectos: 20, visitas: 25 }
-const actualOf = init => ACTUALS[init]     || { ventas: 0,     prospectos: 0,  visitas: 0  }
+const gameOf   = init => SELLER_GAME[init]   || { pts: 0, level: 'Bronce', rank: 99, prev: 99, streak: 0, xpNext: 500, badges: [] }
+const metaOf   = init => DEFAULT_METAS[init] || { ventas: 80000, prospectos: 20, visitas: 25 }
+// actualOf uses real seller data when available; falls back to ACTUALS (now empty)
+const actualOf = (init, sellers = []) => {
+  const s = sellers.find(sl => sl.init === init)
+  return ACTUALS[init] || {
+    ventas:     s?.current   || 0,
+    prospectos: s?.prospects || 0,
+    visitas:    0,
+  }
+}
 
 // ─── Editable cell ────────────────────────────────────────────────────────────
 function EditableCell({ value, onSave, format = 'number', prefix = '' }) {
@@ -146,7 +137,8 @@ function ProgBar({ value, max, color = 'var(--kiuvo-blue)', h = 5 }) {
 // ─── Metas Tab ────────────────────────────────────────────────────────────────
 function MetasTab({ sellers = [] }) {
   const [period,        setPeriod]        = useState('Mes')
-  const [metas,         setMetas]         = useState(DEFAULT_METAS)
+  // Initialize metas from real seller goals (goal_amount from profiles)
+  const [metas,         setMetas]         = useState({})
   const [dirty,         setDirty]         = useState(false)
   const [saved,         setSaved]         = useState(false)
   const [teamGoalCustom,setTeamGoalCustom]= useState(null)   // null = suma de metas individuales
@@ -155,6 +147,24 @@ function MetasTab({ sellers = [] }) {
   const teamInputRef = useRef(null)
 
   useEffect(() => { if (editingTeam) teamInputRef.current?.focus() }, [editingTeam])
+
+  // Seed metas from real seller data when sellers load
+  useEffect(() => {
+    if (!sellers.length) return
+    setMetas(prev => {
+      const next = { ...prev }
+      sellers.forEach(s => {
+        if (!next[s.init]) {
+          next[s.init] = {
+            ventas:     s.goal     || 80000,
+            prospectos: DEFAULT_METAS[s.init]?.prospectos || 20,
+            visitas:    DEFAULT_METAS[s.init]?.visitas    || 25,
+          }
+        }
+      })
+      return next
+    })
+  }, [sellers])
 
   function updateMeta(init, field, val) {
     setMetas(m => ({ ...m, [init]: { ...m[init], [field]: val } }))
@@ -185,17 +195,17 @@ function MetasTab({ sellers = [] }) {
   }
 
   const sorted = [...sellers].sort((a, b) => {
-    const pa = pct(actualOf(a.init).ventas, metas[a.init]?.ventas || metaOf(a.init).ventas)
-    const pb = pct(actualOf(b.init).ventas, metas[b.init]?.ventas || metaOf(b.init).ventas)
+    const pa = pct(actualOf(a.init, sellers).ventas, metas[a.init]?.ventas || metaOf(a.init).ventas)
+    const pb = pct(actualOf(b.init, sellers).ventas, metas[b.init]?.ventas || metaOf(b.init).ventas)
     return pb - pa
   })
 
   const sumIndividual = sellers.reduce((s, sl) => s + (metas[sl.init]?.ventas || metaOf(sl.init).ventas), 0)
   const teamGoal      = teamGoalCustom ?? sumIndividual
-  const teamActual    = sellers.reduce((s, sl) => s + actualOf(sl.init).ventas, 0)
+  const teamActual    = sellers.reduce((s, sl) => s + actualOf(sl.init, sellers).ventas, 0)
   const avgCompl    = sorted.length ? Math.round(sorted.reduce((s, sl) => {
     const m = metas[sl.init]?.ventas || metaOf(sl.init).ventas
-    return s + pct(actualOf(sl.init).ventas, m)
+    return s + pct(actualOf(sl.init, sellers).ventas, m)
   }, 0) / sorted.length) : 0
   const topSeller   = sorted[0]
 
@@ -326,7 +336,7 @@ function MetasTab({ sellers = [] }) {
           {[
             { label:'Alcanzado hasta hoy',   value: fmt(teamActual),  sub: `${pct(teamActual, teamGoal)}% del objetivo`, icon:'trending-up', color:'var(--success)' },
             { label:'Cumplimiento promedio', value: `${avgCompl}%`,   sub: 'del equipo · este mes', icon:'chart-bar', color: avgCompl >= 80 ? 'var(--success)' : avgCompl >= 60 ? 'var(--warning)' : 'var(--danger)' },
-            { label:'Mejor vendedor',        value: topSeller ? sellerName(sellers, topSeller.init).split(' ')[0] : '—', sub: topSeller ? `${pct(actualOf(topSeller.init).ventas, metas[topSeller.init]?.ventas || metaOf(topSeller.init).ventas)}% de cumplimiento` : '', icon:'trophy', color:'#EF9F27' },
+            { label:'Mejor vendedor',        value: topSeller ? sellerName(sellers, topSeller.init).split(' ')[0] : '—', sub: topSeller ? `${pct(actualOf(topSeller.init, sellers).ventas, metas[topSeller.init]?.ventas || metaOf(topSeller.init).ventas)}% de cumplimiento` : '', icon:'trophy', color:'#EF9F27' },
           ].map(c => (
             <div key={c.label} style={{
               background:'var(--surface)', border:'0.5px solid var(--border)',
@@ -370,7 +380,7 @@ function MetasTab({ sellers = [] }) {
           {/* Rows */}
           {sorted.map((sl, i) => {
             const g  = { ...metaOf(sl.init), ...metas[sl.init] }
-            const a  = actualOf(sl.init)
+            const a  = actualOf(sl.init, sellers)
             const sclr = sellerColor(sellers, sl.init)
             const ventasPct = pct(a.ventas, g.ventas)
 

@@ -2,57 +2,9 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'
 import Icon from '../shared/Icon'
 import { useSellers } from '../../hooks/useSellers'
 
-// ─── Extended seller data ─────────────────────────────────────────────────────
-const INIT_EXT = {
-  LR: { role: 'seller', status: 'active',   zone: 'Querétaro',    email: 'lramirez@kiuvo.mx',    lastSeen: 'Hoy, 10:32',   meta: 100000 },
-  MS: { role: 'seller', status: 'active',   zone: 'CDMX Norte',   email: 'msanchez@kiuvo.mx',    lastSeen: 'Hoy, 09:18',   meta: 120000 },
-  JT: { role: 'seller', status: 'active',   zone: 'Guadalajara',  email: 'jtrevino@kiuvo.mx',    lastSeen: 'Ayer, 16:44',  meta: 80000  },
-  AD: { role: 'admin',  status: 'active',   zone: 'Monterrey',    email: 'adominguez@kiuvo.mx',  lastSeen: 'Hoy, 11:05',   meta: 100000 },
-  RC: { role: 'seller', status: 'inactive', zone: 'CDMX Sur',     email: 'rcardenas@kiuvo.mx',   lastSeen: 'hace 3 días',  meta: 90000  },
-}
-
-const SELLER_ACTIVITY = {
-  LR: [
-    { what: 'Registró visita',     target: 'Distribuidora Norte',     detail: '4ª visita',    time: 'hace 12 min', kind: 'visit' },
-    { what: 'Creó cotización',     target: 'Grupo Metálico SA',       detail: '$42,000',      time: 'hace 2 h',    kind: 'quote' },
-    { what: 'Movió a Negociación', target: 'Plastiforte del Bajío',   detail: '',             time: 'hace 4 h',    kind: 'stage' },
-    { what: 'Llamada registrada',  target: 'Aceros Centrales',        detail: '8 min',        time: 'ayer',        kind: 'call'  },
-    { what: 'Nuevo prospecto',     target: 'Cables y Alambres SRL',   detail: '$28,000 est.', time: 'ayer',        kind: 'new'   },
-    { what: 'Registró visita',     target: 'Ferretera Bajío',         detail: '2ª visita',    time: 'hace 2 días', kind: 'visit' },
-  ],
-  MS: [
-    { what: 'Cerró venta',         target: 'Hidráulica del Pacífico', detail: '$35,000',      time: 'hace 4 min',  kind: 'win'   },
-    { what: 'Registró visita',     target: 'Metalúrgica Morelos',     detail: '2ª visita',    time: 'hace 1 h',    kind: 'visit' },
-    { what: 'Envió cotización',    target: 'Distribuidora Latina',    detail: '$67,500',      time: 'hace 3 h',    kind: 'quote' },
-    { what: 'Movió a Cierre',      target: 'Plastinova SA',           detail: '',             time: 'ayer',        kind: 'stage' },
-    { what: 'Llamada registrada',  target: 'Hidráulica del Pacífico', detail: '15 min',       time: 'ayer',        kind: 'call'  },
-    { what: 'Nuevo prospecto',     target: 'Troquelados Oriente',     detail: '$55,000 est.', time: 'hace 2 días', kind: 'new'   },
-  ],
-  JT: [
-    { what: 'Registró visita',     target: 'Empaques del Norte',      detail: '1ª visita',    time: 'hace 30 min', kind: 'visit' },
-    { what: 'Llamada registrada',  target: 'Metalúrgica GDL',         detail: '12 min',       time: 'hace 2 h',    kind: 'call'  },
-    { what: 'Creó cotización',     target: 'Plásticos del Pacífico',  detail: '$31,000',      time: 'hace 5 h',    kind: 'quote' },
-    { what: 'Nuevo prospecto',     target: 'Siderúrgica Occidente',   detail: '$48,000 est.', time: 'ayer',        kind: 'new'   },
-    { what: 'Registró visita',     target: 'Ferretera Central GDL',   detail: '3ª visita',    time: 'hace 2 días', kind: 'visit' },
-    { what: 'Movió a Cotización',  target: 'Empaques del Norte',      detail: '',             time: 'hace 3 días', kind: 'stage' },
-  ],
-  AD: [
-    { what: 'Cerró venta',         target: 'Grupo Industrial MTY',    detail: '$52,000',      time: 'hace 1 h',    kind: 'win'   },
-    { what: 'Registró visita',     target: 'Aceros del Norte SA',     detail: '5ª visita',    time: 'hace 3 h',    kind: 'visit' },
-    { what: 'Envió cotización',    target: 'Plastimex Monterrey',     detail: '$44,000',      time: 'hace 5 h',    kind: 'quote' },
-    { what: 'Llamada registrada',  target: 'Metalúrgica Regia',       detail: '20 min',       time: 'ayer',        kind: 'call'  },
-    { what: 'Nuevo prospecto',     target: 'Hidráulica Regiomontana', detail: '$60,000 est.', time: 'hace 2 días', kind: 'new'   },
-    { what: 'Movió a Negociación', target: 'Aceros del Norte SA',     detail: '',             time: 'hace 3 días', kind: 'stage' },
-  ],
-  RC: [
-    { what: 'Registró visita',     target: 'Ferretera Sur CDMX',      detail: '2ª visita',    time: 'hace 3 días', kind: 'visit' },
-    { what: 'Llamada registrada',  target: 'Plásticos del Valle',     detail: '5 min',        time: 'hace 4 días', kind: 'call'  },
-    { what: 'Creó cotización',     target: 'Metalúrgica Sur',         detail: '$22,000',      time: 'hace 5 días', kind: 'quote' },
-    { what: 'Registró visita',     target: 'Cables Metropolitanos',   detail: '1ª visita',    time: 'hace 6 días', kind: 'visit' },
-    { what: 'Nuevo prospecto',     target: 'Aceros Pedregal',         detail: '$19,000 est.', time: 'hace 1 sem',  kind: 'new'   },
-    { what: 'Llamada registrada',  target: 'Ferretera Sur CDMX',      detail: '8 min',        time: 'hace 1 sem',  kind: 'call'  },
-  ],
-}
+// Extended seller data — populated from state when admin edits (starts empty for real sellers)
+const INIT_EXT = {}
+const SELLER_ACTIVITY = {}
 
 const KIND_CFG = {
   win:   { color: 'var(--success)',         icon: 'trophy'   },
@@ -483,6 +435,11 @@ function SellerDetailPanel({ seller, ext: extProp, onUpdateExt, onClose }) {
 
           {/* Activity timeline */}
           <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--fg-secondary)', marginBottom: 10 }}>Actividad reciente</div>
+          {acts.length === 0 && (
+            <div style={{ textAlign: 'center', color: 'var(--fg-tertiary)', fontSize: 12, padding: '16px 0' }}>
+              Sin actividad registrada.
+            </div>
+          )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
             {acts.map((a, i) => {
               const kc = KIND_CFG[a.kind] || KIND_CFG.visit

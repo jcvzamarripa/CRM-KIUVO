@@ -5,16 +5,6 @@ import { useAdminProspects } from '../../hooks/useAdminProspects'
 import { getProducts } from '../../lib/productsStore'
 import { rules } from '../../lib/validation'
 
-const MOCK_QUOTES = [
-  { id: 'COT-0041', prospect: 'Distribuidora Norte',    seller: 'LR', status: 'sent',     total: 42800, items: 5, created: 'Hoy, 09:15',       due: 'En 5 días' },
-  { id: 'COT-0040', prospect: 'Materiales Pacífico',    seller: 'JT', status: 'draft',    total: 28900, items: 3, created: 'Ayer, 16:30',       due: 'En 7 días' },
-  { id: 'COT-0039', prospect: 'Constructora ABC',       seller: 'LR', status: 'approved', total: 24500, items: 8, created: 'hace 2 días',       due: 'Vence mañana' },
-  { id: 'COT-0038', prospect: 'Hidráulica del Pacífico',seller: 'MS', status: 'approved', total: 35000, items: 6, created: 'hace 3 días',       due: 'En 4 días' },
-  { id: 'COT-0037', prospect: 'Herrajes San Marcos',    seller: 'RC', status: 'sent',     total: 19600, items: 4, created: 'hace 4 días',       due: 'Vence hoy' },
-  { id: 'COT-0036', prospect: 'Aceros Monterrey',       seller: 'MS', status: 'rejected', total: 31200, items: 7, created: 'hace 5 días',       due: 'Vencida' },
-  { id: 'COT-0035', prospect: 'Ferretería del Valle',   seller: 'LR', status: 'draft',    total: 18500, items: 2, created: 'hace 6 días',       due: 'En 9 días' },
-  { id: 'COT-0034', prospect: 'Comercial Las Palmas',   seller: 'AD', status: 'approved', total: 16700, items: 3, created: 'hace 7 días',       due: 'Cerrada' },
-]
 
 const STATUS = {
   draft:    { label: 'Borrador',  bg: 'var(--bg-secondary)',  fg: 'var(--fg-secondary)', border: 'var(--border)' },
@@ -426,14 +416,14 @@ export default function QuotesView() {
   const [filter,    setFilter]    = useState('all')
   const [selected,  setSelected]  = useState(null)
   const [showNew,   setShowNew]   = useState(false)
-  const [quotes,    setQuotes]    = useState(MOCK_QUOTES)
+  const [quotes,    setQuotes]    = useState([])
 
   function handleNewQuote(q) {
     setQuotes(prev => [q, ...prev])
     setSelected(q)
   }
 
-  const nextId = `COT-${String(parseInt(quotes[0]?.id?.split('-')[1] || '0041') + 1).padStart(4,'0')}`
+  const nextId = `COT-${String((parseInt(quotes[0]?.id?.split('-')[1]) || 0) + 1).padStart(4,'0')}`
 
   const filtered = filter === 'all' ? quotes : quotes.filter(q => q.status === filter)
 
@@ -516,6 +506,17 @@ export default function QuotesView() {
               </tr>
             </thead>
             <tbody>
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={9} style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--fg-tertiary)' }}>
+                    <div style={{ fontSize: 28, marginBottom: 8, opacity: 0.4 }}>📋</div>
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>Sin cotizaciones</div>
+                    <div style={{ fontSize: 11, marginTop: 4 }}>
+                      {filter === 'all' ? 'Crea tu primera cotización con el botón "+ Nueva cotización".' : `No hay cotizaciones con estado "${filter}".`}
+                    </div>
+                  </td>
+                </tr>
+              )}
               {filtered.map(q => {
                 const st = STATUS[q.status]
                 return (

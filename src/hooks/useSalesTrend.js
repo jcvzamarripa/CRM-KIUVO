@@ -1,18 +1,19 @@
 import { useState, useEffect } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
-import { MOCK_SALES_TREND } from '../constants/mockData'
 
 /**
  * Returns a sparkline array of daily win amounts for the last `days` days.
  * Shape: number[] — one value per day (0 if no sales that day).
+ * Falls back to all-zeros (not mock) when Supabase has no data yet.
  */
 export function useSalesTrend({ days = 14 } = {}) {
-  const [trend,   setTrend]   = useState(MOCK_SALES_TREND)
+  const zeros   = Array(days).fill(0)
+  const [trend,   setTrend]   = useState(zeros)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
-      setTrend(MOCK_SALES_TREND)
+      setTrend(zeros)
       setLoading(false)
       return
     }
@@ -26,15 +27,15 @@ export function useSalesTrend({ days = 14 } = {}) {
       const fromISO = from.toISOString().slice(0, 10)
       const toISO   = to.toISOString().slice(0, 10)
 
+      // Query the sales table (canonical source) for closed_at + amount
       const { data, error } = await supabase
-        .from('activities')
-        .select('created_at, details')
-        .eq('kind', 'win')
-        .gte('created_at', fromISO)
-        .lte('created_at', toISO + 'T23:59:59Z')
+        .from('sales')
+        .select('closed_at, amount')
+        .gte('closed_at', fromISO)
+        .lte('closed_at', toISO + 'T23:59:59Z')
 
       if (error || !data) {
-        setTrend(MOCK_SALES_TREND)
+        setTrend(zeros)
         setLoading(false)
         return
       }
@@ -46,16 +47,12 @@ export function useSalesTrend({ days = 14 } = {}) {
         byDay[d.toISOString().slice(0, 10)] = 0
       }
 
-      for (const ev of data) {
-        const d = ev.created_at.slice(0, 10)
-        if (d in byDay) byDay[d] += (ev.details?.value || 0)
+      for (const s of data) {
+        const d = s.closed_at.slice(0, 10)
+        if (d in byDay) byDay[d] += Number(s.amount) || 0
       }
 
-      const arr = Object.values(byDay)
-
-      // If all zeros (no real data yet), fall back to mock so sparkline isn't blank
-      const hasData = arr.some(v => v > 0)
-      setTrend(hasData ? arr : MOCK_SALES_TREND)
+      setTrend(Object.values(byDay))
       setLoading(false)
     }
 
