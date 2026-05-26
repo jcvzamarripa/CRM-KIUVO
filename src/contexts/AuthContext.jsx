@@ -46,7 +46,7 @@ export function AuthProvider({ children }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user)
-        fetchProfile(session.user.id)
+        fetchProfile(session.user)
       } else {
         setLoading(false)
       }
@@ -57,7 +57,7 @@ export function AuthProvider({ children }) {
       (_event, session) => {
         if (session?.user) {
           setUser(session.user)
-          fetchProfile(session.user.id)
+          fetchProfile(session.user)
         } else {
           setUser(null)
           setProfile(null)
@@ -69,26 +69,27 @@ export function AuthProvider({ children }) {
     return () => subscription.unsubscribe()
   }, [])
 
-  async function fetchProfile(userId) {
-    const [{ data: profileData }, { data: { user: authUser } }] = await Promise.all([
-      supabase.from('profiles').select('*').eq('id', userId).single(),
-      supabase.auth.getUser(),
-    ])
+  async function fetchProfile(authUser) {
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', authUser.id)
+      .single()
 
-    // El rol puede venir de la tabla profiles, del user_metadata o del app_metadata
+    // Prioridad: user_metadata (Supabase Auth) > app_metadata > profiles.role > 'seller'
     const role =
-      profileData?.role ||
-      authUser?.user_metadata?.role ||
-      authUser?.app_metadata?.role ||
+      authUser.user_metadata?.role ||
+      authUser.app_metadata?.role  ||
+      profileData?.role            ||
       'seller'
 
-    setProfile({ ...(profileData ?? { id: userId }), role })
+    setProfile({ ...(profileData ?? { id: authUser.id }), role })
     setLoading(false)
   }
 
   async function refreshProfile() {
     if (!isSupabaseConfigured) return
-    if (user) await fetchProfile(user.id)
+    if (user) await fetchProfile(user)
   }
 
   async function signIn(email, password) {
