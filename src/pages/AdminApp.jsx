@@ -21,8 +21,8 @@ import GoalsView from '../components/admin/GoalsView'
 import ActivitiesView from '../components/admin/ActivitiesView'
 import SettingsView from '../components/admin/SettingsView'
 import ProductionOrdersView from '../components/admin/ProductionOrdersView'
-import { MOCK_SALES_TREND } from '../constants/mockData'
 import useDashboardKPIs from '../hooks/useDashboardKPIs'
+import { useSalesTrend } from '../hooks/useSalesTrend'
 
 const VIEW_META = {
   dashboard:  { title: 'Dashboard',     subtitle: 'Resumen operativo del equipo · esta semana' },
@@ -166,6 +166,7 @@ function SmallSkeleton({ span = 4 }) {
 export default function AdminApp({ dark, onToggleDark }) {
   const [activeNav, setActiveNav] = useState('dashboard')
   const { kpis, loading: kpiLoading } = useDashboardKPIs()
+  const { trend: salesTrend }          = useSalesTrend({ days: 14 })
   const meta = VIEW_META[activeNav] || VIEW_META.dashboard
 
   let content
@@ -184,7 +185,7 @@ export default function AdminApp({ dark, onToggleDark }) {
               deltaKind={kpis.salesTotal.deltaKind}
               sub={kpis.salesTotal.sub}
               accent="var(--kiuvo-blue)"
-              sparkline={MOCK_SALES_TREND}
+              sparkline={salesTrend}
             />
             <KPICard
               label="Prospectos activos"

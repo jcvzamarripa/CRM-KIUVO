@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import Icon from '../shared/Icon'
-import { MOCK_AGENDA_EVENTS } from '../../constants/mockData'
+import { useAgendaEvents } from '../../hooks/useAgendaEvents'
 import { useSellers } from '../../hooks/useSellers'
 import { STAGE_BY_ID } from '../../constants/stages'
 
@@ -565,6 +565,11 @@ export default function AgendaView() {
   const weekDays = Array.from({ length: 5 }, (_, i) => addDays(weekMon, i))
   const weekISOs = weekDays.map(fmtISO)
 
+  // Fetch events for the visible week ± 2 weeks buffer
+  const fetchFrom = fmtISO(addDays(weekMon, -14))
+  const fetchTo   = fmtISO(addDays(weekMon,  21))
+  const { events: allEvents } = useAgendaEvents({ dateFrom: fetchFrom, dateTo: fetchTo })
+
   const monthLabel = (() => {
     const m1 = weekDays[0], m2 = weekDays[4]
     if (m1.getMonth() === m2.getMonth())
@@ -578,11 +583,10 @@ export default function AgendaView() {
   // Current time in minutes (for red line)
   const nowMin = (() => {
     const now = new Date()
-    // Force today's time for demo purposes (use actual time)
     return now.getHours() * 60 + now.getMinutes()
   })()
 
-  const filteredEvents = MOCK_AGENDA_EVENTS.filter(ev => {
+  const filteredEvents = allEvents.filter(ev => {
     if (view === 'semana' && !weekISOs.includes(ev.date)) return false
     if (view === 'lista') {
       const eDate = parseDate(ev.date)
