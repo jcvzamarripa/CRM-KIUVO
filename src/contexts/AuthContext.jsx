@@ -70,12 +70,19 @@ export function AuthProvider({ children }) {
   }, [])
 
   async function fetchProfile(userId) {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single()
-    setProfile(data ?? null)
+    const [{ data: profileData }, { data: { user: authUser } }] = await Promise.all([
+      supabase.from('profiles').select('*').eq('id', userId).single(),
+      supabase.auth.getUser(),
+    ])
+
+    // El rol puede venir de la tabla profiles, del user_metadata o del app_metadata
+    const role =
+      profileData?.role ||
+      authUser?.user_metadata?.role ||
+      authUser?.app_metadata?.role ||
+      'seller'
+
+    setProfile({ ...(profileData ?? { id: userId }), role })
     setLoading(false)
   }
 
