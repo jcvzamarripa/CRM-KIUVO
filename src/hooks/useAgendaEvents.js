@@ -85,12 +85,19 @@ export function useAgendaEvents({ sellerId, dateFrom, dateTo, limit = 200 } = {}
 }
 
 /**
- * Shortcut: today's agenda for the current seller.
+ * Shortcut: today + next N days agenda for the current seller.
  * Usa fecha LOCAL (no UTC) para evitar desfase en zonas horarias como México (UTC-6).
- * @param {string} sellerId – profile UUID of the current user
+ * @param {string} sellerId  – profile UUID of the current user
+ * @param {number} [days=3]  – number of days ahead to include (default: today + 2 more days)
  */
-export function useTodayAgenda(sellerId) {
+export function useTodayAgenda(sellerId, days = 3) {
   const now   = new Date()
-  const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
-  return useAgendaEvents({ sellerId, dateFrom: today, dateTo: today })
+  const pad   = n => String(n).padStart(2, '0')
+  const today = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`
+
+  const future = new Date(now)
+  future.setDate(future.getDate() + days - 1)
+  const dateTo = `${future.getFullYear()}-${pad(future.getMonth()+1)}-${pad(future.getDate())}`
+
+  return useAgendaEvents({ sellerId, dateFrom: today, dateTo })
 }

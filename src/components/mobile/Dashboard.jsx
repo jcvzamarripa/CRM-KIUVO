@@ -402,11 +402,11 @@ function QuickActions({ onRegisterVisit, onNewProspect, onQuote, onWhatsApp }) {
 
 // ── Helpers de agenda ─────────────────────────────────────────────
 const TYPE_LABEL = {
-  visita:     'Visita presencial',
-  llamada:    'Llamada de seguimiento',
-  cotizacion: 'Presentación de cotización',
-  cierre:     'Cierre de venta',
-  reunion:    'Reunión de equipo',
+  visita:     'Visita',
+  llamada:    'Llamada',
+  cotizacion: 'Cotización',
+  cierre:     'Cierre',
+  reunion:    'Reunión',
 }
 const TYPE_COLOR = {
   visita:     'var(--kiuvo-blue)',
@@ -416,6 +416,8 @@ const TYPE_COLOR = {
   reunion:    '#7C3AED',
 }
 
+const MONTHS_SHORT_D = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+
 function fmtEventTime(timeStr) {
   if (!timeStr) return { time: '—', ampm: '' }
   const [h, m] = timeStr.split(':').map(Number)
@@ -424,9 +426,27 @@ function fmtEventTime(timeStr) {
   return { time: `${h12}:${String(m).padStart(2, '0')}`, ampm }
 }
 
+function fmtDateLabel(dateStr) {
+  // dateStr = 'YYYY-MM-DD'
+  if (!dateStr) return ''
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const evDate  = new Date(y, m - 1, d)
+  const now     = new Date(); now.setHours(0,0,0,0)
+  const tom     = new Date(now); tom.setDate(tom.getDate() + 1)
+  if (evDate.getTime() === now.getTime()) return 'Hoy'
+  if (evDate.getTime() === tom.getTime()) return 'Mañana'
+  return `${d} ${MONTHS_SHORT_D[m - 1]}`
+}
+
 // ── Agenda ────────────────────────────────────────────────────────
 function Agenda({ sellerId, onOpenAgenda, onOpenEvent }) {
   const { events, loading } = useTodayAgenda(sellerId)
+
+  // Separar hoy de próximos días
+  const now     = new Date(); now.setHours(0,0,0,0)
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
+  const todayEvents    = events.filter(ev => ev.date === todayStr)
+  const upcomingEvents = events.filter(ev => ev.date > todayStr)
 
   return (
     <div style={{ margin: '0 16px' }}>
@@ -434,6 +454,7 @@ function Agenda({ sellerId, onOpenAgenda, onOpenEvent }) {
         <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--fg)' }}>Agenda de hoy</div>
         <button onClick={onOpenAgenda} style={{ fontSize: 12, color: 'var(--kiuvo-blue)', fontWeight: 500 }}>Ver semana →</button>
       </div>
+
       {loading ? (
         <div style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)', padding: '16px 12px', textAlign: 'center', fontSize: 12, color: 'var(--fg-tertiary)' }}>
           Cargando agenda…
@@ -444,49 +465,68 @@ function Agenda({ sellerId, onOpenAgenda, onOpenEvent }) {
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {events.map(ev => {
-            const stage = STAGE_BY_ID[ev.stage] || STAGE_BY_ID['prospeccion'] || {}
-            const color = TYPE_COLOR[ev.type] || 'var(--kiuvo-blue)'
-            const { time, ampm } = fmtEventTime(ev.start)
-            return (
-              <button key={ev.id} onClick={() => onOpenEvent && onOpenEvent(ev)} style={{
-                width: '100%', textAlign: 'left',
-                background: 'var(--surface)', border: '0.5px solid var(--border)',
-                borderRadius: 'var(--r-md)', padding: '10px 12px 10px 13px',
-                display: 'flex', gap: 12, position: 'relative', overflow: 'hidden',
-              }}>
-                <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: 3, background: color }} />
-                <div style={{ minWidth: 42, textAlign: 'left' }}>
-                  <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--fg)', letterSpacing: -0.4, lineHeight: 1 }}>{time}</div>
-                  <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginTop: 2 }}>{ampm}</div>
+          {/* Eventos de hoy */}
+          {todayEvents.map(ev => <AgendaEventRow key={ev.id} ev={ev} onOpenEvent={onOpenEvent} />)}
+
+          {/* Próximos días */}
+          {upcomingEvents.length > 0 && (
+            <>
+              {todayEvents.length > 0 && (
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-tertiary)', letterSpacing: 0.4, textTransform: 'uppercase', paddingTop: 4 }}>
+                  Próximas citas
                 </div>
-                <div style={{ width: 0.5, background: 'var(--border)' }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ev.name}</div>
-                    <span style={{
-                      flexShrink: 0, fontSize: 11, fontWeight: 500, color,
-                      background: color + '18',
-                      padding: '2px 7px', borderRadius: 'var(--r-full)',
-                    }}>{TYPE_LABEL[ev.type] || ev.type}</span>
-                  </div>
-                  {ev.contact && (
-                    <div style={{ fontSize: 12, color: 'var(--fg-secondary)', marginTop: 2 }}>{ev.contact}</div>
-                  )}
-                  {ev.address && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4, color: 'var(--fg-tertiary)' }}>
-                      <Icon name="map-pin" size={11} />
-                      <span style={{ fontSize: 11, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ev.address}</span>
-                    </div>
-                  )}
-                </div>
-                <Icon name="chevron-right" size={16} color="var(--fg-tertiary)" style={{ flexShrink: 0, alignSelf: 'center' }} />
-              </button>
-            )
-          })}
+              )}
+              {upcomingEvents.map(ev => <AgendaEventRow key={ev.id} ev={ev} onOpenEvent={onOpenEvent} showDate />)}
+            </>
+          )}
         </div>
       )}
     </div>
+  )
+}
+
+function AgendaEventRow({ ev, onOpenEvent, showDate = false }) {
+  const color = TYPE_COLOR[ev.type] || 'var(--kiuvo-blue)'
+  const { time, ampm } = fmtEventTime(ev.start)
+  return (
+    <button onClick={() => onOpenEvent && onOpenEvent(ev)} style={{
+      width: '100%', textAlign: 'left',
+      background: 'var(--surface)', border: '0.5px solid var(--border)',
+      borderRadius: 'var(--r-md)', padding: '10px 12px 10px 13px',
+      display: 'flex', gap: 12, position: 'relative', overflow: 'hidden',
+    }}>
+      <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: 3, background: color }} />
+      <div style={{ minWidth: 42, textAlign: 'left' }}>
+        <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--fg)', letterSpacing: -0.4, lineHeight: 1 }}>{time}</div>
+        <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginTop: 2 }}>{ampm}</div>
+      </div>
+      <div style={{ width: 0.5, background: 'var(--border)' }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
+          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ev.name}</div>
+          <span style={{
+            flexShrink: 0, fontSize: 11, fontWeight: 500, color,
+            background: color + '18',
+            padding: '2px 7px', borderRadius: 'var(--r-full)',
+          }}>{TYPE_LABEL[ev.type] || ev.type}</span>
+        </div>
+        {showDate && (
+          <div style={{ fontSize: 11, color: 'var(--kiuvo-blue)', fontWeight: 500, marginTop: 2 }}>
+            {fmtDateLabel(ev.date)}
+          </div>
+        )}
+        {ev.contact && (
+          <div style={{ fontSize: 12, color: 'var(--fg-secondary)', marginTop: 2 }}>{ev.contact}</div>
+        )}
+        {ev.address && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4, color: 'var(--fg-tertiary)' }}>
+            <Icon name="map-pin" size={11} />
+            <span style={{ fontSize: 11, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ev.address}</span>
+          </div>
+        )}
+      </div>
+      <Icon name="chevron-right" size={16} color="var(--fg-tertiary)" style={{ flexShrink: 0, alignSelf: 'center' }} />
+    </button>
   )
 }
 
