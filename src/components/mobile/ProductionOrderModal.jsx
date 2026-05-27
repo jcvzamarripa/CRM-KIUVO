@@ -1,16 +1,14 @@
 import React, { useState, useMemo } from 'react'
 import Icon from '../shared/Icon'
-import { getProducts } from '../../lib/productsStore'
+import { useProducts } from '../../hooks/useProducts'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 
 const fmt = n => '$' + (n ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 0 })
 
-const ALL_PRODUCTS = getProducts()
-const CATS = ['Todos', ...Array.from(new Set(ALL_PRODUCTS.map(p => p.category)))]
-
 export default function ProductionOrderModal({ prospect, onClose, onCreated }) {
   const { user } = useAuth()
+  const { products: allProducts } = useProducts()
   const [items,      setItems]      = useState([])
   const [notes,      setNotes]      = useState('')
   const [cat,        setCat]        = useState('Todos')
@@ -19,12 +17,17 @@ export default function ProductionOrderModal({ prospect, onClose, onCreated }) {
   const [error,      setError]      = useState('')
   const [done,       setDone]       = useState(false)
 
-  const catalog = useMemo(() => ALL_PRODUCTS.filter(p => {
+  const cats = useMemo(() =>
+    ['Todos', ...Array.from(new Set(allProducts.map(p => p.category))).sort()],
+    [allProducts]
+  )
+
+  const catalog = useMemo(() => allProducts.filter(p => {
     const matchCat  = cat === 'Todos' || p.category === cat
     const matchText = p.name.toLowerCase().includes(search.toLowerCase()) ||
                       p.sku.toLowerCase().includes(search.toLowerCase())
     return matchCat && matchText
-  }), [search, cat])
+  }), [allProducts, search, cat])
 
   const addItem = product => setItems(prev => {
     const exists = prev.find(i => i.id === product.id)
@@ -201,7 +204,7 @@ export default function ProductionOrderModal({ prospect, onClose, onCreated }) {
             </div>
 
             <div style={{ display: 'flex', gap: 6, marginBottom: 10, overflowX: 'auto', paddingBottom: 2 }}>
-              {CATS.map(c => {
+              {cats.map(c => {
                 const on = cat === c
                 return (
                   <button key={c} onClick={() => setCat(c)} style={{

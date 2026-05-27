@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react'
 import Icon from '../shared/Icon'
-import { getProducts, saveProducts } from '../../lib/productsStore'
+import { useProducts } from '../../hooks/useProducts'
+import { useToast } from '../../contexts/ToastContext'
 
 const UNITS = ['pza', 'ml', 'kg', 'lt', 'rollo', 'caja', 'm2', 'par']
 const fmt = n => '$' + Number(n).toLocaleString('es-MX', { minimumFractionDigits: 0 })
@@ -32,16 +33,25 @@ const inputStyle = {
   outline: 'none', fontFamily: 'inherit',
 }
 
-// ── Tiers editor ──────────────────────────────────────────────────
+// ── Tiers editor (rangos: de X a Y piezas) ────────────────────────
 function TiersEditor({ tiers, onChange }) {
   function addTier() {
-    onChange([...tiers, { id: `t${Date.now()}`, minQty: '', discountPct: '' }])
+    onChange([...tiers, { id: `t${Date.now()}`, minQty: '', maxQty: '', discountPct: '' }])
   }
   function removeTier(id) {
     onChange(tiers.filter(t => t.id !== id))
   }
   function updateTier(id, field, val) {
     onChange(tiers.map(t => t.id === id ? { ...t, [field]: val } : t))
+  }
+
+  // Etiqueta de rango en el preview
+  function rangeLabel(t) {
+    if (!t.minQty) return null
+    const min = t.minQty
+    const max = t.maxQty ? t.maxQty : null
+    if (max) return `${min}–${max} pzas`
+    return `${min}+ pzas`
   }
 
   return (
@@ -73,66 +83,79 @@ function TiersEditor({ tiers, onChange }) {
           Sin descuentos configurados
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {tiers.map((tier, i) => (
-            <div key={tier.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              {/* Label */}
-              <div style={{ fontSize: 11, color: 'var(--fg-secondary)', flexShrink: 0, width: 38 }}>
-                Nivel {i + 1}
+            <div key={tier.id}>
+              {/* Fila de etiqueta + eliminar */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <div style={{ fontSize: 11, color: 'var(--fg-secondary)', fontWeight: 500 }}>
+                  Nivel {i + 1}
+                </div>
+                <button
+                  onClick={() => removeTier(tier.id)}
+                  style={{
+                    width: 22, height: 22, borderRadius: 'var(--r-sm)',
+                    background: 'var(--danger-bg)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  <Icon name="x" size={11} color="var(--danger)" />
+                </button>
               </div>
-              {/* minQty */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1 }}>
-                <span style={{ fontSize: 11, color: 'var(--fg-tertiary)', flexShrink: 0 }}>≥</span>
+
+              {/* Inputs: De [min] a [max] piezas → [%] */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ fontSize: 11, color: 'var(--fg-tertiary)', flexShrink: 0 }}>De</span>
                 <input
                   type="number" min="1"
                   value={tier.minQty}
                   onChange={e => updateTier(tier.id, 'minQty', e.target.value)}
-                  placeholder="Cant."
-                  style={{ ...inputStyle, width: '100%', padding: '7px 8px', textAlign: 'center' }}
+                  placeholder="1"
+                  style={{ ...inputStyle, padding: '7px 8px', textAlign: 'center', width: 60 }}
+                />
+                <span style={{ fontSize: 11, color: 'var(--fg-tertiary)', flexShrink: 0 }}>a</span>
+                <input
+                  type="number" min="1"
+                  value={tier.maxQty}
+                  onChange={e => updateTier(tier.id, 'maxQty', e.target.value)}
+                  placeholder="∞"
+                  style={{ ...inputStyle, padding: '7px 8px', textAlign: 'center', width: 60 }}
                 />
                 <span style={{ fontSize: 11, color: 'var(--fg-tertiary)', flexShrink: 0 }}>pzas →</span>
-              </div>
-              {/* discountPct */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, width: 72 }}>
                 <input
-                  type="number" min="1" max="99"
+                  type="number" min="0" max="99"
                   value={tier.discountPct}
                   onChange={e => updateTier(tier.id, 'discountPct', e.target.value)}
-                  placeholder="%"
-                  style={{ ...inputStyle, padding: '7px 8px', textAlign: 'center' }}
+                  placeholder="0"
+                  style={{ ...inputStyle, padding: '7px 8px', textAlign: 'center', width: 56 }}
                 />
                 <span style={{ fontSize: 11, color: 'var(--success)', fontWeight: 600, flexShrink: 0 }}>%</span>
               </div>
-              {/* Remove */}
-              <button
-                onClick={() => removeTier(tier.id)}
-                style={{
-                  width: 26, height: 26, borderRadius: 'var(--r-sm)',
-                  background: 'var(--danger-bg)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                }}
-              >
-                <Icon name="x" size={12} color="var(--danger)" />
-              </button>
             </div>
           ))}
 
-          {/* Preview */}
-          {tiers.some(t => t.minQty && t.discountPct) && (
+          {/* Preview de rangos */}
+          {tiers.some(t => t.minQty && t.discountPct !== '') && (
             <div style={{
               marginTop: 4, padding: '8px 10px',
               background: 'var(--success-bg)', borderRadius: 'var(--r-md)',
               border: '0.5px solid var(--success)',
-              fontSize: 11, color: 'var(--success-fg)', lineHeight: 1.7,
+              fontSize: 11, color: 'var(--success-fg)', lineHeight: 1.8,
             }}>
               {[...tiers]
-                .filter(t => t.minQty && t.discountPct)
+                .filter(t => t.minQty)
                 .sort((a, b) => Number(a.minQty) - Number(b.minQty))
-                .map(t => (
-                  <div key={t.id}>
-                    ≥ {t.minQty} pzas → <b>−{t.discountPct}% de descuento</b>
-                  </div>
-                ))
+                .map(t => {
+                  const min = t.minQty
+                  const max = t.maxQty ? t.maxQty : null
+                  const label = max ? `${min}–${max} pzas` : `${min}+ pzas`
+                  const pct   = t.discountPct || '0'
+                  return (
+                    <div key={t.id}>
+                      {label} → <b>{pct === '0' || pct === 0 ? 'sin descuento' : `−${pct}% de descuento`}</b>
+                    </div>
+                  )
+                })
               }
             </div>
           )}
@@ -143,13 +166,13 @@ function TiersEditor({ tiers, onChange }) {
 }
 
 // ── Edit panel ────────────────────────────────────────────────────
-function EditPanel({ product, isNew, onSave, onCancel, onDelete }) {
+function EditPanel({ product, isNew, onSave, onCancel, onDelete, saving }) {
   const [form, setForm] = useState({
-    name:     product.name,
-    sku:      product.sku,
-    category: product.category,
-    unit:     product.unit,
-    price:    String(product.price),
+    name:     product.name     ?? '',
+    sku:      product.sku      ?? '',
+    category: product.category ?? '',
+    unit:     product.unit     ?? 'pza',
+    price:    String(product.price ?? ''),
     tiers:    product.tiers ? [...product.tiers] : [],
   })
   const [errors, setErrors] = useState({})
@@ -162,16 +185,24 @@ function EditPanel({ product, isNew, onSave, onCancel, onDelete }) {
 
   function validate() {
     const e = {}
-    if (!form.name.trim()) e.name = 'Nombre requerido'
-    if (!form.sku.trim())  e.sku  = 'SKU requerido'
+    if (!form.name.trim())     e.name     = 'Nombre requerido'
+    if (!form.sku.trim())      e.sku      = 'SKU requerido'
     if (!form.category.trim()) e.category = 'Categoría requerida'
     const p = parseFloat(form.price)
-    if (isNaN(p) || p <= 0) e.price = 'Precio debe ser mayor a 0'
-    // Validate tiers
+    if (isNaN(p) || p <= 0)    e.price    = 'Precio debe ser mayor a 0'
+
     for (const t of form.tiers) {
-      if (!t.minQty || Number(t.minQty) < 1) { e.tiers = 'Cantidad mínima debe ser ≥ 1'; break }
-      if (!t.discountPct || Number(t.discountPct) < 1 || Number(t.discountPct) > 99) {
-        e.tiers = 'Descuento debe ser entre 1 y 99%'; break
+      if (!t.minQty || Number(t.minQty) < 1) {
+        e.tiers = 'Cantidad mínima debe ser ≥ 1'; break
+      }
+      if (t.maxQty && Number(t.maxQty) <= Number(t.minQty)) {
+        e.tiers = 'El máximo debe ser mayor que el mínimo'; break
+      }
+      if (t.discountPct === '' || t.discountPct == null) {
+        e.tiers = 'El descuento es requerido (puede ser 0%)'; break
+      }
+      if (Number(t.discountPct) < 0 || Number(t.discountPct) > 99) {
+        e.tiers = 'Descuento debe ser entre 0 y 99%'; break
       }
     }
     setErrors(e)
@@ -188,8 +219,13 @@ function EditPanel({ product, isNew, onSave, onCancel, onDelete }) {
       unit:     form.unit,
       price:    parseFloat(form.price),
       tiers:    form.tiers
-        .filter(t => t.minQty && t.discountPct)
-        .map(t => ({ ...t, minQty: Number(t.minQty), discountPct: Number(t.discountPct) }))
+        .filter(t => t.minQty !== '')
+        .map(t => ({
+          id:          t.id,
+          minQty:      Number(t.minQty),
+          maxQty:      t.maxQty ? Number(t.maxQty) : null,
+          discountPct: Number(t.discountPct),
+        }))
         .sort((a, b) => a.minQty - b.minQty),
     }
     onSave(parsed)
@@ -197,7 +233,7 @@ function EditPanel({ product, isNew, onSave, onCancel, onDelete }) {
 
   return (
     <div style={{
-      width: 320, flexShrink: 0, borderLeft: '0.5px solid var(--border)',
+      width: 330, flexShrink: 0, borderLeft: '0.5px solid var(--border)',
       background: 'var(--surface)', display: 'flex', flexDirection: 'column', height: '100%',
     }}>
       {/* Header */}
@@ -220,7 +256,7 @@ function EditPanel({ product, isNew, onSave, onCancel, onDelete }) {
           <input
             value={form.name}
             onChange={e => set('name', e.target.value)}
-            placeholder="Ej. Válvula de paso 1/2&quot;"
+            placeholder='Ej. Válvula de paso 1/2"'
             style={{ ...inputStyle, borderColor: errors.name ? 'var(--danger)' : 'var(--border)' }}
           />
         </Field>
@@ -283,25 +319,29 @@ function EditPanel({ product, isNew, onSave, onCancel, onDelete }) {
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             onClick={onCancel}
+            disabled={saving}
             style={{
               flex: 1, padding: '9px 0',
               border: '0.5px solid var(--border)', background: 'var(--bg)',
               borderRadius: 'var(--r-md)', fontSize: 13, color: 'var(--fg)', fontWeight: 500,
+              opacity: saving ? 0.5 : 1,
             }}
           >
             Cancelar
           </button>
           <button
             onClick={handleSave}
+            disabled={saving}
             style={{
               flex: 2, padding: '9px 0',
               background: 'var(--kiuvo-blue)', color: '#fff',
               borderRadius: 'var(--r-md)', fontSize: 13, fontWeight: 500,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              opacity: saving ? 0.7 : 1,
             }}
           >
-            <Icon name="check" size={14} color="#fff" />
-            Guardar cambios
+            <Icon name={saving ? 'loader' : 'check'} size={14} color="#fff" />
+            {saving ? 'Guardando…' : 'Guardar cambios'}
           </button>
         </div>
 
@@ -323,9 +363,11 @@ function EditPanel({ product, isNew, onSave, onCancel, onDelete }) {
                 </button>
                 <button
                   onClick={() => onDelete(product.id)}
+                  disabled={saving}
                   style={{
                     flex: 1, padding: '8px', background: 'var(--danger)', color: '#fff',
                     borderRadius: 'var(--r-md)', fontSize: 12, fontWeight: 500,
+                    opacity: saving ? 0.7 : 1,
                   }}
                 >
                   Eliminar
@@ -355,11 +397,13 @@ function EditPanel({ product, isNew, onSave, onCancel, onDelete }) {
 
 // ── Main view ─────────────────────────────────────────────────────
 export default function ProductsView() {
-  const [products, setProducts] = useState(() => getProducts())
-  const [search,   setSearch]   = useState('')
-  const [cat,      setCat]      = useState('Todas')
-  const [editing,  setEditing]  = useState(null)   // product object being edited
-  const [isNew,    setIsNew]    = useState(false)
+  const { products, loading, error, saveProduct, deleteProduct } = useProducts()
+  const { showToast } = useToast()
+  const [search,  setSearch]  = useState('')
+  const [cat,     setCat]     = useState('Todas')
+  const [editing, setEditing] = useState(null)   // product object being edited
+  const [isNew,   setIsNew]   = useState(false)
+  const [saving,  setSaving]  = useState(false)
 
   const categories = allCategories(products)
 
@@ -370,17 +414,8 @@ export default function ProductsView() {
     return matchQ && matchC
   })
 
-  const persist = useCallback((list) => {
-    setProducts(list)
-    saveProducts(list)
-  }, [])
-
   function startNew() {
-    const newProd = {
-      id: Date.now(),
-      name: '', sku: '', category: '', unit: 'pza', price: 0, tiers: [],
-    }
-    setEditing(newProd)
+    setEditing({ name: '', sku: '', category: '', unit: 'pza', price: 0, tiers: [] })
     setIsNew(true)
   }
 
@@ -389,24 +424,56 @@ export default function ProductsView() {
     setIsNew(false)
   }
 
-  function handleSave(updated) {
-    if (isNew) {
-      persist([...products, updated])
-    } else {
-      persist(products.map(p => p.id === updated.id ? updated : p))
+  async function handleSave(updated) {
+    setSaving(true)
+    try {
+      await saveProduct(updated, isNew)
+      showToast?.(isNew ? 'Producto creado ✓' : 'Producto actualizado ✓', 'success')
+      setEditing(null)
+      setIsNew(false)
+    } catch (err) {
+      showToast?.(`Error al guardar: ${err.message}`, 'error')
+    } finally {
+      setSaving(false)
     }
-    setEditing(null)
-    setIsNew(false)
   }
 
-  function handleDelete(id) {
-    persist(products.filter(p => p.id !== id))
-    setEditing(null)
+  async function handleDelete(id) {
+    setSaving(true)
+    try {
+      await deleteProduct(id)
+      showToast?.('Producto eliminado', 'success')
+      setEditing(null)
+    } catch (err) {
+      showToast?.(`Error al eliminar: ${err.message}`, 'error')
+    } finally {
+      setSaving(false)
+    }
   }
 
   function handleCancel() {
     setEditing(null)
     setIsNew(false)
+  }
+
+  // ── Loading skeleton
+  if (loading) {
+    return (
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-tertiary)', fontSize: 13, gap: 10 }}>
+        <Icon name="loader" size={18} color="var(--fg-tertiary)" />
+        Cargando catálogo…
+      </div>
+    )
+  }
+
+  // ── Error state
+  if (error) {
+    return (
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+        <div style={{ fontSize: 13, color: 'var(--danger)' }}>Error al cargar productos</div>
+        <div style={{ fontSize: 11, color: 'var(--fg-tertiary)' }}>{error}</div>
+      </div>
+    )
   }
 
   return (
@@ -465,94 +532,115 @@ export default function ProductsView() {
 
         {/* Table */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
-              <tr style={{ background: 'var(--bg-secondary)' }}>
-                {['SKU', 'Producto', 'Categoría', 'Precio unitario', 'Unidad', 'Descuentos', ''].map((h, i) => (
-                  <th key={i} style={{
-                    padding: '9px 14px',
-                    textAlign: i === 0 || i === 6 ? 'center' : 'left',
-                    fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)',
-                    borderBottom: '0.5px solid var(--border)', whiteSpace: 'nowrap',
-                  }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(p => {
-                const isActive = editing?.id === p.id
-                const hasTiers = p.tiers && p.tiers.length > 0
-                return (
-                  <tr
-                    key={p.id}
-                    style={{
-                      background: isActive ? 'var(--kiuvo-blue-soft)' : 'transparent',
-                      cursor: 'default',
-                    }}
-                  >
-                    <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', textAlign: 'center' }}>
-                      <span style={{
-                        fontSize: 11, fontFamily: 'monospace',
-                        color: 'var(--fg-secondary)', background: 'var(--bg-secondary)',
-                        padding: '2px 6px', borderRadius: 4,
-                      }}>{p.sku}</span>
-                    </td>
-                    <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', fontWeight: 500, color: 'var(--fg)' }}>
-                      {p.name}
-                    </td>
-                    <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', color: 'var(--fg-secondary)', fontSize: 12 }}>
-                      {p.category}
-                    </td>
-                    <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', fontWeight: 500, color: 'var(--fg)', fontVariantNumeric: 'tabular-nums' }}>
-                      {fmt(p.price)}
-                    </td>
-                    <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', color: 'var(--fg-secondary)', fontSize: 12 }}>
-                      {p.unit}
-                    </td>
-                    <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)' }}>
-                      {hasTiers ? (
-                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                          {[...p.tiers]
-                            .sort((a, b) => a.minQty - b.minQty)
-                            .map(t => (
-                              <span key={t.id} style={{
-                                fontSize: 10, fontWeight: 600,
-                                padding: '2px 6px', borderRadius: 99,
-                                background: 'var(--success-bg)', color: 'var(--success-fg)',
-                                border: '0.5px solid var(--success)',
-                                whiteSpace: 'nowrap',
-                              }}>
-                                ≥{t.minQty} →&nbsp;−{t.discountPct}%
-                              </span>
-                            ))}
-                        </div>
-                      ) : (
-                        <span style={{ fontSize: 11, color: 'var(--fg-tertiary)' }}>—</span>
-                      )}
-                    </td>
-                    <td style={{ padding: '11px 10px', borderBottom: '0.5px solid var(--border)', textAlign: 'center' }}>
-                      <button
-                        onClick={() => isActive ? handleCancel() : startEdit(p)}
-                        style={{
-                          padding: '5px 10px', fontSize: 12, fontWeight: 500,
-                          borderRadius: 'var(--r-md)',
-                          background: isActive ? 'var(--kiuvo-blue)' : 'var(--surface)',
-                          color: isActive ? '#fff' : 'var(--fg-secondary)',
-                          border: `0.5px solid ${isActive ? 'transparent' : 'var(--border)'}`,
-                          display: 'flex', alignItems: 'center', gap: 5,
-                        }}
-                      >
-                        <Icon name={isActive ? 'x' : 'pencil'} size={12} />
-                        {isActive ? 'Cerrar' : 'Editar'}
-                      </button>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+          {products.length === 0 ? (
+            <div style={{ padding: '60px 0', textAlign: 'center', color: 'var(--fg-tertiary)', fontSize: 13 }}>
+              <div style={{ marginBottom: 8 }}>
+                <Icon name="package" size={32} color="var(--border-strong)" />
+              </div>
+              No hay productos en el catálogo.<br />
+              <span style={{ color: 'var(--kiuvo-blue)', cursor: 'pointer' }} onClick={startNew}>
+                Agrega el primero →
+              </span>
+            </div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+                <tr style={{ background: 'var(--bg-secondary)' }}>
+                  {['SKU', 'Producto', 'Categoría', 'Precio unitario', 'Unidad', 'Descuentos por volumen', ''].map((h, i) => (
+                    <th key={i} style={{
+                      padding: '9px 14px',
+                      textAlign: i === 0 || i === 6 ? 'center' : 'left',
+                      fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)',
+                      borderBottom: '0.5px solid var(--border)', whiteSpace: 'nowrap',
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(p => {
+                  const isActive = editing?.id === p.id
+                  const hasTiers = p.tiers && p.tiers.length > 0
+                  return (
+                    <tr
+                      key={p.id}
+                      style={{
+                        background: isActive ? 'var(--kiuvo-blue-soft)' : 'transparent',
+                        cursor: 'default',
+                      }}
+                    >
+                      <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', textAlign: 'center' }}>
+                        <span style={{
+                          fontSize: 11, fontFamily: 'monospace',
+                          color: 'var(--fg-secondary)', background: 'var(--bg-secondary)',
+                          padding: '2px 6px', borderRadius: 4,
+                        }}>{p.sku}</span>
+                      </td>
+                      <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', fontWeight: 500, color: 'var(--fg)' }}>
+                        {p.name}
+                      </td>
+                      <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', color: 'var(--fg-secondary)', fontSize: 12 }}>
+                        {p.category}
+                      </td>
+                      <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', fontWeight: 500, color: 'var(--fg)', fontVariantNumeric: 'tabular-nums' }}>
+                        {fmt(p.price)}
+                      </td>
+                      <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', color: 'var(--fg-secondary)', fontSize: 12 }}>
+                        {p.unit}
+                      </td>
+                      <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)' }}>
+                        {hasTiers ? (
+                          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                            {[...(p.tiers ?? [])]
+                              .sort((a, b) => a.minQty - b.minQty)
+                              .map(t => {
+                                const label = t.maxQty
+                                  ? `${t.minQty}–${t.maxQty}`
+                                  : `${t.minQty}+`
+                                const pctLabel = t.discountPct === 0
+                                  ? 'sin dto.'
+                                  : `−${t.discountPct}%`
+                                return (
+                                  <span key={t.id} style={{
+                                    fontSize: 10, fontWeight: 600,
+                                    padding: '2px 6px', borderRadius: 99,
+                                    background: t.discountPct === 0 ? 'var(--bg-secondary)' : 'var(--success-bg)',
+                                    color: t.discountPct === 0 ? 'var(--fg-tertiary)' : 'var(--success-fg)',
+                                    border: `0.5px solid ${t.discountPct === 0 ? 'var(--border)' : 'var(--success)'}`,
+                                    whiteSpace: 'nowrap',
+                                  }}>
+                                    {label} → {pctLabel}
+                                  </span>
+                                )
+                              })}
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: 11, color: 'var(--fg-tertiary)' }}>—</span>
+                        )}
+                      </td>
+                      <td style={{ padding: '11px 10px', borderBottom: '0.5px solid var(--border)', textAlign: 'center' }}>
+                        <button
+                          onClick={() => isActive ? handleCancel() : startEdit(p)}
+                          style={{
+                            padding: '5px 10px', fontSize: 12, fontWeight: 500,
+                            borderRadius: 'var(--r-md)',
+                            background: isActive ? 'var(--kiuvo-blue)' : 'var(--surface)',
+                            color: isActive ? '#fff' : 'var(--fg-secondary)',
+                            border: `0.5px solid ${isActive ? 'transparent' : 'var(--border)'}`,
+                            display: 'flex', alignItems: 'center', gap: 5,
+                          }}
+                        >
+                          <Icon name={isActive ? 'x' : 'pencil'} size={12} />
+                          {isActive ? 'Cerrar' : 'Editar'}
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
 
-          {filtered.length === 0 && (
+          {products.length > 0 && filtered.length === 0 && (
             <div style={{
               padding: '40px 0', textAlign: 'center',
               color: 'var(--fg-tertiary)', fontSize: 13,
@@ -566,9 +654,10 @@ export default function ProductsView() {
       {/* ── Edit panel ─────────────────────────────────────────── */}
       {editing && (
         <EditPanel
-          key={editing.id}
+          key={editing.id ?? 'new'}
           product={editing}
           isNew={isNew}
+          saving={saving}
           onSave={handleSave}
           onCancel={handleCancel}
           onDelete={handleDelete}

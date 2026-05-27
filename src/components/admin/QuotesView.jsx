@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import Icon from '../shared/Icon'
 import { useSellers } from '../../hooks/useSellers'
 import { useAdminProspects } from '../../hooks/useAdminProspects'
-import { getProducts } from '../../lib/productsStore'
+import { useProducts } from '../../hooks/useProducts'
 import { rules } from '../../lib/validation'
 
 
@@ -412,7 +412,7 @@ function NewQuotePanel({ onClose, onSave, nextId, sellers = [], prospects = [], 
 export default function QuotesView() {
   const { sellers }    = useSellers()
   const { prospects }  = useAdminProspects()
-  const products       = getProducts()
+  const { products }   = useProducts()
   const [filter,    setFilter]    = useState('all')
   const [selected,  setSelected]  = useState(null)
   const [showNew,   setShowNew]   = useState(false)

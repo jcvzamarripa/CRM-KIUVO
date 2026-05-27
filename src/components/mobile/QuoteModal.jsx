@@ -1,17 +1,14 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { pdf } from '@react-pdf/renderer'
 import Icon from '../shared/Icon'
-import { getProducts, getDiscount, getEffectivePrice } from '../../lib/productsStore'
+import { getDiscount, getEffectivePrice } from '../../lib/productsStore'
+import { useProducts } from '../../hooks/useProducts'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { QuotePDFDoc } from '../../lib/quotePDF'
 
 const fmt  = n => '$' + n.toLocaleString('es-MX', { minimumFractionDigits: 0 })
 const fmtPct = n => `${n}%`
-
-// Load products once on mount (catalog comes from productsStore, not MOCK_PRODUCTS directly)
-const ALL_PRODUCTS = getProducts()
-const CATS = ['Todos', ...Array.from(new Set(ALL_PRODUCTS.map(p => p.category)))]
 
 /** Effective unit price after applying volume discount. */
 function effectivePrice(item) {
@@ -381,6 +378,7 @@ function SuccessView({ items, prospectName, prospectEmail, prospectPhone, seller
 // ── Main ──────────────────────────────────────────────────────────
 export default function QuoteModal({ onClose, onGenerated }) {
   const { user, profile } = useAuth()
+  const { products: allProducts } = useProducts()
 
   const [step, setStep]               = useState('form')
   const [search, setSearch]           = useState('')
@@ -405,13 +403,19 @@ export default function QuoteModal({ onClose, onGenerated }) {
       .then(({ data }) => setProspects(data ?? []))
   }, [user.id])
 
+  // Categorías derivadas del catálogo
+  const cats = useMemo(() =>
+    ['Todos', ...Array.from(new Set(allProducts.map(p => p.category))).sort()],
+    [allProducts]
+  )
+
   // Filtered catalog
-  const catalog = useMemo(() => ALL_PRODUCTS.filter(p => {
+  const catalog = useMemo(() => allProducts.filter(p => {
     const matchCat  = cat === 'Todos' || p.category === cat
     const matchText = p.name.toLowerCase().includes(search.toLowerCase()) ||
                       p.sku.toLowerCase().includes(search.toLowerCase())
     return matchCat && matchText
-  }), [search, cat])
+  }), [allProducts, search, cat])
 
   const addItem = product => {
     setItems(prev => {
@@ -729,7 +733,7 @@ export default function QuoteModal({ onClose, onGenerated }) {
                 </div>
 
                 <div style={{ display: 'flex', gap: 6, marginBottom: 10, overflowX: 'auto', paddingBottom: 2 }}>
-                  {CATS.map(c => {
+                  {cats.map(c => {
                     const on = cat === c
                     return (
                       <button key={c} onClick={() => setCat(c)} style={{
