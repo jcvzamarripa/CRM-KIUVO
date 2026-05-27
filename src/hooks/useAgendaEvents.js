@@ -11,7 +11,7 @@ function mapEvent(ev) {
     type:     ev.type     || 'visita',
     name:     ev.name     || '',
     contact:  ev.contact  || '',
-    owner:    ev.seller?.initials || '?',
+    owner:    ev.seller_id ? '?' : '?',
     seller_id:ev.seller_id || null,
     stage:    ev.stage    || '',
     address:  ev.address  || '',
@@ -45,8 +45,7 @@ export function useAgendaEvents({ sellerId, dateFrom, dateTo, limit = 200 } = {}
       .from('agenda_events')
       .select(`
         id, date, start_time, end_time, type, name, contact,
-        seller_id, stage, address, notes, created_at,
-        seller:profiles!seller_id (initials, full_name, avatar_color)
+        seller_id, stage, address, notes, created_at
       `)
       .order('date', { ascending: true })
       .order('start_time', { ascending: true })
