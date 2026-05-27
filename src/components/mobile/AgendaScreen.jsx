@@ -841,6 +841,13 @@ export default function AgendaScreen({ pendingEvent, onClearPending, prefillEven
 
   useEffect(() => { load() }, [load])
 
+  // Refetch cuando el usuario regresa a la app (móvil en background)
+  useEffect(() => {
+    function onVisible() { if (!document.hidden) load() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [load])
+
   // ── Realtime (agenda_events) ──────────────────────────────────────
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) return

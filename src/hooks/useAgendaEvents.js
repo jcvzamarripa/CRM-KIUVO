@@ -39,6 +39,12 @@ export function useAgendaEvents({ sellerId, dateFrom, dateTo, limit = 200 } = {}
       setLoading(false)
       return
     }
+    // Si se requiere sellerId pero aún no cargó el perfil, esperar
+    // (evita fetch sin filtro que mostraría eventos de todos los vendedores)
+    if (sellerId === undefined) {
+      setLoading(false)
+      return
+    }
 
     setLoading(true)
     let q = supabase
