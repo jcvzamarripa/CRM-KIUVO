@@ -74,10 +74,20 @@ export function useAgendaEvents({ sellerId, dateFrom, dateTo, limit = 200 } = {}
   useEffect(() => {
     if (!isSupabaseConfigured) return
     const ch = supabase
-      .channel('agenda-events')
+      .channel(`agenda-events-${sellerId ?? 'all'}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'agenda_events' }, () => fetch())
       .subscribe()
     return () => supabase.removeChannel(ch)
+  }, [fetch, sellerId])
+
+  // Visibilidad: refetch cuando el usuario regresa a la app (móvil en background)
+  useEffect(() => {
+    if (!isSupabaseConfigured) return
+    function onVisible() {
+      if (!document.hidden) fetch()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
   }, [fetch])
 
   return { events, loading, reload: fetch }
