@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import Icon from '../shared/Icon'
 import { STAGE_BY_ID } from '../../constants/stages'
-import { supabase } from '../../lib/supabase'
+import { supabase, isSupabaseConfigured } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -815,6 +815,11 @@ export default function AgendaScreen({ pendingEvent, onClearPending, prefillEven
 
   // ── Load from Supabase (tabla agenda_events) ─────────────────────
   const load = useCallback(async () => {
+    if (!isSupabaseConfigured || !supabase) {
+      setSaveError('⚠️ Modo demo activo: los eventos no se guardan en la nube. Configura las variables de entorno de Supabase.')
+      setLoading(false)
+      return
+    }
     setLoading(true)
     const { data, error } = await supabase
       .from('agenda_events')
@@ -823,7 +828,10 @@ export default function AgendaScreen({ pendingEvent, onClearPending, prefillEven
       .order('date',       { ascending: true })
       .order('start_time', { ascending: true })
 
-    if (error) console.warn('[AgendaScreen] load error:', error.message)
+    if (error) {
+      console.warn('[AgendaScreen] load error:', error.message, error.code)
+      setSaveError(`Error al cargar eventos: ${error.message}`)
+    }
     setEvents(prev => [
       ...(data ?? []).map(normalize),
       ...prev.filter(e => e.source === 'google'),
@@ -835,6 +843,7 @@ export default function AgendaScreen({ pendingEvent, onClearPending, prefillEven
 
   // ── Realtime (agenda_events) ──────────────────────────────────────
   useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return
     const ch = supabase
       .channel(`agenda-events-${user.id}`)
       .on('postgres_changes', {
@@ -955,6 +964,11 @@ export default function AgendaScreen({ pendingEvent, onClearPending, prefillEven
   }
 
   async function handleAddEvent(ev) {
+    if (!isSupabaseConfigured || !supabase) {
+      setSaveError('⚠️ Modo demo: no se puede guardar. Ingresa con tu cuenta real de Supabase.')
+      return
+    }
+
     // Optimistic
     setEvents(prev => [...prev, ev].sort((a, b) => a.date - b.date))
 
