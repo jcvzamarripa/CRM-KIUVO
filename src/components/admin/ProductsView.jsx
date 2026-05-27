@@ -397,8 +397,9 @@ function EditPanel({ product, isNew, onSave, onCancel, onDelete, saving }) {
 
 // ── Main view ─────────────────────────────────────────────────────
 export default function ProductsView() {
-  const { products, loading, error, saveProduct, deleteProduct } = useProducts()
-  const { showToast } = useToast()
+  const { products, loading, error, saveProduct, deleteProduct, reload } = useProducts()
+  const { addToast } = useToast()
+  const showToast = (message, kind = 'success') => addToast({ message, kind })
   const [search,  setSearch]  = useState('')
   const [cat,     setCat]     = useState('Todas')
   const [editing, setEditing] = useState(null)   // product object being edited
@@ -428,6 +429,7 @@ export default function ProductsView() {
     setSaving(true)
     try {
       await saveProduct(updated, isNew)
+      await reload()   // recarga inmediata sin esperar al realtime
       showToast?.(isNew ? 'Producto creado ✓' : 'Producto actualizado ✓', 'success')
       setEditing(null)
       setIsNew(false)
@@ -442,6 +444,7 @@ export default function ProductsView() {
     setSaving(true)
     try {
       await deleteProduct(id)
+      await reload()   // recarga inmediata
       showToast?.('Producto eliminado', 'success')
       setEditing(null)
     } catch (err) {
