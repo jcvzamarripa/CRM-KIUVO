@@ -806,6 +806,7 @@ export default function AgendaScreen({ pendingEvent, onClearPending, prefillEven
   const [gcToken,        setGcToken]        = useState(() => localStorage.getItem(GC_TOKEN_KEY) || null)
   const [gcLoading,      setGcLoading]      = useState(false)
   const [syncError,      setSyncError]      = useState(null)
+  const [saveError,      setSaveError]      = useState(null)
   const [notifOk,        setNotifOk]        = useState(() => {
     try { return typeof Notification !== 'undefined' && Notification.permission === 'granted' }
     catch { return false }
@@ -981,9 +982,13 @@ export default function AgendaScreen({ pendingEvent, onClearPending, prefillEven
       .single()
 
     if (!error && data) {
+      // Reemplaza el evento temporal con el real (tiene el UUID de Supabase)
       setEvents(prev => prev.map(e => e.id === ev.id ? normalize(data) : e))
+      setSaveError(null)
     } else if (error) {
-      console.error('[AgendaScreen] handleAddEvent error:', error.message)
+      console.error('[AgendaScreen] handleAddEvent error:', error.message, error)
+      setSaveError(`No se pudo guardar el evento: ${error.message}`)
+      // Revertir el optimista
       setEvents(prev => prev.filter(e => e.id !== ev.id))
     }
 
@@ -1091,6 +1096,17 @@ export default function AgendaScreen({ pendingEvent, onClearPending, prefillEven
           </button>
         </div>
       </div>
+
+      {/* ── Save error ── */}
+      {saveError && (
+        <div style={{ margin: '0 16px 8px', padding: '10px 12px', background: 'var(--danger-bg)', border: '0.5px solid var(--danger-border)', borderRadius: 'var(--r-md)', fontSize: 12, color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 600, marginBottom: 2 }}>Error al guardar el evento</div>
+            <div style={{ opacity: 0.85 }}>{saveError}</div>
+          </div>
+          <button onClick={() => setSaveError(null)} style={{ color: 'var(--danger)', flexShrink: 0 }}><Icon name="x" size={14} /></button>
+        </div>
+      )}
 
       {/* ── Sync error ── */}
       {syncError && (

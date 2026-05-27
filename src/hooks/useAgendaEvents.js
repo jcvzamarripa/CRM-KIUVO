@@ -86,9 +86,11 @@ export function useAgendaEvents({ sellerId, dateFrom, dateTo, limit = 200 } = {}
 
 /**
  * Shortcut: today's agenda for the current seller.
+ * Usa fecha LOCAL (no UTC) para evitar desfase en zonas horarias como México (UTC-6).
  * @param {string} sellerId – profile UUID of the current user
  */
 export function useTodayAgenda(sellerId) {
-  const today = new Date().toISOString().slice(0, 10)
+  const now   = new Date()
+  const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
   return useAgendaEvents({ sellerId, dateFrom: today, dateTo: today })
 }
