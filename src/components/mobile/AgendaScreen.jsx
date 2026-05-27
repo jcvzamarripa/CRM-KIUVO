@@ -33,19 +33,43 @@ function fmtTime(d) {
   return { hh: `${hh}:${mm}`, ampm: h >= 12 ? 'PM' : 'AM' }
 }
 
+// Mapeo de tipos entre AgendaScreen y agenda_events (tabla Supabase)
+const TYPE_TO_DB   = { visit: 'visita', call: 'llamada', meeting: 'reunion', other: 'visita' }
+const TYPE_FROM_DB = { visita: 'visit', llamada: 'call', cotizacion: 'meeting', cierre: 'visit', reunion: 'meeting' }
+
 function normalize(row) {
+  // Soporta tanto el formato antiguo (starts_at) como el nuevo (date + start_time)
+  let startDate
+  if (row.starts_at) {
+    startDate = new Date(row.starts_at)
+  } else {
+    const [y, m, d]   = (row.date || '2000-01-01').split('-').map(Number)
+    const [h, mi]     = (row.start_time || '09:00').split(':').map(Number)
+    startDate         = new Date(y, m - 1, d, h, mi)
+  }
+  const endDate = row.end_time
+    ? (() => {
+        const [y, m, d] = (row.date || '2000-01-01').split('-').map(Number)
+        const [eh, emi] = row.end_time.split(':').map(Number)
+        return new Date(y, m - 1, d, eh, emi)
+      })()
+    : null
+  const duration = endDate
+    ? Math.max(15, Math.round((endDate - startDate) / 60000))
+    : (row.duration || 60)
+
   return {
     id:       row.id,
-    title:    row.title,
-    type:     row.type,
-    date:     new Date(row.starts_at),
-    duration: row.duration,
+    title:    row.name  || row.title  || '',
+    type:     TYPE_FROM_DB[row.type] || row.type || 'visit',
+    date:     startDate,
+    duration,
     address:  row.address  || '',
     notes:    row.notes    || '',
-    activity: row.activity || '',
+    activity: row.contact  || row.activity || '',
     stage:    row.stage    || null,
-    source:   row.source,
-    notified: row.notified ?? false,
+    source:   'local',
+    notified: false,
   }
 }
 
@@ -788,15 +812,17 @@ export default function AgendaScreen({ pendingEvent, onClearPending, prefillEven
   })
   const notifiedRef = useRef(new Set(JSON.parse(localStorage.getItem(NOTIFIED_KEY) || '[]')))
 
-  // ── Load from Supabase ────────────────────────────────────────────
+  // ── Load from Supabase (tabla agenda_events) ─────────────────────
   const load = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase
-      .from('events')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('starts_at', { ascending: true })
+    const { data, error } = await supabase
+      .from('agenda_events')
+      .select('id, date, start_time, end_time, type, name, contact, seller_id, stage, address, notes, prospect_id')
+      .eq('seller_id', user.id)
+      .order('date',       { ascending: true })
+      .order('start_time', { ascending: true })
 
+    if (error) console.warn('[AgendaScreen] load error:', error.message)
     setEvents(prev => [
       ...(data ?? []).map(normalize),
       ...prev.filter(e => e.source === 'google'),
@@ -806,13 +832,13 @@ export default function AgendaScreen({ pendingEvent, onClearPending, prefillEven
 
   useEffect(() => { load() }, [load])
 
-  // ── Realtime ──────────────────────────────────────────────────────
+  // ── Realtime (agenda_events) ──────────────────────────────────────
   useEffect(() => {
     const ch = supabase
-      .channel(`agenda-${user.id}`)
+      .channel(`agenda-events-${user.id}`)
       .on('postgres_changes', {
-        event: '*', schema: 'public', table: 'events',
-        filter: `user_id=eq.${user.id}`,
+        event: '*', schema: 'public', table: 'agenda_events',
+        filter: `seller_id=eq.${user.id}`,
       }, ({ eventType, new: row, old: oldRow }) => {
         if (eventType === 'INSERT') {
           setEvents(prev =>
@@ -931,22 +957,25 @@ export default function AgendaScreen({ pendingEvent, onClearPending, prefillEven
     // Optimistic
     setEvents(prev => [...prev, ev].sort((a, b) => a.date - b.date))
 
-    // Persist to Supabase
+    // Persist a agenda_events (tabla canónica)
+    const pad = n => String(n).padStart(2, '0')
+    const d   = ev.date
+    const end = new Date(d.getTime() + (ev.duration || 60) * 60000)
+
     const { data, error } = await supabase
-      .from('events')
+      .from('agenda_events')
       .insert({
-        user_id:      user.id,
-        title:        ev.title,
-        type:         ev.type,
-        starts_at:    ev.date.toISOString(),
-        duration:     ev.duration,
-        address:      ev.address     || null,
-        notes:        ev.notes       || null,
-        activity:     ev.activity    || null,
-        stage:        ev.stage       || null,
-        prospect_id:  ev.prospect_id || null,
-        source:       'local',
-        notified:     false,
+        seller_id:   user.id,
+        date:        `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`,
+        start_time:  `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+        end_time:    `${pad(end.getHours())}:${pad(end.getMinutes())}`,
+        type:        TYPE_TO_DB[ev.type] || 'visita',
+        name:        ev.title,
+        contact:     '',
+        stage:       ev.stage       || '',
+        address:     ev.address     || '',
+        notes:       ev.notes       || '',
+        prospect_id: ev.prospect_id || null,
       })
       .select()
       .single()
@@ -954,6 +983,7 @@ export default function AgendaScreen({ pendingEvent, onClearPending, prefillEven
     if (!error && data) {
       setEvents(prev => prev.map(e => e.id === ev.id ? normalize(data) : e))
     } else if (error) {
+      console.error('[AgendaScreen] handleAddEvent error:', error.message)
       setEvents(prev => prev.filter(e => e.id !== ev.id))
     }
 
@@ -967,7 +997,7 @@ export default function AgendaScreen({ pendingEvent, onClearPending, prefillEven
   async function handleDeleteEvent(id) {
     const backup = events.find(e => e.id === id)
     setEvents(prev => prev.filter(e => e.id !== id))
-    const { error } = await supabase.from('events').delete().eq('id', id)
+    const { error } = await supabase.from('agenda_events').delete().eq('id', id)
     if (error && backup) {
       setEvents(prev => [...prev, backup].sort((a, b) => a.date - b.date))
     }

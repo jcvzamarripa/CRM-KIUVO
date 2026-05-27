@@ -5,7 +5,8 @@ import { useSellers } from '../../hooks/useSellers'
 import { STAGE_BY_ID } from '../../constants/stages'
 
 // ─── Config ───────────────────────────────────────────────────────────────────
-const TODAY      = '2026-05-22'
+const _now = new Date()
+const TODAY = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-${String(_now.getDate()).padStart(2,'0')}`
 const HOUR_H     = 64        // px per hour
 const DAY_START  = 8         // 8 AM
 const DAY_END    = 19        // 7 PM  (11 hours)
