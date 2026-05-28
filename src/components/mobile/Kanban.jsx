@@ -876,7 +876,8 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
       .insert({
         name,
         company: name,
-        phone: phone || null,
+        phone:   phone   || null,
+        contact: contact || null,
         owner_id: user.id,
         stage_id: activeStage,
         value: parsed,

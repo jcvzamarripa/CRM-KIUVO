@@ -1,11 +1,11 @@
 import Icon from '../shared/Icon'
 
 const NAV_ITEMS = [
-  { id: 'inicio', label: 'Inicio',  icon: 'home' },
-  { id: 'embudo', label: 'Embudo',  icon: 'layout-kanban' },
-  { id: 'mapa',   label: 'Mapa',    icon: 'map-2' },
-  { id: 'agenda', label: 'Agenda',  icon: 'calendar' },
-  { id: 'mas',    label: 'Más',     icon: 'menu-2' },
+  { id: 'inicio',        label: 'Inicio',        icon: 'home' },
+  { id: 'embudo',        label: 'Embudo',        icon: 'layout-kanban' },
+  { id: 'cotizaciones',  label: 'Cotizaciones',  icon: 'file-invoice' },
+  { id: 'agenda',        label: 'Agenda',        icon: 'calendar' },
+  { id: 'mas',           label: 'Más',           icon: 'menu-2' },
 ]
 
 export default function BottomNav({ active, onChange }) {

@@ -5,7 +5,6 @@ import StatusBar from '../components/mobile/StatusBar'
 import BottomNav from '../components/mobile/BottomNav'
 import Dashboard from '../components/mobile/Dashboard'
 import Kanban from '../components/mobile/Kanban'
-import MapScreen from '../components/mobile/MapScreen'
 import VisitModal from '../components/mobile/VisitModal'
 import NewProspectModal from '../components/mobile/NewProspectModal'
 import NotificationsPanel from '../components/mobile/NotificationsPanel'
@@ -80,8 +79,8 @@ export default function MobileApp({ dark, onToggleDark }) {
     />
   else if (screen === 'embudo')
     content = <Kanban jumpTo={kanbanJump} onOpenNotifications={() => setShowNotifications(true)} unreadCount={notifications.unreadCount} />
-  else if (screen === 'mapa')
-    content = <MapScreen />
+  else if (screen === 'cotizaciones')
+    content = <SellerQuotesScreen onBack={() => setScreen('inicio')} />
   else if (screen === 'agenda')
     content = <AgendaScreen
       pendingEvent={agendaEvent}
@@ -98,23 +97,6 @@ export default function MobileApp({ dark, onToggleDark }) {
       <div style={{ background: 'var(--bg)', minHeight: '100%', padding: '16px 16px 92px' }}>
         <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--fg)', marginBottom: 16 }}>Más opciones</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {/* Mis cotizaciones */}
-          <button onClick={() => setMasSubScreen('cotizaciones')} style={{
-            width: '100%', padding: '14px',
-            display: 'flex', alignItems: 'center', gap: 14,
-            background: 'var(--surface)', border: '0.5px solid var(--border)',
-            borderRadius: 'var(--r-md)', color: 'var(--fg)', fontSize: 14,
-          }}>
-            <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#FEF3E2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Icon name="file-invoice" size={20} color="#854F0B" />
-            </div>
-            <div style={{ flex: 1, textAlign: 'left' }}>
-              <div style={{ fontWeight: 500 }}>Mis cotizaciones</div>
-              <div style={{ fontSize: 12, color: 'var(--fg-tertiary)', marginTop: 1 }}>Historial y descarga de PDFs</div>
-            </div>
-            <Icon name="chevron-right" size={18} color="var(--fg-tertiary)" />
-          </button>
-
           {/* Perfil */}
           <button onClick={() => setMasSubScreen('perfil')} style={{
             width: '100%', padding: '14px',
