@@ -445,7 +445,7 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
   useEffect(() => {
     supabase
       .from('prospects')
-      .select('id, name, email, contact')
+      .select('id, name, email, contact, notes')
       .eq('owner_id', user.id)
       .order('name')
       .then(({ data }) => setProspects(data ?? []))
@@ -715,7 +715,10 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
                             setProspectName(p.name)
                             setProspectId(p.id)
                             setProspectEmail(p.email ?? '')
-                            if (p.contact) setContactName(p.contact)
+                            // contact column first; fall back to "Contacto: X" inside notes
+                            const contact = p.contact ||
+                              p.notes?.match(/^Contacto:\s*(.+?)(\n|$)/m)?.[1]?.trim() || ''
+                            if (contact) setContactName(contact)
                             setShowProspects(false)
                           }}
                           style={{

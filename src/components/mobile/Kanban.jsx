@@ -29,7 +29,8 @@ function normalize(row, visitCounts = {}) {
     days: row.days_in_stage ?? 0,
     last: fmtLast(row.last_contact_at),
     notes: row.notes || '',
-    contact: row.contact || '',
+    contact: row.contact ||
+      row.notes?.match(/^Contacto:\s*(.+?)(\n|$)/m)?.[1]?.trim() || '',
   }
 }
 
