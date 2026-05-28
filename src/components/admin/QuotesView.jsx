@@ -5,6 +5,7 @@ import { useAdminProspects } from '../../hooks/useAdminProspects'
 import { useProducts } from '../../hooks/useProducts'
 import { rules } from '../../lib/validation'
 import { supabase, isSupabaseConfigured } from '../../lib/supabase'
+import { downloadStoredPDF } from '../../hooks/useQuoteHistory'
 
 
 const STATUS = {
@@ -444,11 +445,12 @@ export default function QuotesView() {
   const { sellers }    = useSellers()
   const { prospects }  = useAdminProspects()
   const { products }   = useProducts()
-  const [filter,    setFilter]    = useState('all')
-  const [selected,  setSelected]  = useState(null)
-  const [showNew,   setShowNew]   = useState(false)
-  const [quotes,    setQuotes]    = useState([])
-  const [loading,   setLoading]   = useState(true)
+  const [filter,       setFilter]       = useState('all')
+  const [selected,     setSelected]     = useState(null)
+  const [showNew,      setShowNew]      = useState(false)
+  const [quotes,       setQuotes]       = useState([])
+  const [loading,      setLoading]      = useState(true)
+  const [downloading,  setDownloading]  = useState(null) // quote id
 
   const loadQuotes = useCallback(async () => {
     if (!isSupabaseConfigured) { setLoading(false); return }
@@ -456,7 +458,7 @@ export default function QuotesView() {
     const { data, error } = await supabase
       .from('quotes')
       .select(`
-        id, status, total, notes, created_at,
+        id, status, total, notes, created_at, pdf_path,
         prospect:prospects!prospect_id (id, name),
         seller:profiles!seller_id (id, full_name, initials, avatar_color),
         items:quote_items (id)
@@ -473,6 +475,7 @@ export default function QuotesView() {
                         : dueAt.toLocaleDateString('es-MX')
         return {
           id:               q.id,
+          shortId:          q.id.slice(0, 8).toUpperCase(),
           prospect:         q.prospect?.name || q.notes || 'Sin prospecto',
           seller:           q.seller?.initials || '?',
           seller_color:     q.seller?.avatar_color || '#888',
@@ -482,6 +485,7 @@ export default function QuotesView() {
           items:            q.items?.length || 0,
           created:          createdAt.toLocaleDateString('es-MX'),
           due:              dueLabel,
+          pdfPath:          q.pdf_path || null,
         }
       }))
     }
@@ -651,7 +655,31 @@ export default function QuotesView() {
                       {q.due}
                     </td>
                     <td style={{ padding: '11px 10px', borderBottom: '0.5px solid var(--border)', textAlign: 'center' }}>
-                      <Icon name="chevron-right" size={14} color="var(--fg-tertiary)" />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
+                        {q.pdfPath && (
+                          <button
+                            onClick={async e => {
+                              e.stopPropagation()
+                              setDownloading(q.id)
+                              await downloadStoredPDF(q.pdfPath, q.shortId)
+                              setDownloading(null)
+                            }}
+                            title="Descargar PDF"
+                            style={{
+                              width: 28, height: 28, borderRadius: 'var(--r-md)',
+                              background: downloading === q.id ? 'var(--bg-secondary)' : 'var(--kiuvo-blue)',
+                              border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              cursor: 'pointer', flexShrink: 0,
+                            }}
+                          >
+                            {downloading === q.id
+                              ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--fg-tertiary)" strokeWidth="2.5" strokeLinecap="round" style={{animation:'spin 0.7s linear infinite'}}><path d="M12 2a10 10 0 0 1 10 10"/></svg>
+                              : <Icon name="download" size={13} color="#fff" />
+                            }
+                          </button>
+                        )}
+                        <Icon name="chevron-right" size={14} color="var(--fg-tertiary)" />
+                      </div>
                     </td>
                   </tr>
                 )

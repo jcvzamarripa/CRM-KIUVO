@@ -423,6 +423,10 @@ export default function QuoteModal({ onClose, onGenerated }) {
   const [submitting, setSubmitting]       = useState(false)
   const [serverError, setServerError]     = useState('')
   const [pdfUrl, setPdfUrl]               = useState(null)
+  // Extra quote fields
+  const [contactName, setContactName]   = useState('')
+  const [paymentTerms, setPaymentTerms] = useState('')
+  const [deliveryTime, setDeliveryTime] = useState('')
 
   // Load seller's prospects
   useEffect(() => {
@@ -533,15 +537,47 @@ export default function QuoteModal({ onClose, onGenerated }) {
     // 3 — Generate PDF blob
     let url = null
     try {
+      // Pre-fetch logo as base64 so the PDF worker doesn't need to do a separate request
+      let logoDataUrl = null
+      try {
+        const logoRes = await fetch(window.location.origin + '/kiuvo-logo.png')
+        if (logoRes.ok) {
+          const logoBlob   = await logoRes.blob()
+          const logoBuffer = await logoBlob.arrayBuffer()
+          const logoBytes  = new Uint8Array(logoBuffer)
+          let binary = ''
+          logoBytes.forEach(b => { binary += String.fromCharCode(b) })
+          logoDataUrl = `data:image/png;base64,${btoa(binary)}`
+        }
+      } catch (_) { /* logo fetch failed — PDF will use fallback K box */ }
+
       const blob = await pdf(
         <QuotePDFDoc
           quoteId={quote.id}
           prospectName={prospectName}
+          contactName={contactName}
           sellerName={profile?.full_name}
           items={items}
           date={new Date()}
+          paymentTerms={paymentTerms}
+          deliveryTime={deliveryTime}
+          logoUrl={logoDataUrl}
         />
       ).toBlob()
+
+      // 4 — Upload to Supabase Storage
+      const pdfPath = `${user.id}/${quote.id}.pdf`
+      const { error: uploadErr } = await supabase.storage
+        .from('cotizaciones')
+        .upload(pdfPath, blob, { contentType: 'application/pdf', upsert: true })
+
+      if (!uploadErr) {
+        // Save path back to the quote row
+        await supabase.from('quotes').update({ pdf_path: pdfPath }).eq('id', quote.id)
+      } else {
+        console.warn('[QuoteModal] storage upload:', uploadErr.message)
+      }
+
       url = URL.createObjectURL(blob)
       setPdfUrl(url)
 
@@ -552,7 +588,9 @@ export default function QuoteModal({ onClose, onGenerated }) {
       a.click()
     } catch (pdfErr) {
       console.error('PDF error:', pdfErr)
-      // Quote saved — only PDF failed; still show success
+      setServerError(`Error PDF: ${pdfErr?.message || String(pdfErr)}`)
+      setSubmitting(false)
+      return
     }
 
     onGenerated?.(prospectName, total)
@@ -664,6 +702,55 @@ export default function QuoteModal({ onClose, onGenerated }) {
                       ))}
                     </div>
                   )}
+                </div>
+              </div>
+
+              {/* Extra quote fields */}
+              <div style={{ padding: '0 16px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', letterSpacing: 0.5, marginBottom: 0 }}>DATOS DEL DOCUMENTO</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  {/* Contact name */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <label style={{ fontSize: 10, color: 'var(--fg-tertiary)', fontWeight: 500 }}>Nombre del encargado</label>
+                    <input
+                      value={contactName}
+                      onChange={e => setContactName(e.target.value)}
+                      placeholder="Ej. Juan Pérez"
+                      style={{
+                        padding: '9px 10px', background: 'var(--bg-secondary)',
+                        border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)',
+                        fontSize: 12, color: 'var(--fg)', outline: 'none', fontFamily: 'inherit',
+                      }}
+                    />
+                  </div>
+                  {/* Payment terms */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <label style={{ fontSize: 10, color: 'var(--fg-tertiary)', fontWeight: 500 }}>Forma de pago</label>
+                    <input
+                      value={paymentTerms}
+                      onChange={e => setPaymentTerms(e.target.value)}
+                      placeholder="Ej. 50% anticipo"
+                      style={{
+                        padding: '9px 10px', background: 'var(--bg-secondary)',
+                        border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)',
+                        fontSize: 12, color: 'var(--fg)', outline: 'none', fontFamily: 'inherit',
+                      }}
+                    />
+                  </div>
+                  {/* Delivery time */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <label style={{ fontSize: 10, color: 'var(--fg-tertiary)', fontWeight: 500 }}>Tiempo de entrega</label>
+                    <input
+                      value={deliveryTime}
+                      onChange={e => setDeliveryTime(e.target.value)}
+                      placeholder="Ej. 5-7 días hábiles"
+                      style={{
+                        padding: '9px 10px', background: 'var(--bg-secondary)',
+                        border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)',
+                        fontSize: 12, color: 'var(--fg)', outline: 'none', fontFamily: 'inherit',
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
 
