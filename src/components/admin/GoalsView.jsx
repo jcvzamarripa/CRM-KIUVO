@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import Icon from '../shared/Icon'
 import { useSellers } from '../../hooks/useSellers'
+import { supabase, isSupabaseConfigured } from '../../lib/supabase'
 
 // ─── Gamification data ────────────────────────────────────────────────────────
 // Starts empty — will be populated from DB when gamification table is built.
@@ -41,6 +42,28 @@ const POINTS_RULES = [
 // Metas y actuals por vendedor — starts empty, populated from DB.
 const DEFAULT_METAS = {}
 const ACTUALS = {}
+
+// ─── Period helpers ───────────────────────────────────────────────────────────
+function getPeriodDates(period) {
+  const today    = new Date()
+  const toISO    = d => d.toISOString().slice(0, 10)
+  const todayISO = toISO(today)
+  if (period === 'Semana') {
+    const mon = new Date(today)
+    mon.setDate(today.getDate() - ((today.getDay() + 6) % 7))
+    mon.setHours(0, 0, 0, 0)
+    return { from: toISO(mon), to: todayISO }
+  }
+  if (period === 'Trimestre') {
+    const m = today.getMonth()
+    return { from: toISO(new Date(today.getFullYear(), m - (m % 3), 1)), to: todayISO }
+  }
+  if (period === 'Año') {
+    return { from: `${today.getFullYear()}-01-01`, to: todayISO }
+  }
+  // Mes (default)
+  return { from: todayISO.slice(0, 8) + '01', to: todayISO }
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmt  = n => '$' + n.toLocaleString('es-MX')
@@ -133,50 +156,120 @@ function ProgBar({ value, max, color = 'var(--kiuvo-blue)', h = 5 }) {
 // ─── Metas Tab ────────────────────────────────────────────────────────────────
 function MetasTab({ sellers = [] }) {
   const [period,        setPeriod]        = useState('Mes')
-  // Initialize metas from real seller goals (goal_amount from profiles)
-  const [metas,         setMetas]         = useState({})
+  const [metas,         setMetas]         = useState({})   // { [init]: { ventas, prospectos, visitas } }
+  const [actuals,       setActuals]       = useState({})   // { [sellerId]: { ventas, prospectos, visitas } }
+  const [loadingGoals,  setLoadingGoals]  = useState(false)
+  const [saving,        setSaving]        = useState(false)
   const [dirty,         setDirty]         = useState(false)
   const [saved,         setSaved]         = useState(false)
-  const [teamGoalCustom,setTeamGoalCustom]= useState(null)   // null = suma de metas individuales
+  const [saveError,     setSaveError]     = useState('')
+  const [teamGoalCustom,setTeamGoalCustom]= useState(null)
   const [editingTeam,   setEditingTeam]   = useState(false)
   const [teamDraft,     setTeamDraft]     = useState('')
   const teamInputRef = useRef(null)
 
   useEffect(() => { if (editingTeam) teamInputRef.current?.focus() }, [editingTeam])
 
-  // Seed metas from real seller data when sellers load
-  useEffect(() => {
-    if (!sellers.length) return
-    setMetas(prev => {
-      const next = { ...prev }
-      sellers.forEach(s => {
-        if (!next[s.init]) {
-          next[s.init] = {
-            ventas:     s.goal     || 80000,
-            prospectos: DEFAULT_METAS[s.init]?.prospectos || 20,
-            visitas:    DEFAULT_METAS[s.init]?.visitas    || 25,
-          }
-        }
-      })
-      return next
+  // ── Load goals from DB when period or sellers change ──
+  const loadGoals = useCallback(async () => {
+    if (!isSupabaseConfigured || !sellers.length) return
+    setLoadingGoals(true)
+    const sellerIds = sellers.map(s => s.id)
+    const { data } = await supabase
+      .from('seller_goals')
+      .select('seller_id, goal_ventas, goal_prospectos, goal_visitas')
+      .in('seller_id', sellerIds)
+      .eq('period', period)
+
+    const next = {}
+    // Seed defaults first (from profiles.goal_amount)
+    sellers.forEach(s => {
+      next[s.init] = { ventas: s.goal || 80000, prospectos: 20, visitas: 25 }
     })
-  }, [sellers])
+    // Override with saved values
+    ;(data || []).forEach(g => {
+      const sel = sellers.find(s => s.id === g.seller_id)
+      if (sel) next[sel.init] = { ventas: g.goal_ventas, prospectos: g.goal_prospectos, visitas: g.goal_visitas }
+    })
+    setMetas(next)
+    setDirty(false)
+    setLoadingGoals(false)
+  }, [sellers, period])
+
+  useEffect(() => { loadGoals() }, [loadGoals])
+
+  // ── Load actuals for the selected period ──
+  const loadActuals = useCallback(async () => {
+    if (!isSupabaseConfigured || !sellers.length) return
+    const { from, to } = getPeriodDates(period)
+    const toEnd = to + 'T23:59:59Z'
+    const sellerIds = sellers.map(s => s.id)
+
+    const [{ data: salesData }, { data: prospectsData }, { data: visitsData }] = await Promise.all([
+      supabase.from('sales').select('seller_id, amount')
+        .in('seller_id', sellerIds).gte('closed_at', from).lte('closed_at', toEnd),
+      supabase.from('prospects').select('owner_id')
+        .in('owner_id', sellerIds).gte('created_at', from).lte('created_at', toEnd),
+      supabase.from('visits').select('seller_id').eq('kind', 'visit')
+        .in('seller_id', sellerIds).gte('created_at', from).lte('created_at', toEnd),
+    ])
+
+    const ventasMap = {}; const prospectsMap = {}; const visitasMap = {}
+    ;(salesData    || []).forEach(r => { ventasMap[r.seller_id]    = (ventasMap[r.seller_id]    || 0) + Number(r.amount || 0) })
+    ;(prospectsData|| []).forEach(r => { prospectsMap[r.owner_id]  = (prospectsMap[r.owner_id]  || 0) + 1 })
+    ;(visitsData   || []).forEach(r => { visitasMap[r.seller_id]   = (visitasMap[r.seller_id]   || 0) + 1 })
+
+    const next = {}
+    sellers.forEach(s => {
+      next[s.id] = {
+        ventas:     ventasMap[s.id]    || 0,
+        prospectos: prospectsMap[s.id] || 0,
+        visitas:    visitasMap[s.id]   || 0,
+      }
+    })
+    setActuals(next)
+  }, [sellers, period])
+
+  useEffect(() => { loadActuals() }, [loadActuals])
+
+  function getActual(sellerId) {
+    return actuals[sellerId] || { ventas: 0, prospectos: 0, visitas: 0 }
+  }
 
   function updateMeta(init, field, val) {
     setMetas(m => ({ ...m, [init]: { ...m[init], [field]: val } }))
     setDirty(true)
     setSaved(false)
+    setSaveError('')
   }
 
-  function handleSave() {
-    setDirty(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2500)
+  async function handleSave() {
+    if (!isSupabaseConfigured || !sellers.length) return
+    setSaving(true)
+    setSaveError('')
+    const rows = sellers.map(s => ({
+      seller_id:       s.id,
+      period,
+      goal_ventas:     metas[s.init]?.ventas     ?? 80000,
+      goal_prospectos: metas[s.init]?.prospectos ?? 20,
+      goal_visitas:    metas[s.init]?.visitas    ?? 25,
+      updated_at:      new Date().toISOString(),
+    }))
+    const { error } = await supabase
+      .from('seller_goals')
+      .upsert(rows, { onConflict: 'seller_id,period' })
+    setSaving(false)
+    if (error) {
+      setSaveError('Error al guardar: ' + error.message)
+    } else {
+      setDirty(false)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+    }
   }
 
   function openTeamEdit() {
-    const cur = teamGoalCustom ?? sumIndividual
-    setTeamDraft(String(cur))
+    setTeamDraft(String(teamGoalCustom ?? sumIndividual))
     setEditingTeam(true)
   }
 
@@ -185,25 +278,25 @@ function MetasTab({ sellers = [] }) {
     if (!isNaN(n) && n > 0) {
       setTeamGoalCustom(n === sumIndividual ? null : n)
       setDirty(true)
-      setSaved(false)
     }
     setEditingTeam(false)
   }
 
+  const getMeta = init => metas[init] || { ventas: 80000, prospectos: 20, visitas: 25 }
+
   const sorted = [...sellers].sort((a, b) => {
-    const pa = pct(actualOf(a.init, sellers).ventas, metas[a.init]?.ventas || metaOf(a.init).ventas)
-    const pb = pct(actualOf(b.init, sellers).ventas, metas[b.init]?.ventas || metaOf(b.init).ventas)
+    const pa = pct(getActual(a.id).ventas, getMeta(a.init).ventas)
+    const pb = pct(getActual(b.id).ventas, getMeta(b.init).ventas)
     return pb - pa
   })
 
-  const sumIndividual = sellers.reduce((s, sl) => s + (metas[sl.init]?.ventas || metaOf(sl.init).ventas), 0)
+  const sumIndividual = sellers.reduce((s, sl) => s + getMeta(sl.init).ventas, 0)
   const teamGoal      = teamGoalCustom ?? sumIndividual
-  const teamActual    = sellers.reduce((s, sl) => s + actualOf(sl.init, sellers).ventas, 0)
-  const avgCompl    = sorted.length ? Math.round(sorted.reduce((s, sl) => {
-    const m = metas[sl.init]?.ventas || metaOf(sl.init).ventas
-    return s + pct(actualOf(sl.init, sellers).ventas, m)
+  const teamActual    = sellers.reduce((s, sl) => s + getActual(sl.id).ventas, 0)
+  const avgCompl      = sorted.length ? Math.round(sorted.reduce((s, sl) => {
+    return s + pct(getActual(sl.id).ventas, getMeta(sl.init).ventas)
   }, 0) / sorted.length) : 0
-  const topSeller   = sorted[0]
+  const topSeller     = sorted[0]
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -230,13 +323,19 @@ function MetasTab({ sellers = [] }) {
         <div style={{ flex: 1 }} />
 
         {/* Save state */}
+        {saveError && (
+          <span style={{ fontSize:11, color:'var(--danger)' }}>{saveError}</span>
+        )}
         {saved && (
           <div style={{ display:'flex', alignItems:'center', gap:5, fontSize:12, color:'var(--success)', fontWeight:500 }}>
             <Icon name="check" size={14} color="var(--success)" />
             Cambios guardados
           </div>
         )}
-        {dirty && (
+        {loadingGoals && (
+          <span style={{ fontSize:11, color:'var(--fg-tertiary)' }}>Cargando metas…</span>
+        )}
+        {dirty && !saving && (
           <div style={{ display:'flex', alignItems:'center', gap:8 }}>
             <span style={{ fontSize:11, color:'var(--warning-fg)' }}>Hay cambios sin guardar</span>
             <button
@@ -249,6 +348,9 @@ function MetasTab({ sellers = [] }) {
               }}
             >Guardar cambios</button>
           </div>
+        )}
+        {saving && (
+          <span style={{ fontSize:12, color:'var(--fg-tertiary)' }}>Guardando…</span>
         )}
       </div>
 
@@ -332,7 +434,7 @@ function MetasTab({ sellers = [] }) {
           {[
             { label:'Alcanzado hasta hoy',   value: fmt(teamActual),  sub: `${pct(teamActual, teamGoal)}% del objetivo`, icon:'trending-up', color:'var(--success)' },
             { label:'Cumplimiento promedio', value: `${avgCompl}%`,   sub: 'del equipo · este mes', icon:'chart-bar', color: avgCompl >= 80 ? 'var(--success)' : avgCompl >= 60 ? 'var(--warning)' : 'var(--danger)' },
-            { label:'Mejor vendedor',        value: topSeller ? sellerName(sellers, topSeller.init).split(' ')[0] : '—', sub: topSeller ? `${pct(actualOf(topSeller.init, sellers).ventas, metas[topSeller.init]?.ventas || metaOf(topSeller.init).ventas)}% de cumplimiento` : '', icon:'trophy', color:'#EF9F27' },
+            { label:'Mejor vendedor',        value: topSeller ? sellerName(sellers, topSeller.init).split(' ')[0] : '—', sub: topSeller ? `${pct(getActual(topSeller.id).ventas, getMeta(topSeller.init).ventas)}% de cumplimiento` : '', icon:'trophy', color:'#EF9F27' },
           ].map(c => (
             <div key={c.label} style={{
               background:'var(--surface)', border:'0.5px solid var(--border)',
@@ -375,8 +477,8 @@ function MetasTab({ sellers = [] }) {
 
           {/* Rows */}
           {sorted.map((sl, i) => {
-            const g  = { ...metaOf(sl.init), ...metas[sl.init] }
-            const a  = actualOf(sl.init, sellers)
+            const g  = getMeta(sl.init)
+            const a  = getActual(sl.id)
             const sclr = sellerColor(sellers, sl.init)
             const ventasPct = pct(a.ventas, g.ventas)
 
