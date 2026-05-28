@@ -12,7 +12,7 @@ const HEALTH_LABEL = { green: 'Al día',  amber: 'En riesgo', red: 'Urgente' }
 const fmt = n => '$' + (n || 0).toLocaleString('es-MX')
 
 // ─── Map canvas (vanilla Leaflet, compatible with React 18) ───────────────────
-function MapCanvas({ prospects, colorBy, selected, setSelected, setHovered }) {
+function MapCanvas({ prospects, colorBy, selected, setSelected, setHovered, sellerColor, sellerName }) {
   const containerRef = useRef(null)
   const mapRef       = useRef(null)
   const LfRef        = useRef(null)
@@ -110,7 +110,7 @@ function MapCanvas({ prospects, colorBy, selected, setSelected, setHovered }) {
 }
 
 // ─── Sidebar prospect list ─────────────────────────────────────────────────────
-function SidebarList({ prospects, selected, setSelected, setHovered }) {
+function SidebarList({ prospects, selected, setSelected, setHovered, sellerColor }) {
   return (
     <div style={{
       width: 272, flexShrink: 0,
@@ -322,6 +322,8 @@ export default function MapView() {
             selected={selected}
             setSelected={setSelected}
             setHovered={setHovered}
+            sellerColor={sellerColor}
+            sellerName={sellerName}
           />
         </div>
 
@@ -330,6 +332,7 @@ export default function MapView() {
           selected={selected}
           setSelected={setSelected}
           setHovered={setHovered}
+          sellerColor={sellerColor}
         />
       </div>
     </div>
