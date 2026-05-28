@@ -66,6 +66,16 @@ export function useQuoteHistory({ sellerId = null, limit = 200 } = {}) {
   return { quotes, loading, reload: fetch }
 }
 
+/** Update a quote's status (sent → approved / rejected / etc.) */
+export async function updateQuoteStatus(quoteId, status) {
+  const { error } = await supabase
+    .from('quotes')
+    .update({ status })
+    .eq('id', quoteId)
+  if (error) console.warn('[updateQuoteStatus]', error.message)
+  return !error
+}
+
 /** Download a stored PDF via a signed URL (60 min expiry). */
 export async function downloadStoredPDF(pdfPath, shortId) {
   if (!pdfPath) return

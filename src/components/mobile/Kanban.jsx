@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../../contexts/ToastContext'
 import QuoteModal from './QuoteModal'
 import ProductionOrderModal from './ProductionOrderModal'
+import { updateQuoteStatus, downloadStoredPDF } from '../../hooks/useQuoteHistory'
 
 const fmt = n => '$' + (n ?? 0).toLocaleString('es-MX')
 const healthColor = { green: 'var(--success)', amber: 'var(--warning)', red: 'var(--danger)' }
@@ -28,8 +29,13 @@ function normalize(row, visitCounts = {}) {
     days: row.days_in_stage ?? 0,
     last: fmtLast(row.last_contact_at),
     notes: row.notes || '',
+    contact: row.contact || '',
   }
 }
+
+const QUOTE_STATUS_LABEL = { sent: 'Propuesta', approved: 'Cotización final', rejected: 'Rechazada', draft: 'Borrador' }
+const QUOTE_STATUS_COLOR = { sent: 'var(--kiuvo-blue)', approved: '#1D9E75', rejected: 'var(--danger)', draft: 'var(--fg-tertiary)' }
+const QUOTE_STATUS_BG    = { sent: 'var(--kiuvo-blue-soft)', approved: '#E1F5EE', rejected: 'var(--danger-bg)', draft: 'var(--bg-secondary)' }
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 function SkeletonCard() {
@@ -168,16 +174,56 @@ function AddProspectModal({ stage, onClose, onSave }) {
 }
 
 // ─── ActionSheet ──────────────────────────────────────────────────────────────
-function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, isAdmin }) {
-  const [confirming,    setConfirming]    = useState(false)
-  const [localNotes,    setLocalNotes]    = useState(prospect.notes || '')
-  const [notesDirty,    setNotesDirty]    = useState(false)
-  const [savingNotes,   setSavingNotes]   = useState(false)
-  const [images,        setImages]        = useState([])
-  const [loadingImages, setLoadingImages] = useState(true)
-  const [uploading,     setUploading]     = useState(false)
-  const fileInputRef        = useRef(null)   // galería
-  const cameraInputRef      = useRef(null)   // cámara
+function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, onNewProposal, isAdmin }) {
+  const [confirming,       setConfirming]       = useState(false)
+  const [localNotes,       setLocalNotes]       = useState(prospect.notes || '')
+  const [notesDirty,       setNotesDirty]       = useState(false)
+  const [savingNotes,      setSavingNotes]       = useState(false)
+  const [images,           setImages]           = useState([])
+  const [loadingImages,    setLoadingImages]    = useState(true)
+  const [uploading,        setUploading]        = useState(false)
+  const [quotes,           setQuotes]           = useState([])
+  const [loadingQuotes,    setLoadingQuotes]    = useState(true)
+  const [downloadingQuote, setDownloadingQuote] = useState(null)
+  const [updatingQuote,    setUpdatingQuote]    = useState(null)
+  const fileInputRef   = useRef(null)
+  const cameraInputRef = useRef(null)
+
+  // Load quotes on mount
+  useEffect(() => {
+    if (!isSupabaseConfigured) { setLoadingQuotes(false); return }
+    supabase
+      .from('quotes')
+      .select('id, status, total, created_at, pdf_path')
+      .eq('prospect_id', prospect.id)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        setQuotes((data || []).map(q => ({
+          id:      q.id,
+          shortId: q.id.slice(0, 8).toUpperCase(),
+          status:  q.status || 'draft',
+          total:   q.total  || 0,
+          pdfPath: q.pdf_path || null,
+          dateStr: new Date(q.created_at).toLocaleDateString('es-MX'),
+        })))
+        setLoadingQuotes(false)
+      })
+  }, [prospect.id])
+
+  async function handleQuoteStatus(quoteId, newStatus) {
+    setUpdatingQuote(quoteId)
+    const ok = await updateQuoteStatus(quoteId, newStatus)
+    if (ok) {
+      setQuotes(qs => qs.map(q => q.id === quoteId ? { ...q, status: newStatus } : q))
+    }
+    setUpdatingQuote(null)
+  }
+
+  async function handleDownloadQuote(pdfPath, shortId) {
+    setDownloadingQuote(shortId)
+    await downloadStoredPDF(pdfPath, shortId)
+    setDownloadingQuote(null)
+  }
 
   // Load images on mount
   useEffect(() => {
@@ -254,6 +300,147 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, is
 
         {/* Scrollable content */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px 32px' }}>
+
+          {/* ── Cotizaciones ── */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{
+              fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', letterSpacing: 0.5,
+              marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            }}>
+              COTIZACIONES
+              <button
+                onClick={() => { onClose(); onNewProposal(prospect) }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  padding: '4px 9px', borderRadius: 'var(--r-md)',
+                  background: 'var(--kiuvo-blue-soft)', color: 'var(--kiuvo-blue)',
+                  fontSize: 11, fontWeight: 500,
+                }}
+              >
+                <Icon name="plus" size={12} />
+                Nueva propuesta
+              </button>
+            </div>
+
+            {loadingQuotes ? (
+              <div style={{ fontSize: 12, color: 'var(--fg-tertiary)', padding: '8px 0' }}>Cargando…</div>
+            ) : quotes.length === 0 ? (
+              <div style={{
+                padding: '14px 12px',
+                border: '1px dashed var(--border-strong)', borderRadius: 'var(--r-md)',
+                background: 'var(--bg-secondary)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                color: 'var(--fg-tertiary)',
+              }}>
+                <Icon name="file-invoice" size={20} />
+                <span style={{ fontSize: 12 }}>Sin cotizaciones aún</span>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {quotes.map(q => {
+                  const sColor = QUOTE_STATUS_COLOR[q.status] || 'var(--fg-tertiary)'
+                  const sBg    = QUOTE_STATUS_BG[q.status]    || 'var(--bg-secondary)'
+                  const sLabel = QUOTE_STATUS_LABEL[q.status] || q.status
+                  const isUpdating = updatingQuote === q.id
+                  return (
+                    <div key={q.id} style={{
+                      padding: '10px 12px', borderRadius: 'var(--r-md)',
+                      border: '0.5px solid var(--border)', background: 'var(--surface)',
+                      display: 'flex', flexDirection: 'column', gap: 8,
+                    }}>
+                      {/* Top row: status + total */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{
+                          fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 'var(--r-full)',
+                          background: sBg, color: sColor,
+                        }}>
+                          {sLabel}
+                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)' }}>
+                            {'$' + (q.total ?? 0).toLocaleString('es-MX')}
+                          </span>
+                          {q.pdfPath && (
+                            <button
+                              onClick={() => handleDownloadQuote(q.pdfPath, q.shortId)}
+                              disabled={downloadingQuote === q.shortId}
+                              style={{
+                                width: 26, height: 26, borderRadius: 'var(--r-sm)',
+                                background: 'var(--kiuvo-blue-soft)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                color: 'var(--kiuvo-blue)', opacity: downloadingQuote === q.shortId ? 0.6 : 1,
+                              }}
+                            >
+                              <Icon
+                                name={downloadingQuote === q.shortId ? 'loader' : 'download'}
+                                size={13}
+                                style={downloadingQuote === q.shortId ? { animation: 'spin 0.7s linear infinite' } : {}}
+                              />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Date + shortId */}
+                      <div style={{ fontSize: 11, color: 'var(--fg-tertiary)' }}>
+                        {q.dateStr} · #{q.shortId}
+                      </div>
+
+                      {/* Accept / Reject for sent quotes */}
+                      {q.status === 'sent' && (
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button
+                            onClick={() => handleQuoteStatus(q.id, 'rejected')}
+                            disabled={isUpdating}
+                            style={{
+                              flex: 1, padding: '7px 0', borderRadius: 'var(--r-md)',
+                              border: '0.5px solid var(--danger-border)',
+                              background: 'var(--danger-bg)', color: 'var(--danger-fg)',
+                              fontSize: 12, fontWeight: 500,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                              opacity: isUpdating ? 0.6 : 1,
+                            }}
+                          >
+                            <Icon name="x" size={13} />
+                            Rechazar
+                          </button>
+                          <button
+                            onClick={() => handleQuoteStatus(q.id, 'approved')}
+                            disabled={isUpdating}
+                            style={{
+                              flex: 1, padding: '7px 0', borderRadius: 'var(--r-md)',
+                              background: '#1D9E75', color: '#fff',
+                              fontSize: 12, fontWeight: 500,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                              opacity: isUpdating ? 0.6 : 1,
+                            }}
+                          >
+                            {isUpdating
+                              ? <Icon name="loader" size={13} style={{ animation: 'spin 0.7s linear infinite' }} />
+                              : <Icon name="check" size={13} />
+                            }
+                            Aceptar
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Approved badge */}
+                      {q.status === 'approved' && (
+                        <div style={{
+                          display: 'flex', alignItems: 'center', gap: 5,
+                          padding: '6px 10px', borderRadius: 'var(--r-md)',
+                          background: '#E1F5EE', color: '#1D9E75', fontSize: 12, fontWeight: 500,
+                        }}>
+                          <Icon name="circle-check" size={13} color="#1D9E75" />
+                          Cotización final — usada para producción
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
 
           {/* ── Fotos ── */}
           <div style={{ marginBottom: 20 }}>
@@ -571,15 +758,17 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
   const { addToast } = useToast()
   const isAdmin = profile?.role === 'admin'
 
-  const [activeStage,   setActiveStage]   = useState('presentacion')
-  const [prospects,     setProspects]     = useState([])
-  const [loading,       setLoading]       = useState(true)
-  const [loadError,     setLoadError]     = useState(false)
-  const [showAdd,       setShowAdd]       = useState(false)
-  const [showQuote,     setShowQuote]     = useState(false)
-  const [odpProspect,   setOdpProspect]   = useState(null)
-  const [actionTarget,  setActionTarget]  = useState(null)
-  const [sortMode,      setSortMode]      = useState('value')
+  const [activeStage,      setActiveStage]      = useState('presentacion')
+  const [prospects,        setProspects]        = useState([])
+  const [loading,          setLoading]          = useState(true)
+  const [loadError,        setLoadError]        = useState(false)
+  const [showAdd,          setShowAdd]          = useState(false)
+  const [showQuote,        setShowQuote]        = useState(false)
+  const [showProposalQuote,setShowProposalQuote]= useState(false)
+  const [quoteProspect,    setQuoteProspect]    = useState(null)
+  const [odpProspect,      setOdpProspect]      = useState(null)
+  const [actionTarget,     setActionTarget]     = useState(null)
+  const [sortMode,         setSortMode]         = useState('value')
 
   // ── Load ──────────────────────────────────────────────────────────
   const loadProspects = useCallback(async () => {
@@ -589,7 +778,7 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
     const [{ data: rows, error: pErr }, { data: visits }] = await Promise.all([
       supabase
         .from('prospects')
-        .select('id, name, company, phone, email, stage_id, value, health, days_in_stage, last_contact_at, notes')
+        .select('id, name, company, phone, email, contact, stage_id, value, health, days_in_stage, last_contact_at, notes')
         .eq('owner_id', user.id)
         .order('updated_at', { ascending: false }),
       supabase
@@ -694,7 +883,7 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
         notes: finalNotes,
         health: 'green',
       })
-      .select('id, name, company, phone, email, stage_id, value, health, days_in_stage, last_contact_at, notes')
+      .select('id, name, company, phone, email, contact, stage_id, value, health, days_in_stage, last_contact_at, notes')
       .single()
 
     if (error) {
@@ -755,6 +944,12 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
     if (error) {
       addToast({ message: 'No se pudo guardar la nota. Intenta de nuevo.', kind: 'error' })
     }
+  }
+
+  // ── New proposal from ActionSheet ────────────────────────────────
+  function handleNewProposal(prospect) {
+    setQuoteProspect(prospect)
+    setShowProposalQuote(true)
   }
 
   // ── Render ────────────────────────────────────────────────────────
@@ -907,7 +1102,18 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
           onMoveStage={handleMoveStage}
           onDelete={handleDelete}
           onSaveNotes={handleSaveNotes}
+          onNewProposal={handleNewProposal}
           isAdmin={isAdmin}
+        />
+      )}
+
+      {showProposalQuote && quoteProspect && (
+        <QuoteModal
+          initialProspectId={quoteProspect.id}
+          initialProspectName={quoteProspect.name}
+          initialContactName={quoteProspect.contact || ''}
+          onClose={() => { setShowProposalQuote(false); setQuoteProspect(null) }}
+          onGenerated={() => { setShowProposalQuote(false); setQuoteProspect(null); loadProspects() }}
         />
       )}
     </div>

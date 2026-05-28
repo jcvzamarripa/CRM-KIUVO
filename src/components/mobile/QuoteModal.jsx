@@ -406,8 +406,19 @@ function QtyInput({ qty, onChange, style }) {
   )
 }
 
+// ── Payment options ───────────────────────────────────────────────
+const PAYMENT_OPTIONS = [
+  'Contado Efectivo',
+  'Transferencia',
+  'Tarjeta de Crédito',
+  '50% anticipo / 50% contra entrega',
+  '3 MSI',
+  '6 MSI',
+  'Otro',
+]
+
 // ── Main ──────────────────────────────────────────────────────────
-export default function QuoteModal({ onClose, onGenerated }) {
+export default function QuoteModal({ onClose, onGenerated, initialProspectId = null, initialProspectName = '', initialContactName = '' }) {
   const { user, profile } = useAuth()
   const { products: allProducts } = useProducts()
 
@@ -415,8 +426,8 @@ export default function QuoteModal({ onClose, onGenerated }) {
   const [search, setSearch]           = useState('')
   const [cat, setCat]                 = useState('Todos')
   const [items, setItems]             = useState([])
-  const [prospectName, setProspectName]   = useState('')
-  const [prospectId, setProspectId]       = useState(null)
+  const [prospectName, setProspectName]   = useState(initialProspectName)
+  const [prospectId, setProspectId]       = useState(initialProspectId)
   const [prospectEmail, setProspectEmail] = useState('')
   const [showProspects, setShowProspects] = useState(false)
   const [prospects, setProspects]         = useState([])
@@ -424,15 +435,17 @@ export default function QuoteModal({ onClose, onGenerated }) {
   const [serverError, setServerError]     = useState('')
   const [pdfUrl, setPdfUrl]               = useState(null)
   // Extra quote fields
-  const [contactName, setContactName]   = useState('')
-  const [paymentTerms, setPaymentTerms] = useState('')
-  const [deliveryTime, setDeliveryTime] = useState('')
+  const [contactName, setContactName]     = useState(initialContactName)
+  const [paymentSel, setPaymentSel]       = useState('')          // selected option
+  const [paymentOther, setPaymentOther]   = useState('')          // free text when "Otro"
+  const paymentTerms = paymentSel === 'Otro' ? paymentOther : paymentSel
+  const [deliveryTime, setDeliveryTime]   = useState('7 días hábiles')
 
   // Load seller's prospects
   useEffect(() => {
     supabase
       .from('prospects')
-      .select('id, name, email')
+      .select('id, name, email, contact')
       .eq('owner_id', user.id)
       .order('name')
       .then(({ data }) => setProspects(data ?? []))
@@ -689,6 +702,7 @@ export default function QuoteModal({ onClose, onGenerated }) {
                             setProspectName(p.name)
                             setProspectId(p.id)
                             setProspectEmail(p.email ?? '')
+                            if (p.contact) setContactName(p.contact)
                             setShowProspects(false)
                           }}
                           style={{
@@ -707,50 +721,67 @@ export default function QuoteModal({ onClose, onGenerated }) {
 
               {/* Extra quote fields */}
               <div style={{ padding: '0 16px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', letterSpacing: 0.5, marginBottom: 0 }}>DATOS DEL DOCUMENTO</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  {/* Contact name */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <label style={{ fontSize: 10, color: 'var(--fg-tertiary)', fontWeight: 500 }}>Nombre del encargado</label>
+                <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', letterSpacing: 0.5 }}>DATOS DEL DOCUMENTO</div>
+
+                {/* Contact name */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <label style={{ fontSize: 10, color: 'var(--fg-tertiary)', fontWeight: 500 }}>Nombre del encargado</label>
+                  <input
+                    value={contactName}
+                    onChange={e => setContactName(e.target.value)}
+                    placeholder="Ej. Juan Pérez"
+                    style={{
+                      padding: '9px 10px', background: 'var(--bg-secondary)',
+                      border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)',
+                      fontSize: 13, color: 'var(--fg)', outline: 'none', fontFamily: 'inherit',
+                    }}
+                  />
+                </div>
+
+                {/* Payment terms — select */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <label style={{ fontSize: 10, color: 'var(--fg-tertiary)', fontWeight: 500 }}>Forma de pago</label>
+                  <select
+                    value={paymentSel}
+                    onChange={e => setPaymentSel(e.target.value)}
+                    style={{
+                      padding: '9px 10px', background: 'var(--bg-secondary)',
+                      border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)',
+                      fontSize: 13, color: paymentSel ? 'var(--fg)' : 'var(--fg-tertiary)',
+                      outline: 'none', fontFamily: 'inherit', appearance: 'auto',
+                    }}
+                  >
+                    <option value="">— Seleccionar —</option>
+                    {PAYMENT_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                  {paymentSel === 'Otro' && (
                     <input
-                      value={contactName}
-                      onChange={e => setContactName(e.target.value)}
-                      placeholder="Ej. Juan Pérez"
+                      value={paymentOther}
+                      onChange={e => setPaymentOther(e.target.value)}
+                      placeholder="Especificar forma de pago…"
+                      autoFocus
                       style={{
                         padding: '9px 10px', background: 'var(--bg-secondary)',
-                        border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)',
-                        fontSize: 12, color: 'var(--fg)', outline: 'none', fontFamily: 'inherit',
+                        border: '0.5px solid var(--kiuvo-blue)', borderRadius: 'var(--r-md)',
+                        fontSize: 13, color: 'var(--fg)', outline: 'none', fontFamily: 'inherit', marginTop: 4,
                       }}
                     />
-                  </div>
-                  {/* Payment terms */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <label style={{ fontSize: 10, color: 'var(--fg-tertiary)', fontWeight: 500 }}>Forma de pago</label>
-                    <input
-                      value={paymentTerms}
-                      onChange={e => setPaymentTerms(e.target.value)}
-                      placeholder="Ej. 50% anticipo"
-                      style={{
-                        padding: '9px 10px', background: 'var(--bg-secondary)',
-                        border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)',
-                        fontSize: 12, color: 'var(--fg)', outline: 'none', fontFamily: 'inherit',
-                      }}
-                    />
-                  </div>
-                  {/* Delivery time */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <label style={{ fontSize: 10, color: 'var(--fg-tertiary)', fontWeight: 500 }}>Tiempo de entrega</label>
-                    <input
-                      value={deliveryTime}
-                      onChange={e => setDeliveryTime(e.target.value)}
-                      placeholder="Ej. 5-7 días hábiles"
-                      style={{
-                        padding: '9px 10px', background: 'var(--bg-secondary)',
-                        border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)',
-                        fontSize: 12, color: 'var(--fg)', outline: 'none', fontFamily: 'inherit',
-                      }}
-                    />
-                  </div>
+                  )}
+                </div>
+
+                {/* Delivery time */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <label style={{ fontSize: 10, color: 'var(--fg-tertiary)', fontWeight: 500 }}>Tiempo de entrega</label>
+                  <input
+                    value={deliveryTime}
+                    onChange={e => setDeliveryTime(e.target.value)}
+                    placeholder="7 días hábiles"
+                    style={{
+                      padding: '9px 10px', background: 'var(--bg-secondary)',
+                      border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)',
+                      fontSize: 13, color: 'var(--fg)', outline: 'none', fontFamily: 'inherit',
+                    }}
+                  />
                 </div>
               </div>
 
