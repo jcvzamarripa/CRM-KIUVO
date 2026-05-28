@@ -201,6 +201,7 @@ export default function MapView() {
   const sellers = ['Todos', ...sellerList.map(s => s.init)]
 
   const prospects = allProspects.filter(p => {
+    if (p.lat == null || p.lng == null) return false          // sin coordenadas → no se plotea
     if (sellerFilter !== 'Todos' && p.owner !== sellerFilter) return false
     if (healthFilter === 'Al día'    && p.health !== 'green') return false
     if (healthFilter === 'En riesgo' && p.health !== 'amber') return false
@@ -208,8 +209,9 @@ export default function MapView() {
     return true
   })
 
-  const totalValue = prospects.reduce((s, p) => s + p.value, 0)
-  const atRisk     = prospects.filter(p => p.health !== 'green').length
+  const totalValue  = prospects.reduce((s, p) => s + p.value, 0)
+  const atRisk      = prospects.filter(p => p.health !== 'green').length
+  const noCoords    = allProspects.filter(p => p.lat == null || p.lng == null).length
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg)' }}>
@@ -232,6 +234,12 @@ export default function MapView() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 'var(--r-full)', background: 'var(--warning-bg)', color: 'var(--warning-fg)', fontSize: 12, fontWeight: 500 }}>
             <Icon name="alert-triangle" size={13} />
             {atRisk} en riesgo
+          </div>
+        )}
+        {noCoords > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 'var(--r-full)', background: 'var(--bg-secondary)', color: 'var(--fg-tertiary)', fontSize: 12 }}>
+            <Icon name="map-pin-off" size={13} />
+            {noCoords} sin ubicación
           </div>
         )}
 
