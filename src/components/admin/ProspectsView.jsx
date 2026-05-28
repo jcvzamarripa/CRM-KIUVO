@@ -380,6 +380,16 @@ export default function ProspectsView() {
   const [ownerFilter, setOwnerFilter] = useState('all')
   const [selected,    setSelected]    = useState(null)
   const [showNew,     setShowNew]     = useState(false)
+  const [winW,        setWinW]        = useState(window.innerWidth)
+
+  useEffect(() => {
+    const fn = () => setWinW(window.innerWidth)
+    window.addEventListener('resize', fn)
+    return () => window.removeEventListener('resize', fn)
+  }, [])
+
+  // Panels go side-by-side on wide screens, overlay on narrow ones
+  const isNarrow = winW < 1100
 
   const sellerInits = [...new Set(prospects.map(p => p.owner))]
 
@@ -420,8 +430,21 @@ export default function ProspectsView() {
       ? <DetailPanel p={selected} stageById={stageById} sellers={sellers} onClose={() => setSelected(null)} onDelete={handleDelete} />
       : null
 
+  const panelOpen = showNew || !!selected
+
   return (
-    <div style={{ display: 'flex', height: '100%', minHeight: 0 }}>
+    <div style={{ display: 'flex', height: '100%', minHeight: 0, position: 'relative' }}>
+      {/* ── Overlay backdrop for narrow screens ── */}
+      {isNarrow && panelOpen && (
+        <div
+          onClick={() => { setSelected(null); setShowNew(false) }}
+          style={{
+            position: 'absolute', inset: 0, zIndex: 9,
+            background: 'rgba(0,0,0,0.35)',
+          }}
+        />
+      )}
+
       {/* ── Main list ── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
 
@@ -429,6 +452,7 @@ export default function ProspectsView() {
         <div style={{
           padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 10,
           borderBottom: '0.5px solid var(--border)', background: 'var(--bg)', flexShrink: 0,
+          overflowX: 'auto',
         }}>
 
           {/* + Nuevo prospecto */}
@@ -511,6 +535,7 @@ export default function ProspectsView() {
                     padding: '9px 14px', textAlign: i === 0 ? 'left' : 'center',
                     fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)',
                     borderBottom: '0.5px solid var(--border)', whiteSpace: 'nowrap',
+                    display: isNarrow && (i === 5 || i === 6) ? 'none' : undefined,
                   }}>{h}</th>
                 ))}
               </tr>
@@ -557,10 +582,10 @@ export default function ProspectsView() {
                         {p.owner}
                       </span>
                     </td>
-                    <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', textAlign: 'center', fontSize: 12, color: 'var(--fg-secondary)' }}>
+                    <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', textAlign: 'center', fontSize: 12, color: 'var(--fg-secondary)', display: isNarrow ? 'none' : undefined }}>
                       {p.last}
                     </td>
-                    <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', textAlign: 'center' }}>
+                    <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', textAlign: 'center', display: isNarrow ? 'none' : undefined }}>
                       <span style={{
                         display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
                         background: HEALTH_COLOR[p.health],
@@ -578,7 +603,16 @@ export default function ProspectsView() {
       </div>
 
       {/* ── Right panel (new form or detail) ── */}
-      {rightPanel}
+      {rightPanel && (
+        <div style={isNarrow ? {
+          position: 'absolute', top: 0, right: 0, bottom: 0, zIndex: 10,
+          width: 'min(420px, 92vw)',
+          boxShadow: '-4px 0 24px rgba(0,0,0,0.18)',
+          display: 'flex', flexDirection: 'column',
+        } : { display: 'flex', flexDirection: 'column' }}>
+          {rightPanel}
+        </div>
+      )}
     </div>
   )
 }
