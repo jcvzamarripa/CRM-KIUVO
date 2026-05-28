@@ -282,7 +282,7 @@ export default function NewProspectModal({ onClose, onCreated }) {
   const [step, setStep]           = useState('form')
   const [form, setForm]           = useState({
     clientName: '', businessName: '', phone: '',
-    email: '', location: '', employees: '',
+    email: '', location: '', employees: '', notes: '',
   })
   const [photo, setPhoto]         = useState(null)
   const [locCoords, setLocCoords] = useState(null)
@@ -328,6 +328,7 @@ export default function NewProspectModal({ onClose, onCreated }) {
     const notesParts = []
     if (form.clientName.trim())  notesParts.push('Contacto: ' + form.clientName.trim())
     if (form.employees)          notesParts.push('Empleados: ' + form.employees)
+    if (form.notes.trim())       notesParts.push(form.notes.trim())
 
     const payload = {
       name:      form.businessName.trim(),
@@ -477,6 +478,30 @@ export default function NewProspectModal({ onClose, onCreated }) {
                       </button>
                     )
                   })}
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', letterSpacing: 0.5, marginBottom: 6 }}>
+                  NOTAS <span style={{ fontWeight: 400, opacity: 0.7 }}>(opcional)</span>
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <Icon
+                    name="file-text" size={15}
+                    style={{ position: 'absolute', left: 11, top: 11, color: 'var(--fg-tertiary)', pointerEvents: 'none' }}
+                  />
+                  <textarea
+                    value={form.notes}
+                    onChange={set('notes')}
+                    placeholder="Observaciones, interés del cliente, contexto…"
+                    rows={3}
+                    style={{
+                      ...inputStyle,
+                      paddingTop: 10, paddingBottom: 10,
+                      resize: 'none', verticalAlign: 'top', lineHeight: 1.45,
+                    }}
+                  />
                 </div>
               </div>
 

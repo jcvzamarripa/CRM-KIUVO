@@ -27,6 +27,7 @@ function normalize(row, visitCounts = {}) {
     visits: visitCounts[row.id] ?? 0,
     days: row.days_in_stage ?? 0,
     last: fmtLast(row.last_contact_at),
+    notes: row.notes || '',
   }
 }
 
@@ -57,11 +58,12 @@ function AddProspectModal({ stage, onClose, onSave }) {
   const [contact, setContact] = useState('')
   const [phone,   setPhone]   = useState('')
   const [value,   setValue]   = useState('')
+  const [notes,   setNotes]   = useState('')
   const [error,   setError]   = useState('')
 
   function handleSave() {
     if (!name.trim()) { setError('El nombre de la empresa es obligatorio'); return }
-    onSave({ name: name.trim(), contact: contact.trim(), phone: phone.trim(), value })
+    onSave({ name: name.trim(), contact: contact.trim(), phone: phone.trim(), value, notes: notes.trim() })
     onClose()
   }
 
@@ -123,6 +125,16 @@ function AddProspectModal({ stage, onClose, onSave }) {
             <label style={labelStyle}>Valor estimado ($)</label>
             <input value={value} onChange={e => setValue(e.target.value)} placeholder="0" type="text" inputMode="numeric" style={inputStyle} />
           </div>
+          <div>
+            <label style={labelStyle}>Notas <span style={{ fontWeight: 400, opacity: 0.7 }}>(opcional)</span></label>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="Observaciones, interés del cliente, contexto…"
+              rows={3}
+              style={{ ...inputStyle, resize: 'none', verticalAlign: 'top', lineHeight: 1.45 }}
+            />
+          </div>
           <div style={{
             padding: '10px 12px', borderRadius: 'var(--r-md)',
             background: stage.color + '12', border: `0.5px solid ${stage.color}30`,
@@ -154,8 +166,25 @@ function AddProspectModal({ stage, onClose, onSave }) {
 }
 
 // ─── ActionSheet ──────────────────────────────────────────────────────────────
-function ActionSheet({ prospect, onClose, onMoveStage, onDelete }) {
-  const [confirming, setConfirming] = useState(false)
+function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes }) {
+  const [confirming,   setConfirming]   = useState(false)
+  const [localNotes,   setLocalNotes]   = useState(prospect.notes || '')
+  const [notesDirty,   setNotesDirty]   = useState(false)
+  const [savingNotes,  setSavingNotes]  = useState(false)
+
+  async function saveNotes() {
+    setSavingNotes(true)
+    await onSaveNotes(prospect.id, localNotes)
+    setSavingNotes(false)
+    setNotesDirty(false)
+  }
+
+  const textareaStyle = {
+    width: '100%', padding: '10px 12px', borderRadius: 'var(--r-md)',
+    border: '0.5px solid var(--border)', background: 'var(--bg-secondary)',
+    color: 'var(--fg)', fontSize: 13, outline: 'none', boxSizing: 'border-box',
+    resize: 'none', lineHeight: 1.45, fontFamily: 'inherit',
+  }
 
   return (
     <>
@@ -163,71 +192,107 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete }) {
       <div style={{
         position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 201,
         background: 'var(--bg)', borderRadius: '20px 20px 0 0',
-        padding: '0 16px 32px',
+        maxHeight: '88vh', display: 'flex', flexDirection: 'column',
       }}>
         {/* Handle */}
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 4px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 4px', flexShrink: 0 }}>
           <div style={{ width: 40, height: 4, borderRadius: 2, background: 'var(--border-strong)' }} />
         </div>
 
         {/* Prospect name */}
-        <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--fg)', padding: '8px 0 14px' }}>
+        <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--fg)', padding: '8px 16px 12px', flexShrink: 0 }}>
           {prospect.name}
         </div>
 
-        {/* Move stage */}
-        <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', letterSpacing: 0.5, marginBottom: 8 }}>
-          MOVER A ETAPA
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 18 }}>
-          {STAGES.filter(s => s.id !== prospect.stage_id).map(s => (
-            <button
-              key={s.id}
-              onClick={() => { onMoveStage(prospect.id, s.id); onClose() }}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '12px 14px', borderRadius: 'var(--r-md)',
-                border: '0.5px solid var(--border)', background: 'var(--surface)',
-                textAlign: 'left',
-              }}
-            >
-              <span style={{ width: 10, height: 10, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
-              <span style={{ fontSize: 14, color: 'var(--fg)' }}>{s.label}</span>
-            </button>
-          ))}
-        </div>
+        {/* Scrollable content */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px 32px' }}>
 
-        {/* Delete */}
-        {confirming ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ fontSize: 13, color: 'var(--fg-secondary)', textAlign: 'center', padding: '2px 0 6px' }}>
-              ¿Eliminar <b style={{ color: 'var(--fg)' }}>{prospect.name}</b>? Esta acción no se puede deshacer.
+          {/* ── Notes ── */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', letterSpacing: 0.5, marginBottom: 8 }}>
+              NOTAS
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => setConfirming(false)} style={{
-                flex: 1, padding: '12px', borderRadius: 'var(--r-md)',
-                border: '0.5px solid var(--border)', background: 'var(--surface)',
-                color: 'var(--fg)', fontSize: 14,
-              }}>Cancelar</button>
-              <button onClick={() => { onDelete(prospect.id); onClose() }} style={{
-                flex: 1, padding: '12px', borderRadius: 'var(--r-md)',
-                background: 'var(--danger)', color: '#fff', fontSize: 14, fontWeight: 500,
-              }}>Eliminar</button>
-            </div>
+            <textarea
+              value={localNotes}
+              onChange={e => { setLocalNotes(e.target.value); setNotesDirty(true) }}
+              placeholder="Agrega observaciones, acuerdos, contexto del cliente…"
+              rows={3}
+              style={textareaStyle}
+            />
+            {notesDirty && (
+              <button
+                onClick={saveNotes}
+                disabled={savingNotes}
+                style={{
+                  marginTop: 8, width: '100%', padding: '9px',
+                  background: 'var(--kiuvo-blue)', color: '#fff',
+                  borderRadius: 'var(--r-md)', fontSize: 13, fontWeight: 500,
+                  opacity: savingNotes ? 0.7 : 1,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                }}
+              >
+                <Icon name={savingNotes ? 'loader' : 'device-floppy'} size={14}
+                  style={savingNotes ? { animation: 'spin 0.7s linear infinite' } : {}} />
+                {savingNotes ? 'Guardando…' : 'Guardar nota'}
+              </button>
+            )}
           </div>
-        ) : (
-          <button onClick={() => setConfirming(true)} style={{
-            width: '100%', padding: '12px',
-            border: '0.5px solid var(--danger-border)', background: 'var(--danger-bg)',
-            color: 'var(--danger-fg)', borderRadius: 'var(--r-md)',
-            fontSize: 14, fontWeight: 500,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-          }}>
-            <Icon name="trash" size={15} color="var(--danger-fg)" />
-            Eliminar prospecto
-          </button>
-        )}
+
+          {/* ── Move stage ── */}
+          <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', letterSpacing: 0.5, marginBottom: 8 }}>
+            MOVER A ETAPA
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 18 }}>
+            {STAGES.filter(s => s.id !== prospect.stage_id).map(s => (
+              <button
+                key={s.id}
+                onClick={() => { onMoveStage(prospect.id, s.id); onClose() }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '12px 14px', borderRadius: 'var(--r-md)',
+                  border: '0.5px solid var(--border)', background: 'var(--surface)',
+                  textAlign: 'left',
+                }}
+              >
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+                <span style={{ fontSize: 14, color: 'var(--fg)' }}>{s.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* ── Delete ── */}
+          {confirming ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ fontSize: 13, color: 'var(--fg-secondary)', textAlign: 'center', padding: '2px 0 6px' }}>
+                ¿Eliminar <b style={{ color: 'var(--fg)' }}>{prospect.name}</b>? Esta acción no se puede deshacer.
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => setConfirming(false)} style={{
+                  flex: 1, padding: '12px', borderRadius: 'var(--r-md)',
+                  border: '0.5px solid var(--border)', background: 'var(--surface)',
+                  color: 'var(--fg)', fontSize: 14,
+                }}>Cancelar</button>
+                <button onClick={() => { onDelete(prospect.id); onClose() }} style={{
+                  flex: 1, padding: '12px', borderRadius: 'var(--r-md)',
+                  background: 'var(--danger)', color: '#fff', fontSize: 14, fontWeight: 500,
+                }}>Eliminar</button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={() => setConfirming(true)} style={{
+              width: '100%', padding: '12px',
+              border: '0.5px solid var(--danger-border)', background: 'var(--danger-bg)',
+              color: 'var(--danger-fg)', borderRadius: 'var(--r-md)',
+              fontSize: 14, fontWeight: 500,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}>
+              <Icon name="trash" size={15} color="var(--danger-fg)" />
+              Eliminar prospecto
+            </button>
+          )}
+        </div>
       </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </>
   )
 }
@@ -294,6 +359,17 @@ function ProspectCard({ p, onAction, onAdvance, onODP }) {
           <div style={{ width: `${visitPct * 100}%`, height: '100%', background: stage.color, borderRadius: 2 }} />
         </div>
       </div>
+
+      {p.notes ? (
+        <div style={{
+          fontSize: 11, color: 'var(--fg-tertiary)', lineHeight: 1.35,
+          overflow: 'hidden', display: '-webkit-box',
+          WebkitLineClamp: 1, WebkitBoxOrient: 'vertical',
+        }}>
+          <Icon name="file-text" size={10} style={{ marginRight: 4, verticalAlign: 'middle' }} />
+          {p.notes}
+        </div>
+      ) : null}
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ fontSize: 11, color: 'var(--fg-tertiary)' }}>{p.last}</div>
@@ -368,7 +444,7 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
     const [{ data: rows, error: pErr }, { data: visits }] = await Promise.all([
       supabase
         .from('prospects')
-        .select('id, name, company, phone, email, stage_id, value, health, days_in_stage, last_contact_at')
+        .select('id, name, company, phone, email, stage_id, value, health, days_in_stage, last_contact_at, notes')
         .eq('owner_id', user.id)
         .order('updated_at', { ascending: false }),
       supabase
@@ -443,13 +519,19 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
   const totalValue = rawList.reduce((s, p) => s + (p.value ?? 0), 0)
 
   // ── Create ────────────────────────────────────────────────────────
-  async function handleAddProspect({ name, contact, phone, value }) {
+  async function handleAddProspect({ name, contact, phone, value, notes }) {
     const tempId = `temp-${Date.now()}`
     const parsed = parseInt(value.replace(/\D/g, ''), 10) || 0
+
+    const noteParts = []
+    if (contact) noteParts.push('Contacto: ' + contact)
+    if (notes)   noteParts.push(notes)
+    const finalNotes = noteParts.length ? noteParts.join('\n') : null
+
     const temp   = normalize({
       id: tempId, name, company: name, phone: phone || null, email: null,
       stage_id: activeStage, value: parsed, health: 'green',
-      days_in_stage: 0, last_contact_at: null,
+      days_in_stage: 0, last_contact_at: null, notes: finalNotes || '',
     })
     temp._optimistic = true
 
@@ -464,10 +546,10 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
         owner_id: user.id,
         stage_id: activeStage,
         value: parsed,
-        notes: contact ? `Contacto: ${contact}` : null,
+        notes: finalNotes,
         health: 'green',
       })
-      .select('id, name, company, phone, email, stage_id, value, health, days_in_stage, last_contact_at')
+      .select('id, name, company, phone, email, stage_id, value, health, days_in_stage, last_contact_at, notes')
       .single()
 
     if (error) {
@@ -511,6 +593,22 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
     if (error) {
       setProspects(prev => backup ? [backup, ...prev] : prev)
       addToast({ message: 'No se pudo eliminar el prospecto. Intenta de nuevo.', kind: 'error' })
+    }
+  }
+
+  // ── Save notes ────────────────────────────────────────────────────
+  async function handleSaveNotes(prospectId, notes) {
+    // Optimistic update in list and action sheet
+    setProspects(ps => ps.map(p => p.id === prospectId ? { ...p, notes } : p))
+    setActionTarget(at => at?.id === prospectId ? { ...at, notes } : at)
+
+    const { error } = await supabase
+      .from('prospects')
+      .update({ notes, updated_at: new Date().toISOString() })
+      .eq('id', prospectId)
+
+    if (error) {
+      addToast({ message: 'No se pudo guardar la nota. Intenta de nuevo.', kind: 'error' })
     }
   }
 
@@ -663,6 +761,7 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
           onClose={() => setActionTarget(null)}
           onMoveStage={handleMoveStage}
           onDelete={handleDelete}
+          onSaveNotes={handleSaveNotes}
         />
       )}
     </div>
