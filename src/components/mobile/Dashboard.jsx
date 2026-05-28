@@ -25,7 +25,7 @@ function useSellerDashboard(sellerId) {
 
     const today     = new Date().toISOString().slice(0, 10)
     const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
-    const days60ago  = new Date(Date.now() - 60 * 86400000).toISOString()
+    const days60ago  = new Date(Date.now() - 30 * 86400000).toISOString()
 
     const [profileRes, salesRes, activitiesTodayRes, atRiskRes, inactiveRes] = await Promise.all([
       // Meta del mes desde perfil
@@ -43,7 +43,7 @@ function useSellerDashboard(sellerId) {
         .in('health', ['amber', 'red'])
         .order('health', { ascending: true })
         .limit(5),
-      // Prospectos inactivos +60 días
+      // Prospectos inactivos +30 días
       supabase.from('prospects').select('id', { count: 'exact', head: true })
         .eq('owner_id', sellerId)
         .lt('last_contact_at', days60ago),
@@ -604,7 +604,7 @@ function ReactivatorBanner({ inactiveCount = 0, onOpen }) {
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--danger-fg)' }}>Reactivador</div>
         <div style={{ fontSize: 11, color: 'var(--danger-fg-mid)' }}>
-          {inactiveCount} cliente{inactiveCount > 1 ? 's' : ''} sin contacto +60 días
+          {inactiveCount} cliente{inactiveCount > 1 ? 's' : ''} sin contacto +30 días
         </div>
       </div>
       <Icon name="chevron-right" size={18} color="var(--danger)" />

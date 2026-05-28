@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 
 const DISMISSED_KEY = 'kiuvo_reactivador_dismissed'
-const DAYS_THRESHOLD = 60
+const DAYS_THRESHOLD = 30
 
 const KIND_LABEL = {
   visit:    'Visita presencial',
@@ -155,7 +155,7 @@ function ClientCard({ client, sellerName, onDismiss, onSchedule }) {
 const FILTERS = [
   { id: 'all', label: 'Todos'     },
   { id: '90',  label: '+90 días'  },
-  { id: '60',  label: '60–90 días' },
+  { id: '30',  label: '30–90 días' },
 ]
 
 export default function ReactivadorModal({ onClose, onSchedule }) {
@@ -173,7 +173,7 @@ export default function ReactivadorModal({ onClose, onSchedule }) {
     setLoading(true)
     const cutoff = new Date(Date.now() - DAYS_THRESHOLD * 86400000).toISOString()
 
-    // 1 — Prospects sin contacto en 60+ días (o nunca contactados)
+    // 1 — Prospects sin contacto en 30+ días (o nunca contactados)
     const { data: rows } = await supabase
       .from('prospects')
       .select('id, name, company, phone, stage_id, value, notes, last_contact_at, created_at')
@@ -214,7 +214,7 @@ export default function ReactivadorModal({ onClose, onSchedule }) {
   const visible = active.filter(c =>
     filter === 'all' ||
     (filter === '90' && c.days >= 90) ||
-    (filter === '60' && c.days >= 60 && c.days < 90)
+    (filter === '30' && c.days >= 30 && c.days < 90)
   )
 
   return (

@@ -11,7 +11,7 @@ function useAlerts() {
     if (!isSupabaseConfigured) { setAlerts([]); setLoading(false); return }
 
     async function load() {
-      const cutoff60 = new Date(Date.now() - 60 * 86400000).toISOString()
+      const cutoff60 = new Date(Date.now() - 30 * 86400000).toISOString()
       const cutoff21 = new Date(Date.now() - 21 * 86400000).toISOString()
 
       // Single query: get all prospect counts we need
@@ -54,7 +54,7 @@ function useAlerts() {
           kind: 'red',
           icon: 'history',
           title: `${reactivate} cliente${reactivate !== 1 ? 's' : ''} a reactivar`,
-          sub: `>60 días sin contacto${kLabel ? ` · ${kLabel} potencial` : ''}`,
+          sub: `>30 días sin contacto${kLabel ? ` · ${kLabel} potencial` : ''}`,
           action: 'Reactivar',
         })
       }
