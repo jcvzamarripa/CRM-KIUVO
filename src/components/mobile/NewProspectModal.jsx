@@ -299,18 +299,14 @@ export default function NewProspectModal({ onClose, onCreated }) {
 
   const validate = () => {
     const e = {}
-    if (!form.clientName.trim())   e.clientName   = 'Requerido'
-    if (!form.businessName.trim()) e.businessName = 'Requerido'
 
-    // Phone: required AND must have valid format
-    if (!form.phone.trim()) {
-      e.phone = 'Requerido'
-    } else {
+    // Phone: format check only when filled
+    if (form.phone.trim()) {
       const phoneErr = rules.phone(form.phone)
       if (phoneErr) e.phone = phoneErr
     }
 
-    // Email: optional, but if filled must be valid
+    // Email: format check only when filled
     const emailErr = rules.email(form.email)
     if (emailErr) e.email = emailErr
 
@@ -331,9 +327,9 @@ export default function NewProspectModal({ onClose, onCreated }) {
     if (form.notes.trim())       notesParts.push(form.notes.trim())
 
     const payload = {
-      name:      form.businessName.trim(),
-      company:   form.businessName.trim(),
-      phone:     form.phone.trim(),
+      name:      form.businessName.trim() || form.clientName.trim() || 'Sin nombre',
+      company:   form.businessName.trim() || form.clientName.trim() || 'Sin nombre',
+      phone:     form.phone.trim() || null,
       email:     form.email.trim()    || null,
       address:   form.location.trim() || null,
       lat:       locCoords?.lat ?? null,
@@ -408,7 +404,7 @@ export default function NewProspectModal({ onClose, onCreated }) {
             {/* Body */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '8px 16px 0' }}>
 
-              <Field label="NOMBRE DEL CLIENTE *" icon="user" error={errors.clientName}>
+              <Field label="NOMBRE DEL CLIENTE" icon="user" error={errors.clientName}>
                 <input
                   value={form.clientName}
                   onChange={set('clientName')}
@@ -417,7 +413,7 @@ export default function NewProspectModal({ onClose, onCreated }) {
                 />
               </Field>
 
-              <Field label="NOMBRE DEL NEGOCIO *" icon="building-store" error={errors.businessName}>
+              <Field label="NOMBRE DEL NEGOCIO" icon="building-store" error={errors.businessName}>
                 <input
                   value={form.businessName}
                   onChange={set('businessName')}
@@ -426,7 +422,7 @@ export default function NewProspectModal({ onClose, onCreated }) {
                 />
               </Field>
 
-              <Field label="TELÉFONO *" icon="phone" error={errors.phone}>
+              <Field label="TELÉFONO" icon="phone" error={errors.phone}>
                 <input
                   value={form.phone}
                   onChange={set('phone')}

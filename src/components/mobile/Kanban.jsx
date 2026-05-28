@@ -59,11 +59,15 @@ function AddProspectModal({ stage, onClose, onSave }) {
   const [phone,   setPhone]   = useState('')
   const [value,   setValue]   = useState('')
   const [notes,   setNotes]   = useState('')
-  const [error,   setError]   = useState('')
 
   function handleSave() {
-    if (!name.trim()) { setError('El nombre de la empresa es obligatorio'); return }
-    onSave({ name: name.trim(), contact: contact.trim(), phone: phone.trim(), value, notes: notes.trim() })
+    onSave({
+      name:    name.trim()    || 'Sin nombre',
+      contact: contact.trim(),
+      phone:   phone.trim(),
+      value,
+      notes:   notes.trim(),
+    })
     onClose()
   }
 
@@ -105,13 +109,12 @@ function AddProspectModal({ stage, onClose, onSave }) {
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 32px', display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
-            <label style={labelStyle}>Empresa *</label>
+            <label style={labelStyle}>Empresa</label>
             <input
-              value={name} onChange={e => { setName(e.target.value); setError('') }}
+              value={name} onChange={e => setName(e.target.value)}
               placeholder="Nombre de la empresa"
-              style={{ ...inputStyle, borderColor: error ? 'var(--danger)' : 'var(--border)' }}
+              style={inputStyle}
             />
-            {error && <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4 }}>{error}</div>}
           </div>
           <div>
             <label style={labelStyle}>Persona de contacto</label>
@@ -157,7 +160,6 @@ function AddProspectModal({ stage, onClose, onSave }) {
           <button onClick={handleSave} style={{
             flex: 2, padding: '12px 0', borderRadius: 'var(--r-md)',
             background: stage.color, color: '#fff', fontSize: 14, fontWeight: 500,
-            opacity: !name.trim() ? 0.5 : 1,
           }}>Guardar prospecto</button>
         </div>
       </div>
