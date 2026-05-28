@@ -4,7 +4,7 @@ import EnvBadge from '../shared/EnvBadge'
 
 const PERIODS = ['Hoy', 'Semana', 'Mes', 'Trimestre']
 
-export default function AdminTopBar({ title = 'Dashboard', subtitle = '', dark, onToggleDark }) {
+export default function AdminTopBar({ title = 'Dashboard', subtitle = '', dark, onToggleDark, onMenuClick }) {
   const [period, setPeriod] = useState('Semana')
 
   return (
@@ -13,6 +13,20 @@ export default function AdminTopBar({ title = 'Dashboard', subtitle = '', dark, 
       padding: '13px 24px', borderBottom: '0.5px solid var(--border)',
       background: 'var(--bg)', flexShrink: 0, gap: 16,
     }}>
+      {/* Hamburger — visible only on small screens via CSS */}
+      <button
+        className="admin-hamburger"
+        onClick={onMenuClick}
+        style={{
+          width: 34, height: 34, borderRadius: 'var(--r-md)',
+          border: '0.5px solid var(--border)', background: 'var(--surface)',
+          alignItems: 'center', justifyContent: 'center',
+          color: 'var(--fg-secondary)', flexShrink: 0,
+        }}
+      >
+        <Icon name="menu-2" size={18} />
+      </button>
+
       {/* Title */}
       <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
         <div>
@@ -26,7 +40,7 @@ export default function AdminTopBar({ title = 'Dashboard', subtitle = '', dark, 
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
         {/* Search */}
-        <div style={{
+        <div className="admin-topbar-search" style={{
           display: 'flex', alignItems: 'center', gap: 7,
           padding: '7px 12px', background: 'var(--surface)',
           border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)',
@@ -37,7 +51,7 @@ export default function AdminTopBar({ title = 'Dashboard', subtitle = '', dark, 
         </div>
 
         {/* Period selector */}
-        <div style={{
+        <div className="admin-topbar-period" style={{
           display: 'inline-flex', background: 'var(--surface)',
           border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)', padding: 2, gap: 1,
         }}>
@@ -86,7 +100,7 @@ export default function AdminTopBar({ title = 'Dashboard', subtitle = '', dark, 
         )}
 
         {/* Export */}
-        <button style={{
+        <button className="admin-topbar-export" style={{
           padding: '7px 14px', background: 'var(--kiuvo-blue)', color: '#fff',
           borderRadius: 'var(--r-md)', fontSize: 12, fontWeight: 500,
           display: 'flex', alignItems: 'center', gap: 6,

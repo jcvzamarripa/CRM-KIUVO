@@ -17,19 +17,22 @@ const NAV_ITEMS = [
   { id: 'production',   label: 'Producción',  icon: 'clipboard-list'  },
 ]
 
-export default function AdminSidebar({ active = 'dashboard', onChange }) {
+export default function AdminSidebar({ active = 'dashboard', onChange, open = true }) {
   const { profile, signOut } = useAuth()
   const initials   = profile?.initials  || 'AD'
   const name       = profile?.full_name || 'Administrador'
   const avatarColor = profile?.avatar_color || '#185FA5'
 
   return (
-    <aside style={{
-      width: 220, flexShrink: 0,
-      background: 'var(--surface)',
-      borderRight: '0.5px solid var(--border)',
-      display: 'flex', flexDirection: 'column',
-    }}>
+    <aside
+      className={`admin-sidebar${open ? ' open' : ''}`}
+      style={{
+        width: 220, flexShrink: 0,
+        background: 'var(--surface)',
+        borderRight: '0.5px solid var(--border)',
+        display: 'flex', flexDirection: 'column',
+      }}
+    >
       {/* ── Brand ── */}
       <div style={{ padding: '20px 20px 18px', display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{

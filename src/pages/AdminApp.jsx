@@ -163,98 +163,119 @@ function SmallSkeleton({ span = 4 }) {
   )
 }
 
+const RESPONSIVE_CSS = `
+  /* ── Sidebar drawer ── */
+  .admin-sidebar { transition: transform 0.22s cubic-bezier(.4,0,.2,1); }
+  @media (max-width: 1023px) {
+    .admin-sidebar {
+      position: fixed !important;
+      top: 0; left: 0; bottom: 0;
+      z-index: 300;
+      transform: translateX(-100%);
+      box-shadow: 4px 0 24px rgba(0,0,0,0.18);
+    }
+    .admin-sidebar.open { transform: translateX(0); }
+  }
+  @media (min-width: 1024px) {
+    .admin-sidebar { transform: none !important; position: relative !important; }
+  }
+
+  /* ── Backdrop ── */
+  .admin-backdrop {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.4); z-index: 299;
+  }
+  @media (max-width: 1023px) { .admin-backdrop.visible { display: block; } }
+
+  /* ── Hamburger ── */
+  .admin-hamburger { display: none; }
+  @media (max-width: 1023px) { .admin-hamburger { display: flex; } }
+
+  /* ── TopBar: ocultar elementos en pantallas pequeñas ── */
+  @media (max-width: 768px) {
+    .admin-topbar-search { display: none !important; }
+    .admin-topbar-period { display: none !important; }
+    .admin-topbar-export { display: none !important; }
+  }
+
+  /* ── KPI grid ── */
+  .admin-kpi-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 16px; }
+  @media (max-width: 1280px) { .admin-kpi-grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 768px)  { .admin-kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 480px)  { .admin-kpi-grid { grid-template-columns: 1fr; } }
+
+  /* ── 12-col grid ── */
+  .admin-chart-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; margin-bottom: 16px; }
+  .admin-col-8 { grid-column: span 8; min-width: 0; }
+  .admin-col-4 { grid-column: span 4; min-width: 0; }
+  @media (max-width: 1100px) {
+    .admin-col-8 { grid-column: span 12; }
+    .admin-col-4 { grid-column: span 12; }
+  }
+
+  /* ── Dashboard scroll padding ── */
+  .admin-dashboard-scroll { overflow-y: auto; padding: 20px 28px 28px; flex: 1; }
+  @media (max-width: 768px) { .admin-dashboard-scroll { padding: 12px 12px 20px; } }
+`
+
 export default function AdminApp({ dark, onToggleDark }) {
-  const [activeNav, setActiveNav] = useState('dashboard')
+  const [activeNav,   setActiveNav]   = useState('dashboard')
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   const { kpis, loading: kpiLoading } = useDashboardKPIs()
   const { trend: salesTrend }          = useSalesTrend({ days: 14 })
   const meta = VIEW_META[activeNav] || VIEW_META.dashboard
 
+  function handleNavChange(id) {
+    setActiveNav(id)
+    if (window.innerWidth < 1024) setSidebarOpen(false)
+  }
+
   let content
   if (activeNav === 'dashboard') {
     content = (
-      <div style={{ overflowY: 'auto', padding: '20px 28px 28px', flex: 1 }}>
+      <div className="admin-dashboard-scroll">
         {/* KPI Row */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12, marginBottom: 16 }}>
+        <div className="admin-kpi-grid">
           {kpiLoading || !kpis ? (
             Array.from({ length: 6 }).map((_, i) => <KPISkeleton key={i} />)
           ) : (<>
-            <KPICard
-              label="Ventas totales"
-              value={kpis.salesTotal.value}
-              delta={kpis.salesTotal.delta}
-              deltaKind={kpis.salesTotal.deltaKind}
-              sub={kpis.salesTotal.sub}
-              accent="var(--kiuvo-blue)"
-              sparkline={salesTrend}
-            />
-            <KPICard
-              label="Prospectos activos"
-              value={kpis.prospectosActivos.value}
-              delta={kpis.prospectosActivos.delta}
-              deltaKind={kpis.prospectosActivos.deltaKind}
-              sub={kpis.prospectosActivos.sub}
-              accent="var(--info)"
-            />
-            <KPICard
-              label="Tasa de conversión"
-              value={kpis.tasaConversion.value}
-              delta={kpis.tasaConversion.delta}
-              deltaKind={kpis.tasaConversion.deltaKind}
-              sub={kpis.tasaConversion.sub}
-              accent="var(--success)"
-            />
-            <KPICard
-              label="Ticket promedio"
-              value={kpis.ticketPromedio.value}
-              delta={kpis.ticketPromedio.delta}
-              deltaKind={kpis.ticketPromedio.deltaKind}
-              sub={kpis.ticketPromedio.sub}
-              accent="var(--stage-cotizacion)"
-            />
-            <KPICard
-              label="Cierres del mes"
-              value={kpis.cierresMes.value}
-              delta={kpis.cierresMes.delta}
-              deltaKind={kpis.cierresMes.deltaKind}
-              sub={kpis.cierresMes.sub}
-              accent="var(--warning)"
-            />
-            <KPICard
-              label="Cotizaciones pendientes"
-              value={kpis.cotizacionesPendientes.value}
-              delta={kpis.cotizacionesPendientes.delta}
-              deltaKind={kpis.cotizacionesPendientes.deltaKind}
-              sub={kpis.cotizacionesPendientes.sub}
-              accent="var(--stage-negociacion)"
-            />
+            <KPICard label="Ventas totales"           value={kpis.salesTotal.value}              delta={kpis.salesTotal.delta}              deltaKind={kpis.salesTotal.deltaKind}              sub={kpis.salesTotal.sub}              accent="var(--kiuvo-blue)"         sparkline={salesTrend} />
+            <KPICard label="Prospectos activos"       value={kpis.prospectosActivos.value}       delta={kpis.prospectosActivos.delta}       deltaKind={kpis.prospectosActivos.deltaKind}       sub={kpis.prospectosActivos.sub}       accent="var(--info)"               />
+            <KPICard label="Tasa de conversión"       value={kpis.tasaConversion.value}          delta={kpis.tasaConversion.delta}          deltaKind={kpis.tasaConversion.deltaKind}          sub={kpis.tasaConversion.sub}          accent="var(--success)"            />
+            <KPICard label="Ticket promedio"          value={kpis.ticketPromedio.value}          delta={kpis.ticketPromedio.delta}          deltaKind={kpis.ticketPromedio.deltaKind}          sub={kpis.ticketPromedio.sub}          accent="var(--stage-cotizacion)"   />
+            <KPICard label="Cierres del mes"          value={kpis.cierresMes.value}              delta={kpis.cierresMes.delta}              deltaKind={kpis.cierresMes.deltaKind}              sub={kpis.cierresMes.sub}              accent="var(--warning)"            />
+            <KPICard label="Cotizaciones pendientes"  value={kpis.cotizacionesPendientes.value}  delta={kpis.cotizacionesPendientes.delta}  deltaKind={kpis.cotizacionesPendientes.deltaKind}  sub={kpis.cotizacionesPendientes.sub}  accent="var(--stage-negociacion)"  />
           </>)}
         </div>
 
         {/* Sales + Funnel */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 12, marginBottom: 16 }}>
+        <div className="admin-chart-grid">
           {kpiLoading ? (
             <><ChartSkeleton span={8} h={200} /><SmallSkeleton span={4} /></>
-          ) : (
-            <><SalesChart /><FunnelChart /></>
-          )}
+          ) : (<>
+            <div className="admin-col-8"><SalesChart /></div>
+            <div className="admin-col-4"><FunnelChart /></div>
+          </>)}
         </div>
 
         {/* Team + Activity */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 12, marginBottom: 16 }}>
+        <div className="admin-chart-grid">
           {kpiLoading ? (
             <><TableSkeleton span={8} /><SmallSkeleton span={4} /></>
-          ) : (
-            <><TeamTable /><ActivityFeed /></>
-          )}
+          ) : (<>
+            <div className="admin-col-8"><TeamTable /></div>
+            <div className="admin-col-4"><ActivityFeed /></div>
+          </>)}
         </div>
 
         {/* Heatmap + Alerts */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 12 }}>
+        <div className="admin-chart-grid" style={{ marginBottom: 0 }}>
           {kpiLoading ? (
             <><ChartSkeleton span={8} h={160} /><SmallSkeleton span={4} /></>
-          ) : (
-            <><GeoHeatmap /><AlertsPanel /></>
-          )}
+          ) : (<>
+            <div className="admin-col-8"><GeoHeatmap /></div>
+            <div className="admin-col-4"><AlertsPanel /></div>
+          </>)}
         </div>
       </div>
     )
@@ -291,13 +312,27 @@ export default function AdminApp({ dark, onToggleDark }) {
       width: '100%', height: '100%', display: 'flex',
       background: 'var(--bg)', color: 'var(--fg)', overflow: 'hidden',
     }}>
-      <AdminSidebar active={activeNav} onChange={setActiveNav} />
+      <style>{RESPONSIVE_CSS}</style>
+
+      {/* Mobile backdrop */}
+      <div
+        className={`admin-backdrop${sidebarOpen ? ' visible' : ''}`}
+        onClick={() => setSidebarOpen(false)}
+      />
+
+      <AdminSidebar
+        active={activeNav}
+        onChange={handleNavChange}
+        open={sidebarOpen}
+      />
+
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
         <AdminTopBar
           title={meta.title}
           subtitle={meta.subtitle}
           dark={dark}
           onToggleDark={onToggleDark}
+          onMenuClick={() => setSidebarOpen(o => !o)}
         />
         <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
           <ErrorBoundary key={activeNav}>
