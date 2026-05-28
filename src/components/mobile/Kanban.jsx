@@ -168,7 +168,7 @@ function AddProspectModal({ stage, onClose, onSave }) {
 }
 
 // ─── ActionSheet ──────────────────────────────────────────────────────────────
-function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes }) {
+function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, isAdmin }) {
   const [confirming,   setConfirming]   = useState(false)
   const [localNotes,   setLocalNotes]   = useState(prospect.notes || '')
   const [notesDirty,   setNotesDirty]   = useState(false)
@@ -262,8 +262,8 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes }) 
             ))}
           </div>
 
-          {/* ── Delete ── */}
-          {confirming ? (
+          {/* ── Delete (admin only) ── */}
+          {isAdmin && confirming ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ fontSize: 13, color: 'var(--fg-secondary)', textAlign: 'center', padding: '2px 0 6px' }}>
                 ¿Eliminar <b style={{ color: 'var(--fg)' }}>{prospect.name}</b>? Esta acción no se puede deshacer.
@@ -280,7 +280,7 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes }) 
                 }}>Eliminar</button>
               </div>
             </div>
-          ) : (
+          ) : isAdmin ? (
             <button onClick={() => setConfirming(true)} style={{
               width: '100%', padding: '12px',
               border: '0.5px solid var(--danger-border)', background: 'var(--danger-bg)',
@@ -291,7 +291,7 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes }) 
               <Icon name="trash" size={15} color="var(--danger-fg)" />
               Eliminar prospecto
             </button>
-          )}
+          ) : null}
         </div>
       </div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -425,8 +425,9 @@ function ProspectCard({ p, onAction, onAdvance, onODP }) {
 
 // ─── Kanban ───────────────────────────────────────────────────────────────────
 export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 }) {
-  const { user } = useAuth()
+  const { user, profile } = useAuth()
   const { addToast } = useToast()
+  const isAdmin = profile?.role === 'admin'
 
   const [activeStage,   setActiveStage]   = useState('presentacion')
   const [prospects,     setProspects]     = useState([])
@@ -764,6 +765,7 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
           onMoveStage={handleMoveStage}
           onDelete={handleDelete}
           onSaveNotes={handleSaveNotes}
+          isAdmin={isAdmin}
         />
       )}
     </div>
