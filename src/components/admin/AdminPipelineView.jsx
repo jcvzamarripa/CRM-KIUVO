@@ -48,11 +48,11 @@ function MoveDropdown({ currentStage, onMove, onClose }) {
 }
 
 // ─── Prospect card ────────────────────────────────────────────────────────────
-function KanbanCard({ p, isSelected, onClick, onMove }) {
+function KanbanCard({ p, isSelected, onClick, onMove, sellerByInit }) {
   const { stageById } = useStages()
   const [hovered,    setHovered]    = useState(false)
   const [showMove,   setShowMove]   = useState(false)
-  const seller  = sellerByInit(p.owner)
+  const seller  = sellerByInit?.(p.owner)
   const stage   = stageById[p.stage]
   const hColor  = HEALTH[p.health] || 'var(--fg-tertiary)'
   const visitPct = Math.min(1, p.visits / Math.max(stage?.min || 1, 1))
@@ -150,7 +150,7 @@ function KanbanCard({ p, isSelected, onClick, onMove }) {
 }
 
 // ─── Column ───────────────────────────────────────────────────────────────────
-function KanbanColumn({ stage, cards, selectedId, onSelect, onMove }) {
+function KanbanColumn({ stage, cards, selectedId, onSelect, onMove, sellerByInit }) {
   const totalValue = cards.reduce((s, p) => s + p.value, 0)
   const atRisk     = cards.filter(p => p.health !== 'green').length
 
@@ -210,6 +210,7 @@ function KanbanColumn({ stage, cards, selectedId, onSelect, onMove }) {
             isSelected={selectedId === p.id}
             onClick={() => onSelect(p)}
             onMove={onMove}
+            sellerByInit={sellerByInit}
           />
         ))}
       </div>
@@ -218,10 +219,10 @@ function KanbanColumn({ stage, cards, selectedId, onSelect, onMove }) {
 }
 
 // ─── Detail Panel ─────────────────────────────────────────────────────────────
-function DetailPanel({ p, onClose, onMove }) {
+function DetailPanel({ p, onClose, onMove, sellerByInit }) {
   const { stages, stageById } = useStages()
   const stage  = stageById[p.stage]
-  const seller = sellerByInit(p.owner)
+  const seller = sellerByInit?.(p.owner)
   const hColor = HEALTH[p.health]
   const visitPct = Math.min(1, p.visits / Math.max(stage?.min || 1, 1))
 
@@ -709,6 +710,7 @@ export default function AdminPipelineView() {
                 selectedId={selected?.id}
                 onSelect={handleSelect}
                 onMove={handleMove}
+                sellerByInit={sellerByInit}
               />
             )
           })}
@@ -727,6 +729,7 @@ export default function AdminPipelineView() {
             p={selected}
             onClose={() => setSelected(null)}
             onMove={handleMove}
+            sellerByInit={sellerByInit}
           />
         ) : null}
       </div>
