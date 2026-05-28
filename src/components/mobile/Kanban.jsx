@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import Icon from '../shared/Icon'
 import { STAGES, STAGE_BY_ID } from '../../constants/stages'
-import { supabase } from '../../lib/supabase'
+import { supabase, isSupabaseConfigured } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../../contexts/ToastContext'
 import QuoteModal from './QuoteModal'
@@ -169,16 +169,60 @@ function AddProspectModal({ stage, onClose, onSave }) {
 
 // ─── ActionSheet ──────────────────────────────────────────────────────────────
 function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, isAdmin }) {
-  const [confirming,   setConfirming]   = useState(false)
-  const [localNotes,   setLocalNotes]   = useState(prospect.notes || '')
-  const [notesDirty,   setNotesDirty]   = useState(false)
-  const [savingNotes,  setSavingNotes]  = useState(false)
+  const [confirming,    setConfirming]    = useState(false)
+  const [localNotes,    setLocalNotes]    = useState(prospect.notes || '')
+  const [notesDirty,    setNotesDirty]    = useState(false)
+  const [savingNotes,   setSavingNotes]   = useState(false)
+  const [images,        setImages]        = useState([])
+  const [loadingImages, setLoadingImages] = useState(true)
+  const [uploading,     setUploading]     = useState(false)
+  const fileInputRef = useRef(null)
+
+  // Load images on mount
+  useEffect(() => {
+    if (!isSupabaseConfigured) { setLoadingImages(false); return }
+    supabase
+      .from('prospect_images')
+      .select('id, url, path, created_at')
+      .eq('prospect_id', prospect.id)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => { setImages(data || []); setLoadingImages(false) })
+  }, [prospect.id])
 
   async function saveNotes() {
     setSavingNotes(true)
     await onSaveNotes(prospect.id, localNotes)
     setSavingNotes(false)
     setNotesDirty(false)
+  }
+
+  async function handleUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file || !isSupabaseConfigured) return
+    setUploading(true)
+    const ext  = file.name.split('.').pop() || 'jpg'
+    const path = `${prospect.id}/${Date.now()}.${ext}`
+    const { error: upErr } = await supabase.storage
+      .from('prospect-images')
+      .upload(path, file, { upsert: false })
+    if (upErr) { setUploading(false); return }
+    const { data: { publicUrl } } = supabase.storage
+      .from('prospect-images')
+      .getPublicUrl(path)
+    const { data: row } = await supabase
+      .from('prospect_images')
+      .insert({ prospect_id: prospect.id, url: publicUrl, path })
+      .select('id, url, path, created_at')
+      .single()
+    if (row) setImages(prev => [row, ...prev])
+    setUploading(false)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  async function handleDeleteImage(img) {
+    await supabase.storage.from('prospect-images').remove([img.path])
+    await supabase.from('prospect_images').delete().eq('id', img.id)
+    setImages(prev => prev.filter(i => i.id !== img.id))
   }
 
   const textareaStyle = {
@@ -208,6 +252,93 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, is
 
         {/* Scrollable content */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px 32px' }}>
+
+          {/* ── Fotos ── */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{
+              fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', letterSpacing: 0.5,
+              marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            }}>
+              FOTOS
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  padding: '4px 9px', borderRadius: 'var(--r-md)',
+                  background: 'var(--kiuvo-blue-soft)', color: 'var(--kiuvo-blue)',
+                  fontSize: 11, fontWeight: 500, opacity: uploading ? 0.6 : 1,
+                }}
+              >
+                <Icon name={uploading ? 'loader' : 'camera'} size={12}
+                  style={uploading ? { animation: 'spin 0.7s linear infinite' } : {}} />
+                {uploading ? 'Subiendo…' : 'Añadir foto'}
+              </button>
+            </div>
+
+            {loadingImages ? (
+              <div style={{ fontSize: 12, color: 'var(--fg-tertiary)', padding: '8px 0' }}>Cargando…</div>
+            ) : images.length === 0 ? (
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                style={{
+                  width: '100%', padding: '18px 0',
+                  border: '1px dashed var(--border-strong)', borderRadius: 'var(--r-md)',
+                  background: 'var(--bg-secondary)',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                  color: 'var(--fg-tertiary)',
+                }}
+              >
+                <Icon name="camera" size={22} />
+                <span style={{ fontSize: 12 }}>Toca para adjuntar una foto</span>
+              </button>
+            ) : (
+              <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+                {images.map(img => (
+                  <div key={img.id} style={{ position: 'relative', flexShrink: 0 }}>
+                    <img
+                      src={img.url} alt=""
+                      style={{ width: 84, height: 84, objectFit: 'cover', borderRadius: 'var(--r-md)', border: '0.5px solid var(--border)', display: 'block' }}
+                    />
+                    <button
+                      onClick={() => handleDeleteImage(img)}
+                      style={{
+                        position: 'absolute', top: 4, right: 4,
+                        width: 20, height: 20, borderRadius: '50%',
+                        background: 'rgba(0,0,0,0.6)', border: 'none',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
+                      }}
+                    >
+                      <Icon name="x" size={10} />
+                    </button>
+                  </div>
+                ))}
+                {/* Add more button */}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    width: 84, height: 84, flexShrink: 0,
+                    border: '1px dashed var(--border-strong)', borderRadius: 'var(--r-md)',
+                    background: 'var(--bg-secondary)',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    gap: 4, color: 'var(--fg-tertiary)',
+                  }}
+                >
+                  <Icon name="plus" size={18} />
+                  <span style={{ fontSize: 10 }}>Añadir</span>
+                </button>
+              </div>
+            )}
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleUpload}
+              style={{ display: 'none' }}
+            />
+          </div>
 
           {/* ── Notes ── */}
           <div style={{ marginBottom: 20 }}>
