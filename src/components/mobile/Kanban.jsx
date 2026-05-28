@@ -176,7 +176,8 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, is
   const [images,        setImages]        = useState([])
   const [loadingImages, setLoadingImages] = useState(true)
   const [uploading,     setUploading]     = useState(false)
-  const fileInputRef = useRef(null)
+  const fileInputRef        = useRef(null)   // galería
+  const cameraInputRef      = useRef(null)   // cámara
 
   // Load images on mount
   useEffect(() => {
@@ -216,7 +217,8 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, is
       .single()
     if (row) setImages(prev => [row, ...prev])
     setUploading(false)
-    if (fileInputRef.current) fileInputRef.current.value = ''
+    if (fileInputRef.current)   fileInputRef.current.value   = ''
+    if (cameraInputRef.current) cameraInputRef.current.value = ''
   }
 
   async function handleDeleteImage(img) {
@@ -270,7 +272,7 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, is
                   fontSize: 11, fontWeight: 500, opacity: uploading ? 0.6 : 1,
                 }}
               >
-                <Icon name={uploading ? 'loader' : 'camera'} size={12}
+                <Icon name={uploading ? 'loader' : 'photo'} size={12}
                   style={uploading ? { animation: 'spin 0.7s linear infinite' } : {}} />
                 {uploading ? 'Subiendo…' : 'Añadir foto'}
               </button>
@@ -280,7 +282,7 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, is
               <div style={{ fontSize: 12, color: 'var(--fg-tertiary)', padding: '8px 0' }}>Cargando…</div>
             ) : images.length === 0 ? (
               <button
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => cameraInputRef.current?.click()}
                 style={{
                   width: '100%', padding: '18px 0',
                   border: '1px dashed var(--border-strong)', borderRadius: 'var(--r-md)',
@@ -290,7 +292,7 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, is
                 }}
               >
                 <Icon name="camera" size={22} />
-                <span style={{ fontSize: 12 }}>Toca para adjuntar una foto</span>
+                <span style={{ fontSize: 12 }}>Toca para abrir la cámara</span>
               </button>
             ) : (
               <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
@@ -313,7 +315,7 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, is
                     </button>
                   </div>
                 ))}
-                {/* Add more button */}
+                {/* Add more — galería */}
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   style={{
@@ -325,13 +327,22 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, is
                   }}
                 >
                   <Icon name="plus" size={18} />
-                  <span style={{ fontSize: 10 }}>Añadir</span>
+                  <span style={{ fontSize: 10 }}>Galería</span>
                 </button>
               </div>
             )}
 
+            {/* Galería — sin capture */}
             <input
               ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleUpload}
+              style={{ display: 'none' }}
+            />
+            {/* Cámara trasera */}
+            <input
+              ref={cameraInputRef}
               type="file"
               accept="image/*"
               capture="environment"
