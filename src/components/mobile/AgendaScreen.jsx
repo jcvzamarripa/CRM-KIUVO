@@ -1050,11 +1050,20 @@ export default function AgendaScreen({ pendingEvent, onClearPending, prefillEven
   }
 
   async function handleDeleteEvent(id) {
+    if (!isSupabaseConfigured || !supabase) return
     const backup = events.find(e => e.id === id)
+    // Optimistic: quitar de la UI
     setEvents(prev => prev.filter(e => e.id !== id))
-    const { error } = await supabase.from('agenda_events').delete().eq('id', id)
-    if (error && backup) {
-      setEvents(prev => [...prev, backup].sort((a, b) => a.date - b.date))
+
+    const { error, count } = await supabase
+      .from('agenda_events')
+      .delete({ count: 'exact' })
+      .eq('id', id)
+
+    if (error || count === 0) {
+      // Revertir si falló o RLS bloqueó silenciosamente
+      if (backup) setEvents(prev => [...prev, backup].sort((a, b) => a.date - b.date))
+      setSaveError('No se pudo eliminar el evento. Verifica que tengas permisos.')
     }
   }
 
