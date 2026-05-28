@@ -398,7 +398,15 @@ export default function ProspectsView() {
   }
 
   async function handleDelete(id) {
-    await supabase.from('prospects').delete().eq('id', id)
+    const { error, count } = await supabase
+      .from('prospects')
+      .delete({ count: 'exact' })
+      .eq('id', id)
+    if (error || count === 0) {
+      console.warn('[handleDelete]', error?.message ?? 'RLS blocked delete (0 rows)')
+      alert('No se pudo eliminar el prospecto. Verifica los permisos en Supabase.')
+      return
+    }
     reload()
   }
 
