@@ -17,7 +17,7 @@ export function useQuoteHistory({ sellerId = null, limit = 200 } = {}) {
     let q = supabase
       .from('quotes')
       .select(`
-        id, status, total, notes, created_at, pdf_path,
+        id, status, total, notes, created_at, pdf_path, quote_number,
         prospect:prospects!prospect_id (name),
         seller:profiles!seller_id (full_name, initials, avatar_color),
         items:quote_items (id)
@@ -37,6 +37,7 @@ export function useQuoteHistory({ sellerId = null, limit = 200 } = {}) {
     setQuotes((data ?? []).map(r => ({
       id:           r.id,
       shortId:      r.id.slice(0, 8).toUpperCase(),
+      quoteNumber:  r.quote_number || null,
       status:       r.status || 'draft',
       total:        r.total  || 0,
       pdfPath:      r.pdf_path || null,
@@ -76,8 +77,11 @@ export async function updateQuoteStatus(quoteId, status) {
   return !error
 }
 
-/** Download a stored PDF via a signed URL (60 min expiry). */
-export async function downloadStoredPDF(pdfPath, shortId) {
+/** Download a stored PDF via a signed URL (60 min expiry).
+ *  @param {string} pdfPath   - Storage path (e.g. "seller_id/quote_id.pdf")
+ *  @param {string} filename  - Download filename WITHOUT .pdf extension
+ */
+export async function downloadStoredPDF(pdfPath, filename) {
   if (!pdfPath) return
   const { data, error } = await supabase.storage
     .from('cotizaciones')
@@ -88,6 +92,6 @@ export async function downloadStoredPDF(pdfPath, shortId) {
   }
   const a = document.createElement('a')
   a.href = data.signedUrl
-  a.download = `cotizacion-${shortId || 'kiuvo'}.pdf`
+  a.download = `${filename || 'cotizacion'}.pdf`
   a.click()
 }

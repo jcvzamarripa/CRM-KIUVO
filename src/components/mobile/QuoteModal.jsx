@@ -497,15 +497,27 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
     setSubmitting(true)
     setServerError('')
 
-    // 1 — Save quote header
+    // 1 — Get next sequential number for this seller
+    const { data: lastNum } = await supabase
+      .from('quotes')
+      .select('quote_number')
+      .eq('seller_id', user.id)
+      .not('quote_number', 'is', null)
+      .order('quote_number', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    const quoteNumber = (lastNum?.quote_number ?? 0) + 1
+
+    // 2 — Save quote header
     const { data: quote, error: qErr } = await supabase
       .from('quotes')
       .insert({
-        prospect_id: prospectId ?? null,
-        seller_id:   user.id,
-        status:      'sent',
+        prospect_id:  prospectId ?? null,
+        seller_id:    user.id,
+        status:       'sent',
         total,
-        notes:       !prospectId && prospectName ? prospectName : null,
+        quote_number: quoteNumber,
+        notes:        !prospectId && prospectName ? prospectName : null,
       })
       .select()
       .single()
@@ -521,7 +533,7 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
       return
     }
 
-    // 2 — Save quote items
+    // 3 — Save quote items
     const { error: itemsErr } = await supabase
       .from('quote_items')
       .insert(
@@ -547,7 +559,7 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
       return
     }
 
-    // 3 — Generate PDF blob
+    // 4 — Generate PDF blob
     let url = null
     try {
       // Pre-fetch logo as base64 so the PDF worker doesn't need to do a separate request
@@ -578,7 +590,7 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
         />
       ).toBlob()
 
-      // 4 — Upload to Supabase Storage
+      // 5 — Upload to Supabase Storage
       const pdfPath = `${user.id}/${quote.id}.pdf`
       const { error: uploadErr } = await supabase.storage
         .from('cotizaciones')
@@ -594,10 +606,11 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
       url = URL.createObjectURL(blob)
       setPdfUrl(url)
 
-      // Auto-trigger download
+      // Auto-trigger download with readable filename
+      const safeName = (prospectName || 'cotizacion').replace(/[/\\:*?"<>|]/g, '').trim()
       const a = document.createElement('a')
       a.href = url
-      a.download = `cotizacion-${quote.id.slice(0, 8)}.pdf`
+      a.download = `${safeName} - ${quoteNumber}.pdf`
       a.click()
     } catch (pdfErr) {
       console.error('PDF error:', pdfErr)

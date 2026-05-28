@@ -194,17 +194,18 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, on
     if (!isSupabaseConfigured) { setLoadingQuotes(false); return }
     supabase
       .from('quotes')
-      .select('id, status, total, created_at, pdf_path')
+      .select('id, status, total, created_at, pdf_path, quote_number')
       .eq('prospect_id', prospect.id)
       .order('created_at', { ascending: false })
       .then(({ data }) => {
         setQuotes((data || []).map(q => ({
-          id:      q.id,
-          shortId: q.id.slice(0, 8).toUpperCase(),
-          status:  q.status || 'draft',
-          total:   q.total  || 0,
-          pdfPath: q.pdf_path || null,
-          dateStr: new Date(q.created_at).toLocaleDateString('es-MX'),
+          id:          q.id,
+          shortId:     q.id.slice(0, 8).toUpperCase(),
+          quoteNumber: q.quote_number || null,
+          status:      q.status || 'draft',
+          total:       q.total  || 0,
+          pdfPath:     q.pdf_path || null,
+          dateStr:     new Date(q.created_at).toLocaleDateString('es-MX'),
         })))
         setLoadingQuotes(false)
       })
@@ -219,9 +220,11 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, on
     setUpdatingQuote(null)
   }
 
-  async function handleDownloadQuote(pdfPath, shortId) {
-    setDownloadingQuote(shortId)
-    await downloadStoredPDF(pdfPath, shortId)
+  async function handleDownloadQuote(q) {
+    setDownloadingQuote(q.shortId)
+    const safeName = (prospect.name || 'cotizacion').replace(/[/\\:*?"<>|]/g, '').trim()
+    const filename = q.quoteNumber ? `${safeName} - ${q.quoteNumber}` : `${safeName} - ${q.shortId}`
+    await downloadStoredPDF(q.pdfPath, filename)
     setDownloadingQuote(null)
   }
 
@@ -362,7 +365,7 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, on
                           </span>
                           {q.pdfPath && (
                             <button
-                              onClick={() => handleDownloadQuote(q.pdfPath, q.shortId)}
+                              onClick={() => handleDownloadQuote(q)}
                               disabled={downloadingQuote === q.shortId}
                               style={{
                                 width: 26, height: 26, borderRadius: 'var(--r-sm)',
@@ -381,9 +384,9 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, on
                         </div>
                       </div>
 
-                      {/* Date + shortId */}
+                      {/* Date + number */}
                       <div style={{ fontSize: 11, color: 'var(--fg-tertiary)' }}>
-                        {q.dateStr} · #{q.shortId}
+                        {q.dateStr} · {q.quoteNumber ? `Cotización #${q.quoteNumber}` : `#${q.shortId}`}
                       </div>
 
                       {/* Accept / Reject for sent quotes */}

@@ -32,7 +32,9 @@ export default function SellerQuotesScreen({ onBack }) {
   async function handleDownload(q) {
     if (!q.pdfPath) return
     setDownloading(q.id)
-    await downloadStoredPDF(q.pdfPath, q.shortId)
+    const safeName = (q.prospectName || 'cotizacion').replace(/[/\\:*?"<>|]/g, '').trim()
+    const filename = q.quoteNumber ? `${safeName} - ${q.quoteNumber}` : `${safeName} - ${q.shortId}`
+    await downloadStoredPDF(q.pdfPath, filename)
     setDownloading(null)
   }
 
@@ -184,7 +186,7 @@ export default function SellerQuotesScreen({ onBack }) {
                           {q.itemCount} producto{q.itemCount !== 1 ? 's' : ''} · {q.dateStr}
                         </div>
                         <div style={{ fontSize: 10, color: 'var(--fg-tertiary)', marginTop: 1, fontFamily: 'monospace' }}>
-                          #{q.shortId}
+                          {q.quoteNumber ? `Cotización #${q.quoteNumber}` : `#${q.shortId}`}
                         </div>
                       </div>
 
