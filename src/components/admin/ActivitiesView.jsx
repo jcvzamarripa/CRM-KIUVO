@@ -63,8 +63,7 @@ function KindBadge({ kind }) {
 }
 
 // ─── Seller avatar ────────────────────────────────────────────────────────────
-function SellerAvatar({ init, name }) {
-  const color = sellerColor(init)
+function SellerAvatar({ init, name, color = '#888' }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
       <div style={{
@@ -179,13 +178,13 @@ function ActivityRow({ row, isLast }) {
     <tr style={{ borderBottom: isLast ? 'none' : '0.5px solid var(--border)' }}>
       <td style={{ padding: '10px 16px', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
         <div style={{ fontSize: 12, color: 'var(--fg)', fontWeight: 500 }}>{fmtDate(row.date)}</div>
-        <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginTop: 1 }}>{row.time}</div>
+        <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginTop: 1 }}>{row.timeStr || row.time}</div>
       </td>
       <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
         <KindBadge kind={row.kind} />
       </td>
       <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
-        <SellerAvatar init={row.sellerInit} name={row.sellerName} />
+        <SellerAvatar init={row.sellerInit} name={row.sellerName} color={row.sellerColor} />
       </td>
       <td style={{ padding: '10px 12px', verticalAlign: 'middle', maxWidth: 180 }}>
         <div style={{ fontSize: 12, color: 'var(--fg)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

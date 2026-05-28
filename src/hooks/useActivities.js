@@ -12,12 +12,16 @@ function fmtTime(ts) {
 }
 
 const KIND_LABELS = {
-  win:   'cerró venta en',
-  visit: 'registró visita en',
-  quote: 'envió cotización a',
-  add:   'agregó prospecto',
-  stage: 'avanzó etapa de',
-  msg:   'envió mensaje a',
+  win:      'cerró venta en',
+  visit:    'registró visita en',
+  quote:    'envió cotización a',
+  add:      'agregó prospecto',
+  stage:    'avanzó etapa de',
+  msg:      'envió mensaje a',
+  call:     'llamó a',
+  whatsapp: 'envió WhatsApp a',
+  email:    'envió email a',
+  new:      'agregó prospecto',
 }
 
 export function useActivities({ limit = 50 } = {}) {
@@ -32,10 +36,12 @@ export function useActivities({ limit = 50 } = {}) {
     }
 
     setLoading(true)
+    // Sellers write to the 'visits' table (VisitModal + Kanban actions).
+    // Read from there to surface real seller activity.
     const { data, error } = await supabase
-      .from('activities')
+      .from('visits')
       .select(`
-        id, kind, details, created_at,
+        id, kind, notes, created_at,
         seller:profiles!seller_id (full_name, initials, avatar_color),
         prospect:prospects!prospect_id (name)
       `)
@@ -49,42 +55,31 @@ export function useActivities({ limit = 50 } = {}) {
       return
     }
 
-    const mapped = data.map(a => {
-      const prospectName = a.prospect?.name || a.details?.prospect_name || ''
-      const amountNum = a.kind === 'win'   ? a.details?.value
-                      : a.kind === 'quote' ? a.details?.total
-                      : null
-      const amount = amountNum
-        ? `$${Number(amountNum).toLocaleString('es-MX')}`
-        : a.kind === 'visit' && a.details?.visit_number
-        ? `${a.details.visit_number}ª visita`
-        : ''
-
-      const dt = new Date(a.created_at)
+    const mapped = data.map(v => {
+      const prospectName = v.prospect?.name || ''
+      const dt      = new Date(v.created_at)
       const dateISO = dt.toISOString().slice(0, 10)
       const timeStr = dt.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false })
 
-      const detail = a.details?.note || a.details?.detail || ''
-
       return {
-        id:          a.id,
+        id:          v.id,
         // ActivityFeed shape
-        who:         a.seller?.full_name   || 'Vendedor',
-        what:        KIND_LABELS[a.kind]   || a.kind,
+        who:         v.seller?.full_name    || 'Vendedor',
+        what:        KIND_LABELS[v.kind]    || v.kind,
         target:      prospectName,
-        time:        fmtTime(a.created_at),
-        // ActivitiesView shape
-        sellerInit:  a.seller?.initials    || '?',
-        sellerName:  a.seller?.full_name   || 'Vendedor',
-        sellerColor: a.seller?.avatar_color || '#888',
+        time:        fmtTime(v.created_at),
+        // ActivitiesView / ReportsView shape
+        sellerInit:  v.seller?.initials     || '?',
+        sellerName:  v.seller?.full_name    || 'Vendedor',
+        sellerColor: v.seller?.avatar_color || '#888',
         prospect:    prospectName,
-        detail,
-        amount,
+        detail:      v.notes || '',
+        amount:      '',
         date:        dateISO,
         timeStr,
-        kind:        a.kind,
-        created_at:  a.created_at,
-        details:     a.details || {},
+        kind:        v.kind,
+        created_at:  v.created_at,
+        details:     {},
       }
     })
 
@@ -98,8 +93,8 @@ export function useActivities({ limit = 50 } = {}) {
   useEffect(() => {
     if (!isSupabaseConfigured) return
     const ch = supabase
-      .channel('activities-admin')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activities' },
+      .channel('visits-admin')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'visits' },
         () => fetch()
       )
       .subscribe()
