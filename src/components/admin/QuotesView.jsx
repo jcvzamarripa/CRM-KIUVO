@@ -1,9 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import Icon from '../shared/Icon'
 import { useSellers } from '../../hooks/useSellers'
 import { useAdminProspects } from '../../hooks/useAdminProspects'
 import { useProducts } from '../../hooks/useProducts'
 import { rules } from '../../lib/validation'
+import { supabase, isSupabaseConfigured } from '../../lib/supabase'
 
 
 const STATUS = {
@@ -417,13 +418,54 @@ export default function QuotesView() {
   const [selected,  setSelected]  = useState(null)
   const [showNew,   setShowNew]   = useState(false)
   const [quotes,    setQuotes]    = useState([])
+  const [loading,   setLoading]   = useState(true)
+
+  const loadQuotes = useCallback(async () => {
+    if (!isSupabaseConfigured) { setLoading(false); return }
+    setLoading(true)
+    const { data, error } = await supabase
+      .from('quotes')
+      .select(`
+        id, status, total, notes, created_at,
+        prospect:prospects!prospect_id (id, name),
+        seller:profiles!seller_id (id, full_name, initials, avatar_color),
+        items:quote_items (id)
+      `)
+      .order('created_at', { ascending: false })
+    if (!error && data) {
+      setQuotes(data.map(q => {
+        const createdAt = new Date(q.created_at)
+        const dueAt     = new Date(createdAt.getTime() + 15 * 86400000)
+        const today     = new Date()
+        const diffDays  = Math.ceil((dueAt - today) / 86400000)
+        const dueLabel  = diffDays < 0 ? 'Vencida'
+                        : diffDays === 0 ? 'Vence hoy'
+                        : dueAt.toLocaleDateString('es-MX')
+        return {
+          id:               q.id,
+          prospect:         q.prospect?.name || q.notes || 'Sin prospecto',
+          seller:           q.seller?.initials || '?',
+          seller_color:     q.seller?.avatar_color || '#888',
+          seller_full_name: q.seller?.full_name || '',
+          status:           q.status || 'draft',
+          total:            q.total || 0,
+          items:            q.items?.length || 0,
+          created:          createdAt.toLocaleDateString('es-MX'),
+          due:              dueLabel,
+        }
+      }))
+    }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { loadQuotes() }, [loadQuotes])
 
   function handleNewQuote(q) {
     setQuotes(prev => [q, ...prev])
     setSelected(q)
   }
 
-  const nextId = `COT-${String((parseInt(quotes[0]?.id?.split('-')[1]) || 0) + 1).padStart(4,'0')}`
+  const nextId = `COT-${String(quotes.length + 1).padStart(4, '0')}`
 
   const filtered = filter === 'all' ? quotes : quotes.filter(q => q.status === filter)
 
@@ -439,10 +481,12 @@ export default function QuotesView() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
 
         {/* Summary cards */}
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12,
-          padding: '16px 20px', borderBottom: '0.5px solid var(--border)', flexShrink: 0,
-        }}>
+        <style>{`
+          .quotes-summary-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; padding:16px 20px; border-bottom:0.5px solid var(--border); flex-shrink:0; }
+          @media (max-width:1024px) { .quotes-summary-grid { grid-template-columns:repeat(2,1fr); } }
+          @media (max-width:600px)  { .quotes-summary-grid { grid-template-columns:1fr; } }
+        `}</style>
+        <div className="quotes-summary-grid">
           {[
             { label: 'Pipeline total',    value: fmt(totals.all),      sub: `${quotes.length} cotizaciones`,     accent: 'var(--kiuvo-blue)' },
             { label: 'Enviadas',          value: fmt(totals.sent),     sub: `${quotes.filter(q=>q.status==='sent').length} en espera`,  accent: 'var(--info)' },
@@ -506,7 +550,14 @@ export default function QuotesView() {
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 && (
+              {loading && (
+                <tr>
+                  <td colSpan={9} style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--fg-tertiary)', fontSize: 13 }}>
+                    Cargando cotizaciones…
+                  </td>
+                </tr>
+              )}
+              {!loading && filtered.length === 0 && (
                 <tr>
                   <td colSpan={9} style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--fg-tertiary)' }}>
                     <div style={{ fontSize: 28, marginBottom: 8, opacity: 0.4 }}>📋</div>
@@ -518,7 +569,13 @@ export default function QuotesView() {
                 </tr>
               )}
               {filtered.map(q => {
-                const st = STATUS[q.status]
+                const st    = STATUS[q.status] ?? STATUS.draft
+                const sColor = q.seller_color || sellerColor(sellers, q.seller)
+                const sName  = q.seller_full_name || sellerName(sellers, q.seller)
+                // Shorten UUID for display
+                const displayId = typeof q.id === 'string' && q.id.includes('-')
+                  ? q.id.slice(0, 8).toUpperCase()
+                  : q.id
                 return (
                   <tr
                     key={q.id}
@@ -529,7 +586,7 @@ export default function QuotesView() {
                     }}
                   >
                     <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', textAlign: 'center' }}>
-                      <span style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--fg-secondary)' }}>{q.id}</span>
+                      <span style={{ fontSize: 12, fontFamily: 'monospace', color: 'var(--fg-secondary)' }}>{displayId}</span>
                     </td>
                     <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', fontWeight: 500, color: 'var(--fg)' }}>
                       {q.prospect}
@@ -538,10 +595,10 @@ export default function QuotesView() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <div style={{
                           width: 24, height: 24, borderRadius: '50%',
-                          background: sellerColor(sellers, q.seller) + '22', color: sellerColor(sellers, q.seller),
+                          background: sColor + '22', color: sColor,
                           display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 500,
                         }}>{q.seller}</div>
-                        <span style={{ fontSize: 12, color: 'var(--fg-secondary)' }}>{sellerName(sellers, q.seller)}</span>
+                        <span style={{ fontSize: 12, color: 'var(--fg-secondary)' }}>{sName}</span>
                       </div>
                     </td>
                     <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', fontWeight: 500, color: 'var(--fg)', fontVariantNumeric: 'tabular-nums' }}>
@@ -606,7 +663,9 @@ export default function QuotesView() {
             }}>{STATUS[selected.status].label}</span>
             <div>
               <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--fg)' }}>{selected.prospect}</div>
-              <div style={{ fontSize: 12, color: 'var(--fg-secondary)', marginTop: 2 }}>{sellerName(sellers, selected.seller)}</div>
+              <div style={{ fontSize: 12, color: 'var(--fg-secondary)', marginTop: 2 }}>
+                {selected.seller_full_name || sellerName(sellers, selected.seller)}
+              </div>
             </div>
             {[
               { label: 'Total',       value: fmt(selected.total) },
