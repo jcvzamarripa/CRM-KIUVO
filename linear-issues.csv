@@ -1,0 +1,29 @@
+Title,Description,Priority,Status,Label
+Configurar proyecto Supabase y variables de entorno,"Crear proyecto en Supabase, definir .env con VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY, instalar @supabase/supabase-js, crear src/lib/supabase.js.",Urgent,Backlog,Backend
+Esquema de base de datos — tablas principales,"Crear tablas: profiles, prospects, visits, quotes, quote_items, activities, notifications. Definir relaciones, PKs, FKs y RLS policies básicas.",Urgent,Backlog,Backend
+Autenticación real con Supabase Auth,"Reemplazar el AuthContext de demo por Supabase Auth (email + contraseña). Manejo de sesión persistente, refresh token, logout. Soporte de roles vendedor y admin en tabla profiles.",Urgent,Backlog,Backend
+Pantalla de login conectada a Supabase,"Validación de formulario, mensajes de error reales (credenciales incorrectas, cuenta no verificada), loading state durante login.",High,Backlog,Frontend
+Row Level Security — políticas por rol,"Vendedor solo ve sus propios prospectos y visitas. Admin ve todo el equipo. Implementar policies en todas las tablas con auth.uid().",High,Backlog,Backend
+Prospectos — CRUD completo en Supabase,"Reemplazar MOCK_PROSPECTS en Kanban. Listar, crear, actualizar etapa y eliminar prospectos desde tabla prospects. Optimistic updates para que la UI no se congele.",High,Backlog,Frontend
+Registrar visita conectado a base de datos,"El modal Registrar visita guarda en tabla visits con prospect_id, user_id, type, notes, created_at. Incrementa contador de visitas del prospecto.",High,Backlog,Frontend
+Nuevo prospecto — guardar en Supabase,"El modal Nuevo prospecto inserta en prospects con todos los campos. Asigna automáticamente owner_id = auth.uid() y etapa inicial prospeccion.",High,Backlog,Frontend
+Cotizador — guardar cotización y líneas,"QuoteModal guarda en quotes + quote_items. Relaciona con prospect_id. El botón Generar cotización produce un PDF descargable (edge function o @react-pdf/renderer).",High,Backlog,Frontend
+Agenda — eventos persistidos en Supabase,"Eventos locales guardados en tabla events en lugar de solo memoria. Sincronización bidireccional con Google Calendar sigue opcional.",Medium,Backlog,Frontend
+Notificaciones — generadas por triggers de Supabase,"Crear database function + trigger que inserte en notifications cuando: un prospecto lleva N días sin actividad, una visita queda pendiente, se acerca fecha de agenda.",High,Backlog,Backend
+Perfil de usuario — sincronizado con profiles,"ProfileScreen lee y escribe en tabla profiles (nombre, rol, avatar en Supabase Storage). Eliminar dependencia de localStorage.",Medium,Backlog,Frontend
+Mapa — coordenadas reales de prospectos,"Mostrar en el mapa los prospectos reales del vendedor usando sus campos lat/lng. Geocodificación automática al capturar dirección (OpenStreetMap Nominatim, sin costo).",Medium,Backlog,Frontend
+Reactivador — consulta real a Supabase,"Calcular clientes con más de 60 días sin actividad desde visits y activities. Reemplazar lista hardcodeada.",Medium,Backlog,Backend
+Real-time — actualizaciones en vivo,"Suscribir Kanban y notificaciones a Supabase Realtime. Si otro dispositivo mueve un prospecto, el Kanban se actualiza sin recargar.",Medium,Backlog,Frontend
+Dashboard admin con métricas reales,"Conectar KPIs (prospectos activos, cierres del mes, cotizaciones pendientes, tasa de conversión) a queries Supabase. Reemplazar datos hardcodeados.",High,Backlog,Admin
+Gestión de vendedores,"CRUD de usuarios del equipo. Invitar por email (Supabase Auth invite), asignar rol, ver resumen de actividad por vendedor.",High,Backlog,Admin
+Vista global del embudo — todos los vendedores,"Admin ve Kanban con todos los prospectos del equipo, filtrables por vendedor, etapa y fecha. Vendedor solo ve los suyos.",High,Backlog,Admin
+Historial completo de actividades,"Tabla de todas las visitas, llamadas y acciones con filtros por vendedor, prospecto y rango de fechas. Exportar a CSV.",Medium,Backlog,Admin
+Gestión de cotizaciones,"Admin puede ver, aprobar o rechazar cotizaciones. Estado: borrador → enviada → aprobada → rechazada. Notifica al vendedor al cambiar estado.",Medium,Backlog,Admin
+Reportes y exportación,"Reporte semanal/mensual por vendedor: visitas realizadas, prospectos avanzados, cierres, monto cotizado. Exportar a Excel/CSV.",Medium,Backlog,Admin
+Configuración de etapas del embudo,"Admin puede renombrar etapas, cambiar colores, definir mínimo de visitas requeridas. Se guarda en tabla pipeline_stages.",Low,Backlog,Admin
+Manejo de errores y estados de carga,"Implementar error boundaries, toasts de error para fallos de red, skeletons de carga en Kanban y Dashboard.",High,Backlog,Frontend
+Validación de formularios,"Validar campos requeridos, formatos de teléfono/email y rangos numéricos en todos los modales antes de enviar a Supabase.",Medium,Backlog,Frontend
+Modo offline básico,"Detectar pérdida de conexión (común en campo). Mostrar banner de alerta, encolar cambios locales y sincronizar al reconectar.",Medium,Backlog,Frontend
+Variables de entorno por ambiente,"Separar configuración dev / staging / production. Supabase proyecto diferente por ambiente. Documentar en README.",Medium,Backlog,DevOps
+Deploy en producción — Vercel o Netlify,"Configurar CI/CD desde rama main. Variables de entorno en plataforma. Dominio personalizado. Build optimizado con vite build.",High,Backlog,DevOps
+PWA — instalable en celular del vendedor,"Agregar manifest.json y service worker básico para que el vendedor pueda instalar la app desde Chrome en Android/iPhone sin App Store.",Medium,Backlog,Frontend
