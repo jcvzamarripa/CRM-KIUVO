@@ -774,16 +774,45 @@ function GoogleConnectSheet({ connected, onConnect, onDisconnect, onClose, loadi
 // ─── AgendaScreen (main export) ───────────────────────────────────────────────
 
 function mockAgendaToEvent(a) {
-  const [h, m] = a.time.split(':').map(Number)
+  // Formato real de Supabase (viene de useAgendaEvents: tiene .start y .date string)
+  if (a.start) {
+    const [h, m]     = (a.start || '00:00').split(':').map(Number)
+    const parts      = (a.date || '').split('-').map(Number)
+    const date       = parts.length === 3
+      ? new Date(parts[0], parts[1] - 1, parts[2], h, m)
+      : new Date()
+    return {
+      id:       a.id || `dash-${a.name}-${h}-${m}`,
+      title:    a.name    || '',
+      type:     TYPE_FROM_DB[a.type] || 'visit',
+      date,
+      duration: 60,
+      activity: a.contact || '',
+      address:  a.address || '',
+      notes:    a.notes   || '',
+      stage:    a.stage   || null,
+      source:   'local',
+      notified: false,
+    }
+  }
+
+  // Formato legacy de mock dashboard (tiene .time y .ampm)
+  const [h, m] = (a.time || '00:00').split(':').map(Number)
   let hours = h
   if (a.ampm === 'PM' && h !== 12) hours = h + 12
   if (a.ampm === 'AM' && h === 12) hours = 0
   const date = new Date(); date.setHours(hours, m, 0, 0)
   return {
-    id: `dash-${a.name}-${hours}-${m}`,
-    title: a.name, type: 'visit', date, duration: 60,
-    activity: a.activity, address: a.address,
-    stage: a.stage, source: 'local', notified: false,
+    id:       `dash-${a.name}-${hours}-${m}`,
+    title:    a.name     || '',
+    type:     'visit',
+    date,
+    duration: 60,
+    activity: a.activity || '',
+    address:  a.address  || '',
+    stage:    a.stage    || null,
+    source:   'local',
+    notified: false,
   }
 }
 
