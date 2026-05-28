@@ -4,6 +4,7 @@ import { useStages } from '../../contexts/StagesContext'
 import { useAdminProspects } from '../../hooks/useAdminProspects'
 import { useSellers } from '../../hooks/useSellers'
 import { rules, collectErrors } from '../../lib/validation'
+import { supabase } from '../../lib/supabase'
 
 const HEALTH_COLOR = { green: 'var(--success)', amber: 'var(--warning)', red: 'var(--danger)', black: 'var(--fg-tertiary)' }
 const fmt = n => '$' + n.toLocaleString('es-MX')
@@ -227,9 +228,10 @@ function NewProspectPanel({ stages, sellers = [], onSave, onClose }) {
 }
 
 // ─── Detail Panel ─────────────────────────────────────────────────────────────
-function DetailPanel({ p, stageById, sellers = [], onClose }) {
+function DetailPanel({ p, stageById, sellers = [], onClose, onDelete }) {
   const stage = stageById[p.stage] || {}
   const seller = sellers.find(s => s.init === p.owner)
+  const [confirming, setConfirming] = useState(false)
 
   return (
     <div style={{
@@ -262,12 +264,14 @@ function DetailPanel({ p, stageById, sellers = [], onClose }) {
           { label: 'Visitas',         value: `${p.visits} registradas` },
           { label: 'Días en etapa',   value: `${p.days} días` },
           { label: 'Último contacto', value: p.last },
-          { label: 'Vendedor',        value: seller?.name || p.owner },
-          ...(p.city ? [{ label: 'Ciudad', value: p.city }] : []),
+          { label: 'Vendedor',        value: seller?.name || p.owner_name || p.owner },
+          ...(p.city    ? [{ label: 'Ciudad',  value: p.city }] : []),
+          ...(p.address ? [{ label: 'Dirección', value: p.address }] : []),
+          ...(p.notes   ? [{ label: 'Notas',   value: p.notes }] : []),
         ].map(row => (
           <div key={row.label}>
             <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginBottom: 2 }}>{row.label}</div>
-            <div style={{ fontSize: 13, color: 'var(--fg)', fontWeight: 500 }}>{row.value}</div>
+            <div style={{ fontSize: 13, color: 'var(--fg)', fontWeight: 500, whiteSpace: 'pre-wrap' }}>{row.value}</div>
           </div>
         ))}
         <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
@@ -291,6 +295,48 @@ function DetailPanel({ p, stageById, sellers = [], onClose }) {
           }}>
             Ver historial
           </button>
+        </div>
+
+        {/* ── Delete ── */}
+        <div style={{ marginTop: 'auto', paddingTop: 8, borderTop: '0.5px solid var(--border)' }}>
+          {confirming ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ fontSize: 12, color: 'var(--fg-secondary)', textAlign: 'center' }}>
+                ¿Eliminar <b style={{ color: 'var(--fg)' }}>{p.name}</b>?<br />
+                <span style={{ color: 'var(--danger)' }}>Esta acción no se puede deshacer.</span>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={() => setConfirming(false)}
+                  style={{
+                    flex: 1, padding: '8px 0', borderRadius: 'var(--r-md)',
+                    border: '0.5px solid var(--border)', background: 'var(--surface)',
+                    color: 'var(--fg)', fontSize: 13,
+                  }}
+                >Cancelar</button>
+                <button
+                  onClick={() => { onDelete(p.id); onClose() }}
+                  style={{
+                    flex: 1, padding: '8px 0', borderRadius: 'var(--r-md)',
+                    background: 'var(--danger)', color: '#fff', fontSize: 13, fontWeight: 500,
+                  }}
+                >Eliminar</button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirming(true)}
+              style={{
+                width: '100%', padding: '8px 0', borderRadius: 'var(--r-md)',
+                border: '0.5px solid var(--danger-border)', background: 'var(--danger-bg)',
+                color: 'var(--danger-fg)', fontSize: 13, fontWeight: 500,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              }}
+            >
+              <Icon name="trash" size={14} color="var(--danger-fg)" />
+              Eliminar prospecto
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -351,6 +397,11 @@ export default function ProspectsView() {
     setSelected(p)
   }
 
+  async function handleDelete(id) {
+    await supabase.from('prospects').delete().eq('id', id)
+    reload()
+  }
+
   const sellerName  = init => sellers.find(s => s.init === init)?.name  || init
   const sellerColor = init => sellers.find(s => s.init === init)?.color || '#888'
 
@@ -358,7 +409,7 @@ export default function ProspectsView() {
   const rightPanel = showNew
     ? <NewProspectPanel stages={stages} sellers={sellers} onSave={handleNewProspect} onClose={() => setShowNew(false)} />
     : selected
-      ? <DetailPanel p={selected} stageById={stageById} sellers={sellers} onClose={() => setSelected(null)} />
+      ? <DetailPanel p={selected} stageById={stageById} sellers={sellers} onClose={() => setSelected(null)} onDelete={handleDelete} />
       : null
 
   return (
