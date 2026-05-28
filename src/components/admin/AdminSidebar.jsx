@@ -48,7 +48,7 @@ export default function AdminSidebar({ active = 'dashboard', onChange }) {
       <div style={{ height: '0.5px', background: 'var(--border)', margin: '0 16px 10px' }} />
 
       {/* ── Nav ── */}
-      <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, padding: '0 10px' }}>
+      <nav style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, padding: '0 10px' }}>
         {NAV_ITEMS.map(it => {
           const on = active === it.id
           return (
