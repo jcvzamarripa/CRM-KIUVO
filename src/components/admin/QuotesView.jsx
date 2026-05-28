@@ -18,6 +18,31 @@ const fmt = n => '$' + n.toLocaleString('es-MX')
 const sellerName  = (sellers, init) => sellers.find(s => s.init === init)?.name  || init
 const sellerColor = (sellers, init) => sellers.find(s => s.init === init)?.color || '#888'
 
+// ─── QtyInput: allows free typing; commits on blur ───────────────────────────
+function QtyInput({ qty, onChange, style }) {
+  const [raw, setRaw] = useState(String(qty))
+  const prev = useRef(qty)
+  useEffect(() => {
+    if (qty !== prev.current) { prev.current = qty; setRaw(String(qty)) }
+  }, [qty])
+
+  function handleChange(e) {
+    setRaw(e.target.value)
+    const n = parseInt(e.target.value, 10)
+    if (!isNaN(n) && n >= 1) { prev.current = n; onChange(n) }
+  }
+
+  function handleBlur() {
+    const n = parseInt(raw, 10)
+    if (isNaN(n) || n < 1) setRaw(String(qty))
+  }
+
+  return (
+    <input type="number" min="1" value={raw}
+      onChange={handleChange} onBlur={handleBlur} style={style} />
+  )
+}
+
 // ─── New Quote Panel ──────────────────────────────────────────────────────────
 function NewQuotePanel({ onClose, onSave, nextId, sellers = [], prospects = [], products = [] }) {
   const [prospect,    setProspect]    = useState('')
@@ -55,7 +80,8 @@ function NewQuotePanel({ onClose, onSave, nextId, sellers = [], prospects = [], 
   }
 
   function updateQty(productId, qty) {
-    if (qty <= 0) { setItems(prev => prev.filter(i => i.productId !== productId)); return }
+    // qty < 1 only happens from the − button (QtyInput won't fire below 1)
+    if (qty < 1) { setItems(prev => prev.filter(i => i.productId !== productId)); return }
     setItems(prev => prev.map(i => i.productId === productId ? { ...i, qty } : i))
   }
 
@@ -260,7 +286,11 @@ function NewQuotePanel({ onClose, onSave, nextId, sellers = [], prospects = [], 
                       onClick={() => updateQty(item.productId, item.qty - 1)}
                       style={{ width: 18, height: 18, borderRadius: 4, border: '0.5px solid var(--border)', background: 'var(--bg)', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-secondary)' }}
                     >−</button>
-                    <span style={{ fontSize: 12, fontWeight: 600, minWidth: 16, textAlign: 'center', color: 'var(--fg)' }}>{item.qty}</span>
+                    <QtyInput
+                      qty={item.qty}
+                      onChange={n => updateQty(item.productId, n)}
+                      style={{ width: 28, fontSize: 12, fontWeight: 600, textAlign: 'center', color: 'var(--fg)', background: 'transparent', border: 'none', outline: 'none', fontFamily: 'inherit', padding: 0 }}
+                    />
                     <button
                       onClick={() => updateQty(item.productId, item.qty + 1)}
                       style={{ width: 18, height: 18, borderRadius: 4, border: '0.5px solid var(--border)', background: 'var(--bg)', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-secondary)' }}

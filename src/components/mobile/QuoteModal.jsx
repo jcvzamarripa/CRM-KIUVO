@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { pdf } from '@react-pdf/renderer'
 import Icon from '../shared/Icon'
 import { getDiscount, getEffectivePrice } from '../../lib/productsStore'
@@ -375,6 +375,37 @@ function SuccessView({ items, prospectName, prospectEmail, prospectPhone, seller
   )
 }
 
+// ── QtyInput: allows free typing; commits on blur ─────────────────
+function QtyInput({ qty, onChange, style }) {
+  const [raw, setRaw] = useState(String(qty))
+  const prev = useRef(qty)
+  // Sync if qty changes from outside (+ / − buttons)
+  useEffect(() => {
+    if (qty !== prev.current) { prev.current = qty; setRaw(String(qty)) }
+  }, [qty])
+
+  function handleChange(e) {
+    setRaw(e.target.value)
+    const n = parseInt(e.target.value, 10)
+    if (!isNaN(n) && n >= 1) { prev.current = n; onChange(n) }
+  }
+
+  function handleBlur() {
+    const n = parseInt(raw, 10)
+    if (isNaN(n) || n < 1) setRaw(String(qty)) // revert to last valid value
+  }
+
+  return (
+    <input
+      type="number" min="1"
+      value={raw}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      style={style}
+    />
+  )
+}
+
 // ── Main ──────────────────────────────────────────────────────────
 export default function QuoteModal({ onClose, onGenerated }) {
   const { user, profile } = useAuth()
@@ -430,6 +461,7 @@ export default function QuoteModal({ onClose, onGenerated }) {
     })
   }
   const setQty = (id, qty) => {
+    // − button at qty=1 → remove. Typing 0 or empty → handled by QtyInput (reverts on blur)
     if (qty < 1) { removeItem(id); return }
     setItems(prev => prev.map(i => {
       if (i.id !== id) return i
@@ -692,9 +724,9 @@ export default function QuoteModal({ onClose, onGenerated }) {
                             style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-secondary)' }}>
                             <IcoMinus size={14} />
                           </button>
-                          <input
-                            type="number" min="1" value={item.qty}
-                            onChange={e => setQty(item.id, parseInt(e.target.value) || 1)}
+                          <QtyInput
+                            qty={item.qty}
+                            onChange={n => setQty(item.id, n)}
                             style={{ width: 36, textAlign: 'center', fontSize: 13, fontWeight: 500, color: 'var(--fg)', background: 'transparent', border: 'none', outline: 'none', fontFamily: 'inherit', padding: 0 }}
                           />
                           <button onClick={() => setQty(item.id, item.qty + 1)}
