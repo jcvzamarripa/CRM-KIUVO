@@ -1,11 +1,11 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import Icon from '../shared/Icon'
 import { useSellers } from '../../hooks/useSellers'
 import { useAdminProspects } from '../../hooks/useAdminProspects'
 import { useProducts } from '../../hooks/useProducts'
 import { rules } from '../../lib/validation'
-import { supabase, isSupabaseConfigured } from '../../lib/supabase'
-import { downloadStoredPDF } from '../../hooks/useQuoteHistory'
+import { supabase } from '../../lib/supabase'
+import { useQuoteHistory, downloadStoredPDF } from '../../hooks/useQuoteHistory'
 
 
 const STATUS = {
@@ -442,60 +442,44 @@ function NewQuotePanel({ onClose, onSave, nextId, sellers = [], prospects = [], 
 
 // ─── Main QuotesView ──────────────────────────────────────────────────────────
 export default function QuotesView() {
-  const { sellers }    = useSellers()
-  const { prospects }  = useAdminProspects()
-  const { products }   = useProducts()
-  const [filter,       setFilter]       = useState('all')
-  const [selected,     setSelected]     = useState(null)
-  const [showNew,      setShowNew]      = useState(false)
-  const [quotes,       setQuotes]       = useState([])
-  const [loading,      setLoading]      = useState(true)
-  const [downloading,  setDownloading]  = useState(null) // quote id
+  const { sellers }   = useSellers()
+  const { prospects } = useAdminProspects()
+  const { products }  = useProducts()
 
-  const loadQuotes = useCallback(async () => {
-    if (!isSupabaseConfigured) { setLoading(false); return }
-    setLoading(true)
-    const { data, error } = await supabase
-      .from('quotes')
-      .select(`
-        id, status, total, notes, created_at, pdf_path,
-        prospect:prospects!prospect_id (id, name),
-        seller:profiles!seller_id (id, full_name, initials, avatar_color),
-        items:quote_items (id)
-      `)
-      .order('created_at', { ascending: false })
-    if (!error && data) {
-      setQuotes(data.map(q => {
-        const createdAt = new Date(q.created_at)
-        const dueAt     = new Date(createdAt.getTime() + 15 * 86400000)
-        const today     = new Date()
-        const diffDays  = Math.ceil((dueAt - today) / 86400000)
-        const dueLabel  = diffDays < 0 ? 'Vencida'
-                        : diffDays === 0 ? 'Vence hoy'
-                        : dueAt.toLocaleDateString('es-MX')
-        return {
-          id:               q.id,
-          shortId:          q.id.slice(0, 8).toUpperCase(),
-          prospect:         q.prospect?.name || q.notes || 'Sin prospecto',
-          seller:           q.seller?.initials || '?',
-          seller_color:     q.seller?.avatar_color || '#888',
-          seller_full_name: q.seller?.full_name || '',
-          status:           q.status || 'draft',
-          total:            q.total || 0,
-          items:            q.items?.length || 0,
-          created:          createdAt.toLocaleDateString('es-MX'),
-          due:              dueLabel,
-          pdfPath:          q.pdf_path || null,
-        }
-      }))
+  // sellerId=null → sin filtro → admin ve todas las cotizaciones de todos los vendedores
+  // useQuoteHistory tiene Realtime incorporado y manejo de errores
+  const { quotes: rawQuotes, loading } = useQuoteHistory({ sellerId: null })
+
+  const [filter,      setFilter]      = useState('all')
+  const [selected,    setSelected]    = useState(null)
+  const [showNew,     setShowNew]     = useState(false)
+  const [downloading, setDownloading] = useState(null)
+
+  // Normalizar al shape que espera esta vista
+  const quotes = rawQuotes.map(q => {
+    const createdAt = new Date(q.createdAt)
+    const dueAt     = new Date(createdAt.getTime() + 15 * 86400000)
+    const diffDays  = Math.ceil((dueAt - new Date()) / 86400000)
+    const dueLabel  = diffDays < 0   ? 'Vencida'
+                    : diffDays === 0  ? 'Vence hoy'
+                    : dueAt.toLocaleDateString('es-MX')
+    return {
+      id:               q.id,
+      shortId:          q.shortId,
+      prospect:         q.prospectName,
+      seller:           q.sellerInit,
+      seller_color:     q.sellerColor,
+      seller_full_name: q.sellerName,
+      status:           q.status,
+      total:            q.total,
+      items:            q.itemCount,
+      created:          q.dateStr,
+      due:              dueLabel,
+      pdfPath:          q.pdfPath,
     }
-    setLoading(false)
-  }, [])
-
-  useEffect(() => { loadQuotes() }, [loadQuotes])
+  })
 
   function handleNewQuote(q) {
-    setQuotes(prev => [q, ...prev])
     setSelected(q)
   }
 
