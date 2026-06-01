@@ -1,6 +1,6 @@
-import React, { useState, useRef } from 'react'
+import React, { useState } from 'react'
 import Icon from '../shared/Icon'
-import { supabase } from '../../lib/supabase'
+import { supabase, isSupabaseConfigured } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { rules } from '../../lib/validation'
 import { enqueue } from '../../lib/offlineQueue'
@@ -186,20 +186,48 @@ function LocationField({ value, onChange, onCoords }) {
 }
 
 // ── PhotoField ────────────────────────────────────────────────────
+// El input se crea dinámicamente en document.body para evitar el bug de iOS Safari
+// donde file inputs dentro de contenedores overflow:hidden no abren la cámara.
 function PhotoField({ photo, onPhoto }) {
-  const inputRef = useRef(null)
+  function openPicker() {
+    try {
+      const input = document.createElement('input')
+      input.type = 'file'
+      input.accept = 'image/*'
+      // capture solo si el dispositivo lo soporta (evita crash en algunos WebViews)
+      if ('capture' in HTMLInputElement.prototype) input.capture = 'environment'
+      input.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0'
+      document.body.appendChild(input)
 
-  const handleFile = e => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const url = URL.createObjectURL(file)
-    onPhoto(url)
+      input.addEventListener('change', () => {
+        const file = input.files?.[0]
+        if (file) {
+          try {
+            const url = URL.createObjectURL(file)
+            onPhoto(url)
+          } catch {
+            // URL.createObjectURL no soportado — mostrar nombre como fallback
+            onPhoto(null)
+          }
+        }
+        document.body.removeChild(input)
+      })
+
+      // Limpiar si el usuario cancela (focus regresa a la ventana)
+      window.addEventListener('focus', function cleanup() {
+        setTimeout(() => {
+          if (document.body.contains(input)) document.body.removeChild(input)
+        }, 500)
+        window.removeEventListener('focus', cleanup)
+      })
+
+      input.click()
+    } catch {
+      /* Silenciar errores de apertura de picker en entornos sin soporte */
+    }
   }
 
-  const handleRemove = () => {
-    onPhoto(null)
-    if (inputRef.current) inputRef.current.value = ''
-  }
+  const handleRemove = () => onPhoto(null)
 
   return (
     <div style={{ marginBottom: 16 }}>
@@ -223,7 +251,7 @@ function PhotoField({ photo, onPhoto }) {
             <Icon name="x" size={14} />
           </button>
           <button
-            onClick={() => inputRef.current?.click()}
+            onClick={openPicker}
             style={{
               position: 'absolute', bottom: 8, right: 8,
               padding: '5px 10px', borderRadius: 'var(--r-md)',
@@ -238,7 +266,7 @@ function PhotoField({ photo, onPhoto }) {
         </div>
       ) : (
         <button
-          onClick={() => inputRef.current?.click()}
+          onClick={openPicker}
           style={{
             width: '100%', padding: '20px 0',
             border: '1px dashed var(--border-strong)',
@@ -261,16 +289,6 @@ function PhotoField({ photo, onPhoto }) {
           </div>
         </button>
       )}
-
-      {/* Hidden file input — capture="environment" abre la cámara trasera en móvil */}
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        onChange={handleFile}
-        style={{ display: 'none' }}
-      />
     </div>
   )
 }
@@ -341,8 +359,8 @@ export default function NewProspectModal({ onClose, onCreated }) {
       value:     0,
     }
 
-    // ── Offline: enqueue locally ──────────────────────────────────────────
-    if (!isOnline) {
+    // ── Sin conexión o sin Supabase configurado: guardar en cola local ───────
+    if (!isOnline || !isSupabaseConfigured) {
       enqueue({ type: 'INSERT_PROSPECT', table: 'prospects', payload })
       setLoading(false)
       setSavedOffline(true)
@@ -351,22 +369,24 @@ export default function NewProspectModal({ onClose, onCreated }) {
       return
     }
 
-    // ── Online: send to Supabase ──────────────────────────────────────────
-    const { data, error } = await supabase.from('prospects').insert(payload).select().single()
-    setLoading(false)
+    // ── Online + Supabase configurado: enviar ─────────────────────────────
+    try {
+      const { data, error } = await supabase.from('prospects').insert(payload).select().single()
 
-    if (error) {
-      // Network failed despite being "online" — enqueue as fallback
+      if (error) throw error
+
+      onCreated?.(data)
+      setStep('success')
+      setTimeout(onClose, 1800)
+    } catch {
+      // Red falló o error de BD — encolar como fallback
       enqueue({ type: 'INSERT_PROSPECT', table: 'prospects', payload })
       setSavedOffline(true)
       setStep('success')
       setTimeout(onClose, 2200)
-      return
+    } finally {
+      setLoading(false)
     }
-
-    onCreated?.(data)
-    setStep('success')
-    setTimeout(onClose, 1800)
   }
 
   return (

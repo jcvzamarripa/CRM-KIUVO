@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import Icon from '../shared/Icon'
 import { STAGE_BY_ID } from '../../constants/stages'
-import { supabase } from '../../lib/supabase'
+import { supabase, isSupabaseConfigured } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { enqueue } from '../../lib/offlineQueue'
 import useOnlineStatus from '../../hooks/useOnlineStatus'
@@ -29,9 +29,9 @@ export default function VisitModal({ onClose, onSaved }) {
   const [serverError, setServerError] = useState('')
   const [savedOffline, setSavedOffline] = useState(false)
 
-  // Load seller's prospects — fall back to cache when offline
+  // Load seller's prospects — fall back to cache when offline or Supabase not configured
   useEffect(() => {
-    if (!isOnline) {
+    if (!isOnline || !isSupabaseConfigured) {
       try {
         const cached = JSON.parse(localStorage.getItem(PROSPECTS_CACHE_KEY) || '[]')
         setProspects(cached)
@@ -45,12 +45,27 @@ export default function VisitModal({ onClose, onSaved }) {
       .select('id, name, stage_id')
       .eq('owner_id', user.id)
       .order('name')
-      .then(({ data }) => {
-        const list = data ?? []
-        setProspects(list)
+      .then(({ data, error }) => {
+        if (error) {
+          // Fallo de red o BD — usar caché
+          try {
+            const cached = JSON.parse(localStorage.getItem(PROSPECTS_CACHE_KEY) || '[]')
+            setProspects(cached)
+          } catch { setProspects([]) }
+        } else {
+          const list = data ?? []
+          setProspects(list)
+          try { localStorage.setItem(PROSPECTS_CACHE_KEY, JSON.stringify(list)) } catch {}
+        }
         setLoadingList(false)
-        // Keep cache fresh for offline use
-        try { localStorage.setItem(PROSPECTS_CACHE_KEY, JSON.stringify(list)) } catch {}
+      })
+      .catch(() => {
+        // Error inesperado — usar caché silenciosamente
+        try {
+          const cached = JSON.parse(localStorage.getItem(PROSPECTS_CACHE_KEY) || '[]')
+          setProspects(cached)
+        } catch { setProspects([]) }
+        setLoadingList(false)
       })
   }, [user.id, isOnline])
 
@@ -70,8 +85,8 @@ export default function VisitModal({ onClose, onSaved }) {
       notes:       note.trim() || null,
     }
 
-    // ── Offline: enqueue locally ──────────────────────────────────────────
-    if (!isOnline) {
+    // ── Sin conexión o sin Supabase configurado: guardar en cola local ───────
+    if (!isOnline || !isSupabaseConfigured) {
       enqueue({ type: 'INSERT_VISIT', table: 'visits', payload })
       setSubmitting(false)
       setSavedOffline(true)
@@ -80,22 +95,22 @@ export default function VisitModal({ onClose, onSaved }) {
       return
     }
 
-    // ── Online: send to Supabase ──────────────────────────────────────────
-    const { error } = await supabase.from('visits').insert(payload)
-    setSubmitting(false)
-
-    if (error) {
-      // Network failed despite being "online" — enqueue as fallback
+    // ── Online + Supabase configurado: enviar ─────────────────────────────
+    try {
+      const { error } = await supabase.from('visits').insert(payload)
+      if (error) throw error
+      onSaved?.()
+      setStep('success')
+      setTimeout(onClose, 1800)
+    } catch {
+      // Fallo de red o BD — encolar como fallback
       enqueue({ type: 'INSERT_VISIT', table: 'visits', payload })
       setSavedOffline(true)
       setStep('success')
       setTimeout(onClose, 2200)
-      return
+    } finally {
+      setSubmitting(false)
     }
-
-    onSaved?.()
-    setStep('success')
-    setTimeout(onClose, 1800)
   }
 
   const selectedProspect = prospects.find(p => p.id === selected)
