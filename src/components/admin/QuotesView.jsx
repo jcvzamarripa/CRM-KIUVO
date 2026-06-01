@@ -450,10 +450,11 @@ export default function QuotesView() {
   // useQuoteHistory tiene Realtime incorporado y manejo de errores
   const { quotes: rawQuotes, loading } = useQuoteHistory({ sellerId: null })
 
-  const [filter,      setFilter]      = useState('all')
-  const [selected,    setSelected]    = useState(null)
-  const [showNew,     setShowNew]     = useState(false)
-  const [downloading, setDownloading] = useState(null)
+  const [filter,       setFilter]       = useState('all')
+  const [sellerFilter, setSellerFilter] = useState('all')
+  const [selected,     setSelected]     = useState(null)
+  const [showNew,      setShowNew]      = useState(false)
+  const [downloading,  setDownloading]  = useState(null)
 
   // Normalizar al shape que espera esta vista
   const quotes = rawQuotes.map(q => {
@@ -479,19 +480,25 @@ export default function QuotesView() {
     }
   })
 
-  function handleNewQuote(q) {
-    setSelected(q)
-  }
+  function handleNewQuote(q) { setSelected(q) }
 
   const nextId = `COT-${String(quotes.length + 1).padStart(4, '0')}`
 
-  const filtered = filter === 'all' ? quotes : quotes.filter(q => q.status === filter)
+  // Aplicar ambos filtros: status + vendedor
+  const filtered = quotes
+    .filter(q => filter === 'all'       || q.status           === filter)
+    .filter(q => sellerFilter === 'all' || q.seller_full_name === sellerFilter)
+
+  // KPIs sobre el subconjunto ya filtrado por vendedor (no por status)
+  const sellerBase = sellerFilter === 'all'
+    ? quotes
+    : quotes.filter(q => q.seller_full_name === sellerFilter)
 
   const totals = {
-    all:      quotes.reduce((s, q) => s + q.total, 0),
-    sent:     quotes.filter(q => q.status === 'sent').reduce((s, q) => s + q.total, 0),
-    approved: quotes.filter(q => q.status === 'approved').reduce((s, q) => s + q.total, 0),
-    draft:    quotes.filter(q => q.status === 'draft').length,
+    all:      sellerBase.reduce((s, q) => s + q.total, 0),
+    sent:     sellerBase.filter(q => q.status === 'sent').reduce((s, q) => s + q.total, 0),
+    approved: sellerBase.filter(q => q.status === 'approved').reduce((s, q) => s + q.total, 0),
+    draft:    sellerBase.filter(q => q.status === 'draft').length,
   }
 
   return (
@@ -506,10 +513,10 @@ export default function QuotesView() {
         `}</style>
         <div className="quotes-summary-grid">
           {[
-            { label: 'Pipeline total',    value: fmt(totals.all),      sub: `${quotes.length} cotizaciones`,     accent: 'var(--kiuvo-blue)' },
-            { label: 'Enviadas',          value: fmt(totals.sent),     sub: `${quotes.filter(q=>q.status==='sent').length} en espera`,  accent: 'var(--info)' },
-            { label: 'Aprobadas',         value: fmt(totals.approved), sub: `${quotes.filter(q=>q.status==='approved').length} esta semana`, accent: 'var(--success)' },
-            { label: 'Borradores',        value: totals.draft,         sub: 'Pendientes de enviar',                  accent: 'var(--fg-secondary)' },
+            { label: 'Pipeline total',    value: fmt(totals.all),      sub: `${sellerBase.length} cotizaciones`,                                        accent: 'var(--kiuvo-blue)'   },
+            { label: 'Enviadas',          value: fmt(totals.sent),     sub: `${sellerBase.filter(q=>q.status==='sent').length} en espera`,              accent: 'var(--info)'         },
+            { label: 'Aprobadas',         value: fmt(totals.approved), sub: `${sellerBase.filter(q=>q.status==='approved').length} aprobadas`,          accent: 'var(--success)'      },
+            { label: 'Borradores',        value: totals.draft,         sub: 'Pendientes de enviar',                                                      accent: 'var(--fg-secondary)' },
           ].map(c => (
             <div key={c.label} style={{
               padding: '12px 16px', background: 'var(--surface)',
@@ -523,11 +530,12 @@ export default function QuotesView() {
           ))}
         </div>
 
-        {/* Filter tabs */}
+        {/* Filter bar */}
         <div style={{
-          padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 8,
+          padding: '8px 20px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
           borderBottom: '0.5px solid var(--border)', background: 'var(--bg)', flexShrink: 0,
         }}>
+          {/* Status chips */}
           {[['all','Todas'],['draft','Borrador'],['sent','Enviadas'],['approved','Aprobadas'],['rejected','Rechazadas']].map(([k, l]) => (
             <button key={k} onClick={() => setFilter(k)} style={{
               padding: '5px 14px', borderRadius: 'var(--r-full)', fontSize: 12,
@@ -537,6 +545,57 @@ export default function QuotesView() {
               fontWeight: filter === k ? 500 : 400,
             }}>{l}</button>
           ))}
+
+          {/* Separator */}
+          {sellers.length > 0 && (
+            <div style={{ width: '0.5px', height: 20, background: 'var(--border)', margin: '0 4px', flexShrink: 0 }} />
+          )}
+
+          {/* Seller chips */}
+          {sellers.length > 0 && (
+            <>
+              <button
+                onClick={() => setSellerFilter('all')}
+                style={{
+                  padding: '5px 12px', borderRadius: 'var(--r-full)', fontSize: 12,
+                  background: sellerFilter === 'all' ? 'var(--fg)' : 'var(--surface)',
+                  color: sellerFilter === 'all' ? 'var(--bg)' : 'var(--fg-secondary)',
+                  border: `0.5px solid ${sellerFilter === 'all' ? 'transparent' : 'var(--border)'}`,
+                  fontWeight: sellerFilter === 'all' ? 500 : 400,
+                }}
+              >
+                Todos
+              </button>
+              {sellers.map(s => {
+                const on = sellerFilter === s.name
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => setSellerFilter(on ? 'all' : s.name)}
+                    title={s.name}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '4px 10px 4px 4px', borderRadius: 'var(--r-full)', fontSize: 12,
+                      background: on ? s.color + '18' : 'var(--surface)',
+                      color: on ? s.color : 'var(--fg-secondary)',
+                      border: `0.5px solid ${on ? s.color : 'var(--border)'}`,
+                      fontWeight: on ? 600 : 400,
+                    }}
+                  >
+                    <div style={{
+                      width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+                      background: on ? s.color : s.color + '30',
+                      color: on ? '#fff' : s.color,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 9, fontWeight: 700,
+                    }}>{s.init}</div>
+                    {s.name.split(' ')[0]}
+                  </button>
+                )
+              })}
+            </>
+          )}
+
           <div style={{ marginLeft: 'auto' }}>
             <button
               onClick={() => { setShowNew(true); setSelected(null) }}
