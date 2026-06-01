@@ -4,18 +4,19 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase'
 // ── Shape mapper ──────────────────────────────────────────────────────────────
 function mapEvent(ev) {
   return {
-    id:       ev.id,
-    date:     ev.date,
-    start:    ev.start_time?.slice(0, 5) || '00:00',
-    end:      ev.end_time?.slice(0, 5)   || '00:00',
-    type:     ev.type     || 'visita',
-    name:     ev.name     || '',
-    contact:  ev.contact  || '',
-    owner:    ev.seller_id ? '?' : '?',
-    seller_id:ev.seller_id || null,
-    stage:    ev.stage    || '',
-    address:  ev.address  || '',
-    notes:    ev.notes    || '',
+    id:        ev.id,
+    date:      ev.date,
+    start:     ev.start_time?.slice(0, 5) || '00:00',
+    end:       ev.end_time?.slice(0, 5)   || '00:00',
+    type:      ev.type      || 'visita',
+    name:      ev.name      || '',
+    contact:   ev.contact   || '',
+    // owner se resuelve en el componente usando sellers (seller_id → initials)
+    owner:     ev.seller_id || null,
+    seller_id: ev.seller_id || null,
+    stage:     ev.stage     || '',
+    address:   ev.address   || '',
+    notes:     ev.notes     || '',
     created_at: ev.created_at,
   }
 }
@@ -39,12 +40,13 @@ export function useAgendaEvents({ sellerId, dateFrom, dateTo, limit = 200 } = {}
       setLoading(false)
       return
     }
-    // Si se requiere sellerId pero aún no cargó el perfil, esperar
-    // (evita fetch sin filtro que mostraría eventos de todos los vendedores)
+    // undefined = aún no se sabe si hay sellerId (esperando que cargue el perfil)
+    // null      = sin filtro intencional (admin ve todos los eventos)
     if (sellerId === undefined) {
       setLoading(false)
       return
     }
+
 
     setLoading(true)
     let q = supabase

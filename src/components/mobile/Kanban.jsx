@@ -22,11 +22,18 @@ function fmtLast(ts) {
 }
 
 function normalize(row, visitCounts = {}) {
+  // Calcular días reales en la etapa actual desde stage_entered_at (columna nueva)
+  // Si no existe aún (antes de correr la migración), cae a days_in_stage como fallback
+  const enteredAt = row.stage_entered_at ? new Date(row.stage_entered_at) : null
+  const days = enteredAt
+    ? Math.max(0, Math.floor((Date.now() - enteredAt.getTime()) / 86400000))
+    : (row.days_in_stage ?? 0)
+
   return {
     ...row,
     stage: row.stage_id,
     visits: visitCounts[row.id] ?? 0,
-    days: row.days_in_stage ?? 0,
+    days,
     last: fmtLast(row.last_contact_at),
     notes: row.notes || '',
     contact: row.contact ||
@@ -782,7 +789,7 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
     const [{ data: rows, error: pErr }, { data: visits }] = await Promise.all([
       supabase
         .from('prospects')
-        .select('id, name, company, phone, email, contact, stage_id, value, health, days_in_stage, last_contact_at, notes')
+        .select('id, name, company, phone, email, contact, stage_id, value, health, days_in_stage, stage_entered_at, last_contact_at, notes')
         .eq('owner_id', user.id)
         .order('updated_at', { ascending: false }),
       supabase
@@ -888,7 +895,7 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
         notes: finalNotes,
         health: 'green',
       })
-      .select('id, name, company, phone, email, contact, stage_id, value, health, days_in_stage, last_contact_at, notes')
+      .select('id, name, company, phone, email, contact, stage_id, value, health, days_in_stage, stage_entered_at, last_contact_at, notes')
       .single()
 
     if (error) {
@@ -905,18 +912,23 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
     const old = prospects.find(p => p.id === prospectId)
     if (!old) return
 
+    const now = new Date().toISOString()
     setProspects(ps => ps.map(p =>
-      p.id === prospectId ? { ...p, stage_id: newStageId, stage: newStageId } : p
+      p.id === prospectId
+        ? { ...p, stage_id: newStageId, stage: newStageId, stage_entered_at: now, days: 0 }
+        : p
     ))
 
     const { error } = await supabase
       .from('prospects')
-      .update({ stage_id: newStageId, updated_at: new Date().toISOString() })
+      .update({ stage_id: newStageId, stage_entered_at: now, updated_at: now })
       .eq('id', prospectId)
 
     if (error) {
       setProspects(ps => ps.map(p =>
-        p.id === prospectId ? { ...p, stage_id: old.stage_id, stage: old.stage_id } : p
+        p.id === prospectId
+          ? { ...p, stage_id: old.stage_id, stage: old.stage_id, stage_entered_at: old.stage_entered_at, days: old.days }
+          : p
       ))
       addToast({ message: 'No se pudo mover el prospecto. Cambio revertido.', kind: 'warning' })
     }

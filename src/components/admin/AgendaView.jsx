@@ -567,9 +567,19 @@ export default function AgendaView() {
   const weekISOs = weekDays.map(fmtISO)
 
   // Fetch events for the visible week ± 2 weeks buffer
+  // sellerId={null} → sin filtro de vendedor (admin ve todos)
   const fetchFrom = fmtISO(addDays(weekMon, -14))
   const fetchTo   = fmtISO(addDays(weekMon,  21))
-  const { events: allEvents } = useAgendaEvents({ dateFrom: fetchFrom, dateTo: fetchTo })
+  const { events: rawEvents } = useAgendaEvents({ sellerId: null, dateFrom: fetchFrom, dateTo: fetchTo })
+
+  // Resolver seller_id → initials usando la lista de vendedores
+  const sellerById = Object.fromEntries(sellers.map(s => [s.id, s]))
+  const allEvents = rawEvents.map(ev => ({
+    ...ev,
+    owner: sellerById[ev.seller_id]?.init
+        || ev.seller_id?.slice(0, 2)?.toUpperCase()
+        || '?',
+  }))
 
   const monthLabel = (() => {
     const m1 = weekDays[0], m2 = weekDays[4]
