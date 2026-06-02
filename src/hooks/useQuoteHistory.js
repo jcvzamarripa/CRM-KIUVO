@@ -9,27 +9,30 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase'
 export function useQuoteHistory({ sellerId = null, limit = 200 } = {}) {
   const [quotes,  setQuotes]  = useState([])
   const [loading, setLoading] = useState(true)
+  const [error,   setError]   = useState(null)
 
   const fetch = useCallback(async () => {
     if (!isSupabaseConfigured) { setLoading(false); return }
     setLoading(true)
+    setError(null)
 
     let q = supabase
       .from('quotes')
       .select(`
         id, status, total, notes, created_at, pdf_path, quote_number,
-        prospect:prospects!prospect_id (name),
-        seller:profiles!seller_id (full_name, initials, avatar_color),
-        items:quote_items (id)
+        prospect:prospects ( name ),
+        seller:profiles ( full_name, initials, avatar_color ),
+        items:quote_items ( id )
       `)
       .order('created_at', { ascending: false })
       .limit(limit)
 
     if (sellerId) q = q.eq('seller_id', sellerId)
 
-    const { data, error } = await q
-    if (error) {
-      console.warn('[useQuoteHistory]', error.message)
+    const { data, error: qErr } = await q
+    if (qErr) {
+      console.error('[useQuoteHistory]', qErr)
+      setError(qErr.message)
       setLoading(false)
       return
     }
@@ -64,7 +67,7 @@ export function useQuoteHistory({ sellerId = null, limit = 200 } = {}) {
     return () => supabase.removeChannel(ch)
   }, [fetch])
 
-  return { quotes, loading, reload: fetch }
+  return { quotes, loading, error, reload: fetch }
 }
 
 /** Update a quote's status (sent → approved / rejected / etc.) */

@@ -448,13 +448,25 @@ export default function QuotesView() {
 
   // sellerId=null → sin filtro → admin ve todas las cotizaciones de todos los vendedores
   // useQuoteHistory tiene Realtime incorporado y manejo de errores
-  const { quotes: rawQuotes, loading } = useQuoteHistory({ sellerId: null })
+  const { quotes: rawQuotes, loading, error: quotesError } = useQuoteHistory({ sellerId: null })
 
   const [filter,       setFilter]       = useState('all')
   const [sellerFilter, setSellerFilter] = useState('all')
   const [selected,     setSelected]     = useState(null)
   const [showNew,      setShowNew]      = useState(false)
   const [downloading,  setDownloading]  = useState(null)
+  const [deleting,     setDeleting]     = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
+  async function handleDelete(quote) {
+    if (!confirmDelete) { setConfirmDelete(true); return }
+    setDeleting(true)
+    const { error } = await supabase.from('quotes').delete().eq('id', quote.id)
+    setDeleting(false)
+    setConfirmDelete(false)
+    if (!error) { setSelected(null) }
+    else console.error('[delete quote]', error.message)
+  }
 
   // Normalizar al shape que espera esta vista
   const quotes = rawQuotes.map(q => {
@@ -481,6 +493,11 @@ export default function QuotesView() {
   })
 
   function handleNewQuote(q) { setSelected(q) }
+
+  function selectQuote(q) {
+    setSelected(prev => prev?.id === q.id ? null : q)
+    setConfirmDelete(false)
+  }
 
   const nextId = `COT-${String(quotes.length + 1).padStart(4, '0')}`
 
@@ -612,6 +629,13 @@ export default function QuotesView() {
           </div>
         </div>
 
+        {/* Error banner */}
+        {quotesError && (
+          <div style={{ padding: '10px 20px', background: 'var(--danger-bg)', color: 'var(--danger)', fontSize: 12, borderBottom: '0.5px solid var(--danger)' }}>
+            Error al cargar cotizaciones: {quotesError}
+          </div>
+        )}
+
         {/* List */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -656,7 +680,7 @@ export default function QuotesView() {
                 return (
                   <tr
                     key={q.id}
-                    onClick={() => setSelected(prev => prev?.id === q.id ? null : q)}
+                    onClick={() => selectQuote(q)}
                     style={{
                       cursor: 'pointer',
                       background: selected?.id === q.id ? 'var(--kiuvo-blue-soft)' : 'transparent',
@@ -795,6 +819,49 @@ export default function QuotesView() {
               }}>
                 Ver detalle completo
               </button>
+
+              {/* Borrar cotización */}
+              {confirmDelete ? (
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    onClick={() => setConfirmDelete(false)}
+                    style={{
+                      flex: 1, padding: '9px 0', borderRadius: 'var(--r-md)',
+                      border: '0.5px solid var(--border)', background: 'var(--bg)',
+                      color: 'var(--fg)', fontSize: 12, fontWeight: 500,
+                    }}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={() => handleDelete(selected)}
+                    disabled={deleting}
+                    style={{
+                      flex: 1, padding: '9px 0', borderRadius: 'var(--r-md)',
+                      background: 'var(--danger, #dc2626)', color: '#fff',
+                      fontSize: 12, fontWeight: 600,
+                      opacity: deleting ? 0.7 : 1,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                    }}
+                  >
+                    {deleting ? '…' : <><Icon name="trash" size={13} color="#fff" /> Confirmar</>}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => handleDelete(selected)}
+                  style={{
+                    width: '100%', padding: '9px 0', borderRadius: 'var(--r-md)',
+                    border: '0.5px solid var(--danger, #dc2626)',
+                    background: 'transparent',
+                    color: 'var(--danger, #dc2626)', fontSize: 13, fontWeight: 500,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  }}
+                >
+                  <Icon name="trash" size={14} color="var(--danger, #dc2626)" />
+                  Borrar cotización
+                </button>
+              )}
             </div>
           </div>
         </div>
