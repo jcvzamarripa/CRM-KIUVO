@@ -2,6 +2,8 @@ import React, { useState, useMemo, useEffect } from 'react'
 import Icon from '../shared/Icon'
 import { useSellers } from '../../hooks/useSellers'
 import { useActivities } from '../../hooks/useActivities'
+import { useQuoteHistory } from '../../hooks/useQuoteHistory'
+import { useAdminProspects } from '../../hooks/useAdminProspects'
 import { supabase, isSupabaseConfigured } from '../../lib/supabase'
 import { STAGES } from '../../constants/stages'
 
@@ -92,23 +94,46 @@ function useReportCharts() {
 }
 
 // ─── Cálculo de estadísticas por vendedor ────────────────────────────────────
-function computeSellerStats(sellers, activities, from, to) {
+function computeSellerStats(sellers, activities, from, to, allQuotes = [], allProspects = []) {
   const inPeriod = activities.filter(a => a.date >= from && a.date <= to)
+
+  // Cotizaciones reales del período por vendedor (tabla quotes)
+  const quotesInPeriod = allQuotes.filter(q => {
+    const d = q.createdAt?.slice(0, 10) || ''
+    return d >= from && d <= to
+  })
+
+  // Prospectos nuevos del período por vendedor (tabla prospects)
+  const prospectsInPeriod = allProspects.filter(p => {
+    const d = p.created_at?.slice(0, 10) || ''
+    return d >= from && d <= to
+  })
 
   return sellers.map(seller => {
     const acts = inPeriod.filter(a => a.sellerInit === seller.init)
     const visits    = acts.filter(a => a.kind === 'visit').length
     const calls     = acts.filter(a => a.kind === 'call').length
     const msgs      = acts.filter(a => a.kind === 'whatsapp' || a.kind === 'email').length
-    const quoteActs = acts.filter(a => a.kind === 'quote')
-    const quotes    = quoteActs.length
-    const quotedAmt = quoteActs.reduce((s, a) => s + parseAmount(a.amount), 0)
+
+    // Cotizaciones: usar datos reales de quotes si visits está vacío
+    const quoteActs    = acts.filter(a => a.kind === 'quote')
+    const quotesFromDB = quotesInPeriod.filter(q => q.sellerInit === seller.init)
+    const quotes    = quoteActs.length > 0 ? quoteActs.length : quotesFromDB.length
+    const quotedAmt = quoteActs.length > 0
+      ? quoteActs.reduce((s, a) => s + parseAmount(a.amount), 0)
+      : quotesFromDB.reduce((s, q) => s + (q.total || 0), 0)
+
     const winActs   = acts.filter(a => a.kind === 'win')
     const wins      = winActs.length
     const wonAmt    = winActs.reduce((s, a) => s + parseAmount(a.amount), 0)
     const stageAdv  = acts.filter(a => a.kind === 'stage').length
-    const newProsp  = acts.filter(a => a.kind === 'new').length
-    const total     = acts.length
+
+    // Nuevos prospectos: usar datos reales de prospects si visits está vacío
+    const newFromActs = acts.filter(a => a.kind === 'new').length
+    const newFromDB   = prospectsInPeriod.filter(p => p.owner_id === seller.id).length
+    const newProsp    = newFromActs > 0 ? newFromActs : newFromDB
+
+    const total = acts.length + (quoteActs.length === 0 ? quotesFromDB.length : 0) + (newFromActs === 0 ? newFromDB : 0)
 
     return { ...seller, visits, calls, msgs, quotes, quotedAmt, wins, wonAmt, stageAdv, newProsp, total, acts }
   })
@@ -515,6 +540,8 @@ function EmbudoTab({ stageData = [] }) {
 export default function ReportsView() {
   const { sellers }                              = useSellers()
   const { activities }                           = useActivities({ limit: 500 })
+  const { quotes: allQuotes }                    = useQuoteHistory({ sellerId: null, limit: 1000 })
+  const { prospects: allProspects }              = useAdminProspects()
   const { weeklyChart, monthlyChart, stageData } = useReportCharts()
   const [tab,      setTab]      = useState('sellers')
   const [periodId, setPeriodId] = useState('week')
@@ -524,8 +551,8 @@ export default function ReportsView() {
   const period = PERIODS.find(p => p.id === periodId) || PERIODS[0]
 
   const stats = useMemo(
-    () => computeSellerStats(sellers, activities, period.from, period.to),
-    [sellers, activities, period.from, period.to]
+    () => computeSellerStats(sellers, activities, period.from, period.to, allQuotes, allProspects),
+    [sellers, activities, period.from, period.to, allQuotes, allProspects]
   )
 
   const totalWon      = sellers.reduce((s, r) => s + (r.won || 0), 0)
