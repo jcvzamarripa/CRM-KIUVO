@@ -24,7 +24,7 @@ export function useAdminProspects() {
         lat, lng, stage_id, value, notes,
         health, days_in_stage, last_contact_at,
         created_at, updated_at,
-        owner:profiles!owner_id (
+        owner:profiles (
           id, full_name, initials, avatar_color
         )
       `)

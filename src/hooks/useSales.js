@@ -28,8 +28,8 @@ export function useSales({ sellerId, dateFrom, dateTo, limit = 500 } = {}) {
       .from('sales')
       .select(`
         id, amount, notes, closed_at, created_at,
-        seller:profiles!seller_id  (id, full_name, initials, avatar_color),
-        prospect:prospects!prospect_id (id, name, company)
+        seller:profiles ( id, full_name, initials, avatar_color ),
+        prospect:prospects ( id, name, company )
       `)
       .order('closed_at', { ascending: false })
       .limit(limit)

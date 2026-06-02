@@ -42,8 +42,8 @@ export function useActivities({ limit = 50 } = {}) {
       .from('visits')
       .select(`
         id, kind, notes, created_at,
-        seller:profiles!seller_id (full_name, initials, avatar_color),
-        prospect:prospects!prospect_id (name)
+        seller:profiles ( full_name, initials, avatar_color ),
+        prospect:prospects ( name )
       `)
       .order('created_at', { ascending: false })
       .limit(limit)
