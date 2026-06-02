@@ -447,24 +447,25 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
   // Load seller's prospects — con caché offline
   useEffect(() => {
     const CACHE_KEY = `kiuvo_prospects_${user.id}`
-    // Cargar caché inmediatamente
+
+    // Mostrar caché inmediatamente
     try {
       const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null')
       if (cached?.length) setProspects(cached)
     } catch {}
 
-    if (!navigator.onLine) return   // Sin señal: usar solo caché
-
+    // Intentar Supabase; si falla (sin red) se queda con el caché
     supabase
       .from('prospects')
       .select('id, name, email, contact, notes, phone')
       .eq('owner_id', user.id)
       .order('name')
-      .then(({ data }) => {
-        if (data) {
+      .then(({ data, error }) => {
+        if (data && !error) {
           setProspects(data)
           try { localStorage.setItem(CACHE_KEY, JSON.stringify(data)) } catch {}
         }
+        // Si hay error (offline), el caché ya fue cargado arriba
       })
   }, [user.id])
 

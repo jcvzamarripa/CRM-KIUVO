@@ -28,27 +28,30 @@ export function useProducts() {
   const [error,    setError]    = useState(null)
 
   const load = useCallback(async () => {
-    // Si hay caché, mostrar de inmediato y seguir cargando en background
+    // Mostrar caché inmediatamente mientras carga
     const cached = getCachedProducts()
     if (cached?.length) { setProducts(cached); setLoading(false) }
 
-    if (!navigator.onLine) { setLoading(false); return }
+    try {
+      const { data, error: err } = await supabase
+        .from('products')
+        .select('*')
+        .eq('active', true)
+        .order('name')
 
-    const { data, error: err } = await supabase
-      .from('products')
-      .select('*')
-      .eq('active', true)
-      .order('name')
+      if (err) throw err
 
-    if (err) {
-      console.error('[useProducts] load error:', err.message)
-      setError(err.message)
-      // Mantener caché si hay
-      if (cached?.length) setProducts(cached)
-    } else {
       setProducts(data ?? [])
-      setCachedProducts(data ?? [])
+      setCachedProducts(data ?? [])   // ← actualiza caché siempre que haya éxito
       setError(null)
+    } catch (err) {
+      // Sin conexión o error: usar caché si existe
+      if (cached?.length) {
+        setProducts(cached)
+      } else {
+        console.error('[useProducts] load error:', err.message)
+        setError(err.message)
+      }
     }
     setLoading(false)
   }, [])
