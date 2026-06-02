@@ -444,14 +444,28 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
   const paymentTerms = paymentSel === 'Otro' ? paymentOther : paymentSel
   const [deliveryTime, setDeliveryTime]   = useState('7 días hábiles')
 
-  // Load seller's prospects
+  // Load seller's prospects — con caché offline
   useEffect(() => {
+    const CACHE_KEY = `kiuvo_prospects_${user.id}`
+    // Cargar caché inmediatamente
+    try {
+      const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null')
+      if (cached?.length) setProspects(cached)
+    } catch {}
+
+    if (!navigator.onLine) return   // Sin señal: usar solo caché
+
     supabase
       .from('prospects')
-      .select('id, name, email, contact, notes')
+      .select('id, name, email, contact, notes, phone')
       .eq('owner_id', user.id)
       .order('name')
-      .then(({ data }) => setProspects(data ?? []))
+      .then(({ data }) => {
+        if (data) {
+          setProspects(data)
+          try { localStorage.setItem(CACHE_KEY, JSON.stringify(data)) } catch {}
+        }
+      })
   }, [user.id])
 
   // Categorías derivadas del catálogo

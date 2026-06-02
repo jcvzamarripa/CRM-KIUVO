@@ -13,12 +13,27 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 
+const PRODUCTS_CACHE_KEY = 'kiuvo_products_cache'
+
+function getCachedProducts() {
+  try { return JSON.parse(localStorage.getItem(PRODUCTS_CACHE_KEY) || 'null') } catch { return null }
+}
+function setCachedProducts(data) {
+  try { localStorage.setItem(PRODUCTS_CACHE_KEY, JSON.stringify(data)) } catch {}
+}
+
 export function useProducts() {
-  const [products, setProducts] = useState([])
+  const [products, setProducts] = useState(() => getCachedProducts() ?? [])
   const [loading,  setLoading]  = useState(true)
   const [error,    setError]    = useState(null)
 
   const load = useCallback(async () => {
+    // Si hay caché, mostrar de inmediato y seguir cargando en background
+    const cached = getCachedProducts()
+    if (cached?.length) { setProducts(cached); setLoading(false) }
+
+    if (!navigator.onLine) { setLoading(false); return }
+
     const { data, error: err } = await supabase
       .from('products')
       .select('*')
@@ -28,8 +43,11 @@ export function useProducts() {
     if (err) {
       console.error('[useProducts] load error:', err.message)
       setError(err.message)
+      // Mantener caché si hay
+      if (cached?.length) setProducts(cached)
     } else {
       setProducts(data ?? [])
+      setCachedProducts(data ?? [])
       setError(null)
     }
     setLoading(false)
