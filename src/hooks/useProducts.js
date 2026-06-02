@@ -56,7 +56,7 @@ export function useProducts() {
   useEffect(() => {
     load()
 
-    // Realtime: cualquier cambio en la tabla recarga la lista
+    // Realtime: cualquier cambio en la tabla recarga la lista y actualiza caché
     const channel = supabase
       .channel('products-changes')
       .on(
@@ -66,7 +66,15 @@ export function useProducts() {
       )
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    // Al recuperar señal: refrescar catálogo y actualizar caché
+    // (cubre el caso de productos agregados mientras el vendedor estaba offline)
+    const handleOnline = () => load()
+    window.addEventListener('online', handleOnline)
+
+    return () => {
+      supabase.removeChannel(channel)
+      window.removeEventListener('online', handleOnline)
+    }
   }, [load])
 
   /** Guarda un producto (insert si es nuevo, update si ya existe). */
