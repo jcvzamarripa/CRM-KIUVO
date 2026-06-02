@@ -6,6 +6,8 @@ import { useProducts } from '../../hooks/useProducts'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { QuotePDFDoc } from '../../lib/quotePDF'
+import useOnlineStatus from '../../hooks/useOnlineStatus'
+import { enqueue } from '../../lib/offlineQueue'
 
 const fmt  = n => '$' + n.toLocaleString('es-MX', { minimumFractionDigits: 0 })
 const fmtPct = n => `${n}%`
@@ -421,6 +423,7 @@ const PAYMENT_OPTIONS = [
 export default function QuoteModal({ onClose, onGenerated, initialProspectId = null, initialProspectName = '', initialContactName = '' }) {
   const { user, profile } = useAuth()
   const { products: allProducts } = useProducts()
+  const isOnline = useOnlineStatus()
 
   const [step, setStep]               = useState('form')
   const [search, setSearch]           = useState('')
@@ -496,6 +499,83 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
     if (!canSubmit) return
     setSubmitting(true)
     setServerError('')
+
+    // ── OFFLINE: encolar y generar PDF localmente ─────────────────────────────
+    if (!isOnline) {
+      const tempId = crypto.randomUUID()
+      enqueue({
+        type: 'INSERT_QUOTE',
+        table: 'quotes',
+        payload: {
+          tempId,
+          prospect_id:  prospectId ?? null,
+          seller_id:    user.id,
+          status:       'sent',
+          total,
+          notes:        !prospectId && prospectName ? prospectName : null,
+          // Datos para regenerar PDF y items al sincronizar
+          _sync: {
+            prospectName,
+            contactName,
+            sellerName:    profile?.full_name || '',
+            paymentTerms,
+            deliveryTime,
+            items: items.map(i => ({
+              name:        i.name,
+              sku:         i.sku  ?? null,
+              unit:        i.unit ?? null,
+              qty:         i.qty,
+              price:       i.price,
+              discountPct: i.discountPct ?? 0,
+              unitPrice:   effectivePrice(i),
+            })),
+          },
+        },
+      })
+
+      // Generar PDF localmente para descarga/compartir inmediata
+      try {
+        let logoDataUrl = null
+        try {
+          const r = await fetch(window.location.origin + '/kiuvo-logo.png')
+          if (r.ok) {
+            const buf   = await (await r.blob()).arrayBuffer()
+            const bytes = new Uint8Array(buf)
+            let b = ''; bytes.forEach(x => { b += String.fromCharCode(x) })
+            logoDataUrl = `data:image/png;base64,${btoa(b)}`
+          }
+        } catch (_) {}
+
+        const offlineQuoteNum = `OFF-${Date.now().toString().slice(-4)}`
+        const blob = await pdf(
+          <QuotePDFDoc
+            quoteId={tempId}
+            prospectName={prospectName}
+            contactName={contactName}
+            sellerName={profile?.full_name}
+            items={items}
+            date={new Date()}
+            paymentTerms={paymentTerms}
+            deliveryTime={deliveryTime}
+            logoUrl={logoDataUrl}
+          />
+        ).toBlob()
+
+        const url = URL.createObjectURL(blob)
+        setPdfUrl(url)
+        const safeName = (prospectName || 'cotizacion').replace(/[/\\:*?"<>|]/g, '').trim()
+        const a = document.createElement('a')
+        a.href = url; a.download = `${safeName} - ${offlineQuoteNum}.pdf`; a.click()
+      } catch (pdfErr) {
+        console.warn('[QuoteModal offline] PDF error:', pdfErr)
+      }
+
+      onGenerated?.(prospectName, total)
+      setSubmitting(false)
+      setStep('success')
+      return
+    }
+    // ── FIN OFFLINE ───────────────────────────────────────────────────────────
 
     // 1 — Get next sequential number for this seller
     const { data: lastNum } = await supabase

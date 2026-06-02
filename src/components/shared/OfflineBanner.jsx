@@ -1,7 +1,77 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { pdf } from '@react-pdf/renderer'
 import useOnlineStatus from '../../hooks/useOnlineStatus'
 import { getQueue, getQueueCount, dequeue } from '../../lib/offlineQueue'
 import { supabase, isSupabaseConfigured } from '../../lib/supabase'
+import { QuotePDFDoc } from '../../lib/quotePDF'
+
+// ── Sync de cotizaciones offline ──────────────────────────────────────────────
+async function syncQuote(item) {
+  const { tempId, _sync, ...quoteHeader } = item.payload
+  const { prospectName, contactName, sellerName, paymentTerms, deliveryTime, items } = _sync || {}
+
+  // 1. Número secuencial real
+  const { data: lastNum } = await supabase
+    .from('quotes')
+    .select('quote_number')
+    .eq('seller_id', quoteHeader.seller_id)
+    .not('quote_number', 'is', null)
+    .order('quote_number', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  const quoteNumber = (lastNum?.quote_number ?? 0) + 1
+
+  // 2. Insertar cotización
+  const { data: quote, error: qErr } = await supabase
+    .from('quotes')
+    .insert({ ...quoteHeader, quote_number: quoteNumber })
+    .select()
+    .single()
+  if (qErr) throw new Error(qErr.message)
+
+  // 3. Insertar partidas
+  if (items?.length) {
+    await supabase.from('quote_items').insert(
+      items.map(i => ({
+        quote_id:     quote.id,
+        product_name: i.name,
+        sku:          i.sku  ?? null,
+        unit:         i.unit ?? null,
+        quantity:     i.qty,
+        unit_price:   i.unitPrice,
+        discount_pct: i.discountPct ?? 0,
+      }))
+    )
+  }
+
+  // 4. Regenerar PDF y subir al storage
+  try {
+    const blob = await pdf(
+      <QuotePDFDoc
+        quoteId={quote.id}
+        prospectName={prospectName || ''}
+        contactName={contactName  || ''}
+        sellerName={sellerName    || ''}
+        items={items?.map(i => ({ ...i, discountPct: i.discountPct ?? 0 })) || []}
+        date={new Date(item.timestamp)}
+        paymentTerms={paymentTerms || ''}
+        deliveryTime={deliveryTime || ''}
+        logoUrl={null}
+      />
+    ).toBlob()
+
+    const pdfPath = `${quoteHeader.seller_id}/${quote.id}.pdf`
+    const { error: upErr } = await supabase.storage
+      .from('cotizaciones')
+      .upload(pdfPath, blob, { contentType: 'application/pdf', upsert: true })
+    if (!upErr) {
+      await supabase.from('quotes').update({ pdf_path: pdfPath }).eq('id', quote.id)
+    }
+  } catch (pdfErr) {
+    console.warn('[sync] PDF offline upload failed:', pdfErr)
+    // La cotización ya quedó guardada, solo falta el PDF
+  }
+}
 
 // ── Sync the queue against Supabase ──────────────────────────────────────────
 async function replayQueue() {
@@ -11,13 +81,17 @@ async function replayQueue() {
   for (const item of queue) {
     try {
       if (isSupabaseConfigured) {
-        const { error } = await supabase.from(item.table).insert(item.payload)
-        if (!error) { dequeue(item.id); synced++ }
+        if (item.type === 'INSERT_QUOTE') {
+          await syncQuote(item)
+          dequeue(item.id); synced++
+        } else {
+          const { error } = await supabase.from(item.table).insert(item.payload)
+          if (!error) { dequeue(item.id); synced++ }
+        }
       } else {
-        // Demo / no-Supabase mode: just drop from queue
         dequeue(item.id); synced++
       }
-    } catch { /* leave item in queue, retry next time */ }
+    } catch { /* dejar en cola, reintentar la próxima vez */ }
   }
   return synced
 }
