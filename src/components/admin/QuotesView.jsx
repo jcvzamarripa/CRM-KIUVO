@@ -450,13 +450,28 @@ export default function QuotesView() {
   // useQuoteHistory tiene Realtime incorporado y manejo de errores
   const { quotes: rawQuotes, loading, error: quotesError } = useQuoteHistory({ sellerId: null })
 
-  const [filter,       setFilter]       = useState('all')
-  const [sellerFilter, setSellerFilter] = useState('all')
-  const [selected,     setSelected]     = useState(null)
-  const [showNew,      setShowNew]      = useState(false)
-  const [downloading,  setDownloading]  = useState(null)
-  const [deleting,     setDeleting]     = useState(false)
+  const [filter,        setFilter]        = useState('all')
+  const [sellerFilter,  setSellerFilter]  = useState('all')
+  const [selected,      setSelected]      = useState(null)
+  const [showNew,       setShowNew]       = useState(false)
+  const [downloading,   setDownloading]   = useState(null)
+  const [deleting,      setDeleting]      = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [quoteItems,    setQuoteItems]    = useState([])
+  const [loadingItems,  setLoadingItems]  = useState(false)
+  const [showItems,     setShowItems]     = useState(false)
+
+  async function loadQuoteItems(quoteId) {
+    setLoadingItems(true)
+    setShowItems(true)
+    const { data, error } = await supabase
+      .from('quote_items')
+      .select('product_name, sku, quantity, unit_price, discount_pct, subtotal')
+      .eq('quote_id', quoteId)
+      .order('created_at', { ascending: true })
+    if (!error) setQuoteItems(data ?? [])
+    setLoadingItems(false)
+  }
 
   async function handleDelete(quote) {
     if (!confirmDelete) { setConfirmDelete(true); return }
@@ -497,6 +512,8 @@ export default function QuotesView() {
   function selectQuote(q) {
     setSelected(prev => prev?.id === q.id ? null : q)
     setConfirmDelete(false)
+    setShowItems(false)
+    setQuoteItems([])
   }
 
   const nextId = `COT-${String(quotes.length + 1).padStart(4, '0')}`
@@ -804,21 +821,68 @@ export default function QuotesView() {
               </div>
             ))}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
-              <button style={{
-                width: '100%', padding: '10px 0', borderRadius: 'var(--r-md)',
-                background: 'var(--kiuvo-blue)', color: '#fff', fontSize: 13, fontWeight: 500,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              }}>
-                <Icon name="download" size={14} />
-                Descargar PDF
+              <button
+                onClick={async () => {
+                  if (!selected.pdfPath) return
+                  setDownloading(selected.id)
+                  await downloadStoredPDF(selected.pdfPath, selected.shortId || selected.id.slice(0,8))
+                  setDownloading(null)
+                }}
+                disabled={!selected.pdfPath || downloading === selected.id}
+                style={{
+                  width: '100%', padding: '10px 0', borderRadius: 'var(--r-md)',
+                  background: selected.pdfPath ? 'var(--kiuvo-blue)' : 'var(--bg-secondary)',
+                  color: selected.pdfPath ? '#fff' : 'var(--fg-tertiary)',
+                  fontSize: 13, fontWeight: 500,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  cursor: selected.pdfPath ? 'pointer' : 'not-allowed',
+                }}
+              >
+                {downloading === selected.id
+                  ? <><Icon name="loader" size={14} color="#fff" /> Descargando…</>
+                  : <><Icon name="download" size={14} color={selected.pdfPath ? '#fff' : 'var(--fg-tertiary)'} /> {selected.pdfPath ? 'Descargar PDF' : 'PDF no disponible'}</>
+                }
               </button>
-              <button style={{
-                width: '100%', padding: '9px 0', borderRadius: 'var(--r-md)',
-                border: '0.5px solid var(--border)', background: 'var(--bg)',
-                color: 'var(--fg)', fontSize: 13, fontWeight: 500,
-              }}>
-                Ver detalle completo
+              <button
+                onClick={() => showItems ? setShowItems(false) : loadQuoteItems(selected.id)}
+                style={{
+                  width: '100%', padding: '9px 0', borderRadius: 'var(--r-md)',
+                  border: '0.5px solid var(--border)', background: showItems ? 'var(--bg-secondary)' : 'var(--bg)',
+                  color: 'var(--fg)', fontSize: 13, fontWeight: 500,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                }}
+              >
+                <Icon name={showItems ? 'chevron-up' : 'list'} size={14} color="var(--fg-secondary)" />
+                {showItems ? 'Ocultar productos' : 'Ver productos'}
               </button>
+
+              {/* Lista de productos */}
+              {showItems && (
+                <div style={{ border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)', overflow: 'hidden' }}>
+                  {loadingItems ? (
+                    <div style={{ padding: '12px', textAlign: 'center', fontSize: 12, color: 'var(--fg-tertiary)' }}>Cargando…</div>
+                  ) : quoteItems.length === 0 ? (
+                    <div style={{ padding: '12px', textAlign: 'center', fontSize: 12, color: 'var(--fg-tertiary)' }}>Sin productos registrados</div>
+                  ) : quoteItems.map((item, i) => (
+                    <div key={i} style={{
+                      padding: '8px 12px',
+                      borderBottom: i < quoteItems.length - 1 ? '0.5px solid var(--border)' : 'none',
+                      background: i % 2 === 0 ? 'var(--bg)' : 'var(--bg-secondary)',
+                    }}>
+                      <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--fg)' }}>{item.product_name}</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
+                        <span style={{ fontSize: 11, color: 'var(--fg-tertiary)' }}>
+                          {item.sku && `${item.sku} · `}{item.quantity} u.
+                          {item.discount_pct > 0 && <span style={{ color: 'var(--success)', marginLeft: 4 }}>−{item.discount_pct}%</span>}
+                        </span>
+                        <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--kiuvo-blue)' }}>
+                          ${(item.subtotal ?? item.unit_price * item.quantity).toLocaleString('es-MX')}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Borrar cotización */}
               {confirmDelete ? (
