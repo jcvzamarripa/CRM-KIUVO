@@ -466,10 +466,14 @@ export default function QuotesView() {
     setShowItems(true)
     const { data, error } = await supabase
       .from('quote_items')
-      .select('product_name, sku, quantity, unit_price, discount_pct, subtotal')
+      .select('product_name, sku, unit, quantity, unit_price, discount_pct')
       .eq('quote_id', quoteId)
-      .order('created_at', { ascending: true })
-    if (!error) setQuoteItems(data ?? [])
+    if (error) {
+      console.error('[loadQuoteItems]', error)
+      setQuoteItems([{ product_name: `Error: ${error.message}`, sku: '', quantity: 0, unit_price: 0, discount_pct: 0 }])
+    } else {
+      setQuoteItems(data ?? [])
+    }
     setLoadingItems(false)
   }
 
@@ -872,11 +876,11 @@ export default function QuotesView() {
                       <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--fg)' }}>{item.product_name}</div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
                         <span style={{ fontSize: 11, color: 'var(--fg-tertiary)' }}>
-                          {item.sku && `${item.sku} · `}{item.quantity} u.
+                          {item.sku && `${item.sku} · `}{item.quantity} {item.unit || 'u.'}
                           {item.discount_pct > 0 && <span style={{ color: 'var(--success)', marginLeft: 4 }}>−{item.discount_pct}%</span>}
                         </span>
                         <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--kiuvo-blue)' }}>
-                          ${(item.subtotal ?? item.unit_price * item.quantity).toLocaleString('es-MX')}
+                          ${(item.unit_price * item.quantity * (1 - (item.discount_pct || 0) / 100)).toLocaleString('es-MX')}
                         </span>
                       </div>
                     </div>
