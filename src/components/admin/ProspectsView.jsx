@@ -62,7 +62,7 @@ function NewProspectPanel({ stages, sellers = [], onSave, onClose }) {
 
   return (
     <div style={{
-      width: 400, flexShrink: 0, borderLeft: '0.5px solid var(--border)',
+      width: '100%', borderLeft: '0.5px solid var(--border)',
       background: 'var(--surface)', display: 'flex', flexDirection: 'column',
       animation: 'slideInRight 0.18s ease',
     }}>
@@ -235,7 +235,7 @@ function DetailPanel({ p, stageById, sellers = [], onClose, onDelete }) {
 
   return (
     <div style={{
-      width: 300, flexShrink: 0, borderLeft: '0.5px solid var(--border)',
+      width: '100%', borderLeft: '0.5px solid var(--border)',
       background: 'var(--surface)', display: 'flex', flexDirection: 'column',
       animation: 'slideInRight 0.18s ease',
     }}>
@@ -609,7 +609,11 @@ export default function ProspectsView() {
           width: 'min(420px, 92vw)',
           boxShadow: '-4px 0 24px rgba(0,0,0,0.18)',
           display: 'flex', flexDirection: 'column',
-        } : { display: 'flex', flexDirection: 'column' }}>
+        } : {
+          width: 'clamp(280px, 28vw, 420px)',
+          flexShrink: 0,
+          display: 'flex', flexDirection: 'column',
+        }}>
           {rightPanel}
         </div>
       )}

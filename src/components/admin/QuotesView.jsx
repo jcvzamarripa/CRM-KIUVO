@@ -533,10 +533,11 @@ export default function QuotesView() {
     : quotes.filter(q => q.seller_full_name === sellerFilter)
 
   const totals = {
-    all:      sellerBase.reduce((s, q) => s + q.total, 0),
+    all:      sellerBase.filter(q => q.status !== 'rejected').reduce((s, q) => s + q.total, 0),
     sent:     sellerBase.filter(q => q.status === 'sent').reduce((s, q) => s + q.total, 0),
     approved: sellerBase.filter(q => q.status === 'approved').reduce((s, q) => s + q.total, 0),
-    draft:    sellerBase.filter(q => q.status === 'draft').length,
+    rejected: sellerBase.filter(q => q.status === 'rejected').reduce((s, q) => s + q.total, 0),
+    rejectedCount: sellerBase.filter(q => q.status === 'rejected').length,
   }
 
   return (
@@ -554,7 +555,7 @@ export default function QuotesView() {
             { label: 'Pipeline total',    value: fmt(totals.all),      sub: `${sellerBase.length} cotizaciones`,                                        accent: 'var(--kiuvo-blue)'   },
             { label: 'Enviadas',          value: fmt(totals.sent),     sub: `${sellerBase.filter(q=>q.status==='sent').length} en espera`,              accent: 'var(--info)'         },
             { label: 'Aprobadas',         value: fmt(totals.approved), sub: `${sellerBase.filter(q=>q.status==='approved').length} aprobadas`,          accent: 'var(--success)'      },
-            { label: 'Borradores',        value: totals.draft,         sub: 'Pendientes de enviar',                                                      accent: 'var(--fg-secondary)' },
+            { label: 'Rechazadas',         value: fmt(totals.rejected), sub: `${totals.rejectedCount} cotizacion${totals.rejectedCount !== 1 ? 'es' : ''} perdida${totals.rejectedCount !== 1 ? 's' : ''}`, accent: 'var(--danger)' },
           ].map(c => (
             <div key={c.label} style={{
               padding: '12px 16px', background: 'var(--surface)',
