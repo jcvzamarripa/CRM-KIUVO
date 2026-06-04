@@ -279,19 +279,20 @@ function DetailPanel({ p, stageById, sellers = [], onClose, onDelete }) {
             href={`https://wa.me/52${(p.phone || '').replace(/\D/g, '')}`}
             target="_blank" rel="noreferrer"
             style={{
-              flex: 1, padding: '9px 0', borderRadius: 'var(--r-md)',
-              background: '#25D366', color: '#fff', fontSize: 13, fontWeight: 500,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              textDecoration: 'none',
+              flex: 1, minWidth: 0, padding: '9px 6px', borderRadius: 'var(--r-md)',
+              background: '#25D366', color: '#fff', fontSize: 12, fontWeight: 500,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+              textDecoration: 'none', whiteSpace: 'nowrap', overflow: 'hidden',
             }}
           >
             <Icon name="brand-whatsapp" size={14} color="#fff" />
             WhatsApp
           </a>
           <button style={{
-            flex: 1, padding: '9px 0', borderRadius: 'var(--r-md)',
+            flex: 1, minWidth: 0, padding: '9px 6px', borderRadius: 'var(--r-md)',
             border: '0.5px solid var(--border)', background: 'var(--bg)',
-            color: 'var(--fg)', fontSize: 13, fontWeight: 500,
+            color: 'var(--fg)', fontSize: 12, fontWeight: 500,
+            whiteSpace: 'nowrap', overflow: 'hidden',
           }}>
             Ver historial
           </button>
@@ -394,8 +395,8 @@ export default function ProspectsView() {
     return () => ro.disconnect()
   }, [])
 
-  // Panel lateral a partir de 900px de espacio real disponible
-  const isNarrow   = containerW < 900
+  // Panel lateral a partir de 1000px de espacio real disponible
+  const isNarrow   = containerW < 1000
 
   // Ancho real de la tabla según si el panel está abierto en modo lateral
   const panelVisible = !isNarrow && (showNew || !!selected)
@@ -535,7 +536,7 @@ export default function ProspectsView() {
             {sellerInits.map(s => <option key={s} value={s}>{sellerName(s)}</option>)}
           </select>
 
-          <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--fg-tertiary)' }}>
+          <div style={{ flexShrink: 0, fontSize: 12, color: 'var(--fg-tertiary)', whiteSpace: 'nowrap' }}>
             {filtered.length} prospectos
           </div>
         </div>
