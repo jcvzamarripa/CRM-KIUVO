@@ -380,16 +380,31 @@ export default function ProspectsView() {
   const [ownerFilter, setOwnerFilter] = useState('all')
   const [selected,    setSelected]    = useState(null)
   const [showNew,     setShowNew]     = useState(false)
-  const [winW,        setWinW]        = useState(window.innerWidth)
+  const [containerW,  setContainerW]  = useState(9999)
+  const containerRef = useRef(null)
 
+  // Medir el ancho REAL del contenedor (descuenta el sidebar, etc.)
+  // así el breakpoint es independiente del ancho del viewport
   useEffect(() => {
-    const fn = () => setWinW(window.innerWidth)
-    window.addEventListener('resize', fn)
-    return () => window.removeEventListener('resize', fn)
+    if (!containerRef.current) return
+    const ro = new ResizeObserver(entries => {
+      setContainerW(entries[0].contentRect.width)
+    })
+    ro.observe(containerRef.current)
+    return () => ro.disconnect()
   }, [])
 
-  // Panels go side-by-side on wide screens, overlay on narrow ones
-  const isNarrow = winW < 1100
+  // Panel lateral a partir de 900px de espacio real disponible
+  const isNarrow   = containerW < 900
+
+  // Ancho real de la tabla según si el panel está abierto en modo lateral
+  const panelVisible = !isNarrow && (showNew || !!selected)
+  const panelW  = panelVisible ? Math.min(420, Math.max(280, containerW * 0.30)) : 0
+  const tableW  = containerW - panelW
+  // Ocultar columnas progresivamente para no aplastar la tabla
+  const hideSalud  = tableW < 820   // col "Salud"
+  const hideUltimo = tableW < 740   // col "Último contacto"
+  const hideVisitas= tableW < 660   // col "Visitas"
 
   const sellerInits = [...new Set(prospects.map(p => p.owner))]
 
@@ -433,7 +448,7 @@ export default function ProspectsView() {
   const panelOpen = showNew || !!selected
 
   return (
-    <div style={{ display: 'flex', height: '100%', minHeight: 0, position: 'relative' }}>
+    <div ref={containerRef} style={{ display: 'flex', height: '100%', minHeight: 0, position: 'relative' }}>
       {/* ── Overlay backdrop for narrow screens ── */}
       {isNarrow && panelOpen && (
         <div
@@ -535,7 +550,10 @@ export default function ProspectsView() {
                     padding: '9px 14px', textAlign: i === 0 ? 'left' : 'center',
                     fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)',
                     borderBottom: '0.5px solid var(--border)', whiteSpace: 'nowrap',
-                    display: isNarrow && (i === 5 || i === 6) ? 'none' : undefined,
+                    display:
+                      (i === 6 && hideSalud)  ? 'none' :
+                      (i === 5 && hideUltimo) ? 'none' :
+                      (i === 3 && hideVisitas) ? 'none' : undefined,
                   }}>{h}</th>
                 ))}
               </tr>
@@ -568,7 +586,7 @@ export default function ProspectsView() {
                     <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', textAlign: 'center', fontVariantNumeric: 'tabular-nums', fontWeight: 500, color: 'var(--fg)' }}>
                       {fmt(p.value)}
                     </td>
-                    <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', textAlign: 'center', color: 'var(--fg)', fontVariantNumeric: 'tabular-nums' }}>
+                    <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', textAlign: 'center', color: 'var(--fg)', fontVariantNumeric: 'tabular-nums', display: hideVisitas ? 'none' : undefined }}>
                       {p.visits}
                     </td>
                     <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', textAlign: 'center' }}>
@@ -582,10 +600,10 @@ export default function ProspectsView() {
                         {p.owner}
                       </span>
                     </td>
-                    <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', textAlign: 'center', fontSize: 12, color: 'var(--fg-secondary)', display: isNarrow ? 'none' : undefined }}>
+                    <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', textAlign: 'center', fontSize: 12, color: 'var(--fg-secondary)', display: hideUltimo ? 'none' : undefined }}>
                       {p.last}
                     </td>
-                    <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', textAlign: 'center', display: isNarrow ? 'none' : undefined }}>
+                    <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', textAlign: 'center', display: hideSalud ? 'none' : undefined }}>
                       <span style={{
                         display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
                         background: HEALTH_COLOR[p.health],
@@ -606,11 +624,12 @@ export default function ProspectsView() {
       {rightPanel && (
         <div style={isNarrow ? {
           position: 'absolute', top: 0, right: 0, bottom: 0, zIndex: 10,
-          width: 'min(420px, 92vw)',
+          width: Math.min(420, containerW * 0.92),
           boxShadow: '-4px 0 24px rgba(0,0,0,0.18)',
           display: 'flex', flexDirection: 'column',
         } : {
-          width: 'clamp(280px, 28vw, 420px)',
+          // 30% del contenedor real, entre 280px y 420px
+          width: Math.min(420, Math.max(280, containerW * 0.30)),
           flexShrink: 0,
           display: 'flex', flexDirection: 'column',
         }}>
