@@ -9,9 +9,6 @@ import AdminApp from './pages/AdminApp'
 import OfflineBanner from './components/shared/OfflineBanner'
 import ToastManager from './components/shared/ToastManager'
 import ErrorBoundary from './components/shared/ErrorBoundary'
-import { pdf } from '@react-pdf/renderer'
-import { QuotePDFDoc } from './lib/quotePDF'
-
 const SAMPLE_ITEMS = [
   { id: 1, name: 'Banner Invitación K Club', sku: 'BAN-001',  unit: 'pza',      price: 350,  qty: 1,   discountPct: 0  },
   { id: 2, name: 'Kiuvo Restaurantera',      sku: 'INAN-RST', unit: 'pza',      price: 25,   qty: 6,   discountPct: 0  },
@@ -26,6 +23,10 @@ function PdfTestPage() {
 
   React.useEffect(() => {
     async function generate() {
+      const [{ pdf }, { QuotePDFDoc }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('./lib/quotePDF'),
+      ])
       let logoDataUrl = null
       try {
         const r = await fetch(window.location.origin + '/kiuvo-logo.png')

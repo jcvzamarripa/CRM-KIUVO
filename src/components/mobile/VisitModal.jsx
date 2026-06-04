@@ -121,12 +121,12 @@ export default function VisitModal({ onClose, onSaved }) {
       {/* Backdrop */}
       <div
         onClick={onClose}
-        style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100 }}
+        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100 }}
       />
 
       {/* Bottom sheet */}
       <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 101,
+        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 101,
         background: 'var(--bg)', borderRadius: '20px 20px 0 0',
         maxHeight: '90%', display: 'flex', flexDirection: 'column',
         overflow: 'hidden',

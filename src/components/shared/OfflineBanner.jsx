@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { pdf } from '@react-pdf/renderer'
 import useOnlineStatus from '../../hooks/useOnlineStatus'
 import { getQueue, getQueueCount, dequeue } from '../../lib/offlineQueue'
 import { supabase, isSupabaseConfigured } from '../../lib/supabase'
-import { QuotePDFDoc } from '../../lib/quotePDF'
 
 // ── Sync de cotizaciones offline ──────────────────────────────────────────────
 async function syncQuote(item) {
@@ -44,8 +42,12 @@ async function syncQuote(item) {
     )
   }
 
-  // 4. Regenerar PDF y subir al storage
+  // 4. Regenerar PDF y subir al storage (carga react-pdf solo cuando se necesita)
   try {
+    const [{ pdf }, { QuotePDFDoc }] = await Promise.all([
+      import('@react-pdf/renderer'),
+      import('../../lib/quotePDF'),
+    ])
     const blob = await pdf(
       <QuotePDFDoc
         quoteId={quote.id}

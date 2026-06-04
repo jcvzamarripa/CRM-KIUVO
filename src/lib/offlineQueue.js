@@ -9,26 +9,35 @@ export function getQueue() {
 }
 
 export function enqueue({ type, table, payload }) {
-  const queue = getQueue()
-  const item = {
-    id:        `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-    timestamp: new Date().toISOString(),
-    type,
-    table,
-    payload,
+  try {
+    const queue = getQueue()
+    const item = {
+      id:        `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      timestamp: new Date().toISOString(),
+      type,
+      table,
+      payload,
+    }
+    queue.push(item)
+    localStorage.setItem(KEY, JSON.stringify(queue))
+    return item
+  } catch (e) {
+    console.warn('[offlineQueue] enqueue failed (storage unavailable):', e?.message)
+    return null
   }
-  queue.push(item)
-  localStorage.setItem(KEY, JSON.stringify(queue))
-  return item
 }
 
 export function dequeue(id) {
-  const next = getQueue().filter(i => i.id !== id)
-  localStorage.setItem(KEY, JSON.stringify(next))
+  try {
+    const next = getQueue().filter(i => i.id !== id)
+    localStorage.setItem(KEY, JSON.stringify(next))
+  } catch (e) {
+    console.warn('[offlineQueue] dequeue failed (storage unavailable):', e?.message)
+  }
 }
 
 export function clearQueue() {
-  localStorage.removeItem(KEY)
+  try { localStorage.removeItem(KEY) } catch {}
 }
 
 export function getQueueCount() {

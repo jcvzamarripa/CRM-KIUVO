@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, Suspense, lazy } from 'react'
 import { useNotifications } from '../hooks/useNotifications'
 import ErrorBoundary from '../components/shared/ErrorBoundary'
 import StatusBar from '../components/mobile/StatusBar'
@@ -8,15 +8,17 @@ import Kanban from '../components/mobile/Kanban'
 import VisitModal from '../components/mobile/VisitModal'
 import NewProspectModal from '../components/mobile/NewProspectModal'
 import NotificationsPanel from '../components/mobile/NotificationsPanel'
-import QuoteModal from '../components/mobile/QuoteModal'
 import WhatsAppModal from '../components/mobile/WhatsAppModal'
 import AgendaScreen from '../components/mobile/AgendaScreen'
 import ReactivadorModal from '../components/mobile/ReactivadorModal'
 import ProfileScreen from '../components/mobile/ProfileScreen'
 import MapScreen from '../components/mobile/MapScreen'
-import SellerQuotesScreen from '../components/mobile/SellerQuotesScreen'
 import Icon from '../components/shared/Icon'
 import { useAuth } from '../contexts/AuthContext'
+
+// Carga lazy: react-pdf (~1.4 MB) solo cuando el usuario abre el módulo de cotizaciones
+const QuoteModal         = lazy(() => import('../components/mobile/QuoteModal'))
+const SellerQuotesScreen = lazy(() => import('../components/mobile/SellerQuotesScreen'))
 
 function PlaceholderScreen({ title, icon }) {
   return (
@@ -92,7 +94,7 @@ export default function MobileApp({ dark, onToggleDark }) {
   else if (masSubScreen === 'perfil')
     content = <ProfileScreen onBack={() => setMasSubScreen(null)} />
   else if (masSubScreen === 'cotizaciones')
-    content = <SellerQuotesScreen onBack={() => setMasSubScreen(null)} />
+    content = <Suspense fallback={null}><SellerQuotesScreen onBack={() => setMasSubScreen(null)} /></Suspense>
   else
     content = (
       <div style={{ background: 'var(--bg)', minHeight: '100%', padding: '16px 16px 92px' }}>
@@ -178,7 +180,7 @@ export default function MobileApp({ dark, onToggleDark }) {
           dismissRead={notifications.dismissRead}
         />
       )}
-      {showQuote         && <QuoteModal        onClose={() => setShowQuote(false)} />}
+      {showQuote         && <Suspense fallback={null}><QuoteModal onClose={() => setShowQuote(false)} /></Suspense>}
       {showWhatsApp      && <WhatsAppModal     onClose={() => setShowWhatsApp(false)} />}
       {showReactivador   && <ReactivadorModal  onClose={() => setShowReactivador(false)} onSchedule={scheduleReactivation} />}
     </div>

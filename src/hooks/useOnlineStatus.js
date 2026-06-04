@@ -5,7 +5,9 @@ import { useState, useEffect } from 'react'
  * Listens to the native 'online' / 'offline' window events.
  */
 export default function useOnlineStatus() {
-  const [isOnline, setIsOnline] = useState(() => navigator.onLine)
+  const [isOnline, setIsOnline] = useState(() => {
+    try { return navigator.onLine } catch { return true }
+  })
 
   useEffect(() => {
     const on  = () => setIsOnline(true)

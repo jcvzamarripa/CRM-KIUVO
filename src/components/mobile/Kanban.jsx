@@ -1,12 +1,14 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef, Suspense, lazy } from 'react'
 import Icon from '../shared/Icon'
 import { STAGES, STAGE_BY_ID } from '../../constants/stages'
 import { supabase, isSupabaseConfigured } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../../contexts/ToastContext'
-import QuoteModal from './QuoteModal'
-import ProductionOrderModal from './ProductionOrderModal'
 import { updateQuoteStatus, downloadStoredPDF } from '../../hooks/useQuoteHistory'
+
+// Lazy: evita cargar react-pdf (~1.4 MB) hasta que el usuario abre cotizaciones
+const QuoteModal           = lazy(() => import('./QuoteModal'))
+const ProductionOrderModal = lazy(() => import('./ProductionOrderModal'))
 
 const fmt = n => '$' + (n ?? 0).toLocaleString('es-MX')
 const healthColor = { green: 'var(--success)', amber: 'var(--warning)', red: 'var(--danger)' }
@@ -1098,18 +1100,22 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
       )}
 
       {showQuote && (
-        <QuoteModal
-          onClose={() => setShowQuote(false)}
-          onGenerated={loadProspects}
-        />
+        <Suspense fallback={null}>
+          <QuoteModal
+            onClose={() => setShowQuote(false)}
+            onGenerated={loadProspects}
+          />
+        </Suspense>
       )}
 
       {odpProspect && (
-        <ProductionOrderModal
-          prospect={odpProspect}
-          onClose={() => setOdpProspect(null)}
-          onCreated={() => setOdpProspect(null)}
-        />
+        <Suspense fallback={null}>
+          <ProductionOrderModal
+            prospect={odpProspect}
+            onClose={() => setOdpProspect(null)}
+            onCreated={() => setOdpProspect(null)}
+          />
+        </Suspense>
       )}
 
       {actionTarget && (
@@ -1125,13 +1131,15 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
       )}
 
       {showProposalQuote && quoteProspect && (
-        <QuoteModal
-          initialProspectId={quoteProspect.id}
-          initialProspectName={quoteProspect.name}
-          initialContactName={quoteProspect.contact || ''}
-          onClose={() => { setShowProposalQuote(false); setQuoteProspect(null) }}
-          onGenerated={() => { setShowProposalQuote(false); setQuoteProspect(null); loadProspects() }}
-        />
+        <Suspense fallback={null}>
+          <QuoteModal
+            initialProspectId={quoteProspect.id}
+            initialProspectName={quoteProspect.name}
+            initialContactName={quoteProspect.contact || ''}
+            onClose={() => { setShowProposalQuote(false); setQuoteProspect(null) }}
+            onGenerated={() => { setShowProposalQuote(false); setQuoteProspect(null); loadProspects() }}
+          />
+        </Suspense>
       )}
     </div>
   )
