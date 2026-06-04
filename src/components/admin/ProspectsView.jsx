@@ -62,9 +62,9 @@ function NewProspectPanel({ stages, sellers = [], onSave, onClose }) {
 
   return (
     <div style={{
-      width: '100%', borderLeft: '0.5px solid var(--border)',
+      width: '100%', flex: 1, borderLeft: '0.5px solid var(--border)',
       background: 'var(--surface)', display: 'flex', flexDirection: 'column',
-      animation: 'slideInRight 0.18s ease',
+      animation: 'slideInRight 0.18s ease', overflow: 'hidden',
     }}>
       <style>{`@keyframes slideInRight { from { transform:translateX(24px); opacity:0 } to { transform:translateX(0); opacity:1 } }`}</style>
 
@@ -235,17 +235,18 @@ function DetailPanel({ p, stageById, sellers = [], onClose, onDelete }) {
 
   return (
     <div style={{
-      width: '100%', borderLeft: '0.5px solid var(--border)',
+      width: '100%', flex: 1, borderLeft: '0.5px solid var(--border)',
       background: 'var(--surface)', display: 'flex', flexDirection: 'column',
-      animation: 'slideInRight 0.18s ease',
+      animation: 'slideInRight 0.18s ease', overflow: 'hidden',
     }}>
-      <div style={{ padding: '16px 18px', borderBottom: '0.5px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ padding: '16px 18px', borderBottom: '0.5px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg)' }}>Detalle</div>
         <button onClick={onClose} style={{ color: 'var(--fg-tertiary)' }}>
           <Icon name="x" size={16} />
         </button>
       </div>
-      <div style={{ flex: 1, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto' }}>
+      {/* Scrollable info */}
+      <div style={{ flex: 1, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto', minHeight: 0 }}>
         {/* Stage badge */}
         <span style={{
           display: 'inline-block', padding: '4px 12px', borderRadius: 'var(--r-full)',
@@ -274,7 +275,11 @@ function DetailPanel({ p, stageById, sellers = [], onClose, onDelete }) {
             <div style={{ fontSize: 13, color: 'var(--fg)', fontWeight: 500, whiteSpace: 'pre-wrap' }}>{row.value}</div>
           </div>
         ))}
-        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+      </div>
+
+      {/* Fixed footer: actions */}
+      <div style={{ flexShrink: 0, borderTop: '0.5px solid var(--border)', padding: '12px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8 }}>
           <a
             href={`https://wa.me/52${(p.phone || '').replace(/\D/g, '')}`}
             target="_blank" rel="noreferrer"
@@ -298,47 +303,45 @@ function DetailPanel({ p, stageById, sellers = [], onClose, onDelete }) {
           </button>
         </div>
 
-        {/* ── Delete ── */}
-        <div style={{ marginTop: 'auto', paddingTop: 8, borderTop: '0.5px solid var(--border)' }}>
-          {confirming ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ fontSize: 12, color: 'var(--fg-secondary)', textAlign: 'center' }}>
-                ¿Eliminar <b style={{ color: 'var(--fg)' }}>{p.name}</b>?<br />
-                <span style={{ color: 'var(--danger)' }}>Esta acción no se puede deshacer.</span>
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  onClick={() => setConfirming(false)}
-                  style={{
-                    flex: 1, padding: '8px 0', borderRadius: 'var(--r-md)',
-                    border: '0.5px solid var(--border)', background: 'var(--surface)',
-                    color: 'var(--fg)', fontSize: 13,
-                  }}
-                >Cancelar</button>
-                <button
-                  onClick={() => { onDelete(p.id); onClose() }}
-                  style={{
-                    flex: 1, padding: '8px 0', borderRadius: 'var(--r-md)',
-                    background: 'var(--danger)', color: '#fff', fontSize: 13, fontWeight: 500,
-                  }}
-                >Eliminar</button>
-              </div>
+        {/* Delete */}
+        {confirming ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ fontSize: 12, color: 'var(--fg-secondary)', textAlign: 'center' }}>
+              ¿Eliminar <b style={{ color: 'var(--fg)' }}>{p.name}</b>?<br />
+              <span style={{ color: 'var(--danger)' }}>Esta acción no se puede deshacer.</span>
             </div>
-          ) : (
-            <button
-              onClick={() => setConfirming(true)}
-              style={{
-                width: '100%', padding: '8px 0', borderRadius: 'var(--r-md)',
-                border: '0.5px solid var(--danger-border)', background: 'var(--danger-bg)',
-                color: 'var(--danger-fg)', fontSize: 13, fontWeight: 500,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              }}
-            >
-              <Icon name="trash" size={14} color="var(--danger-fg)" />
-              Eliminar prospecto
-            </button>
-          )}
-        </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setConfirming(false)}
+                style={{
+                  flex: 1, padding: '8px 0', borderRadius: 'var(--r-md)',
+                  border: '0.5px solid var(--border)', background: 'var(--surface)',
+                  color: 'var(--fg)', fontSize: 13,
+                }}
+              >Cancelar</button>
+              <button
+                onClick={() => { onDelete(p.id); onClose() }}
+                style={{
+                  flex: 1, padding: '8px 0', borderRadius: 'var(--r-md)',
+                  background: 'var(--danger)', color: '#fff', fontSize: 13, fontWeight: 500,
+                }}
+              >Eliminar</button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirming(true)}
+            style={{
+              width: '100%', padding: '8px 0', borderRadius: 'var(--r-md)',
+              border: '0.5px solid var(--danger-border)', background: 'var(--danger-bg)',
+              color: 'var(--danger-fg)', fontSize: 13, fontWeight: 500,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            }}
+          >
+            <Icon name="trash" size={14} color="var(--danger-fg)" />
+            Eliminar prospecto
+          </button>
+        )}
       </div>
     </div>
   )
