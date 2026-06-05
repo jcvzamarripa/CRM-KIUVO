@@ -227,11 +227,149 @@ function NewProspectPanel({ stages, sellers = [], onSave, onClose }) {
   )
 }
 
+// ─── Kind config for history timeline ─────────────────────────────────────────
+const KIND_CFG = {
+  visit:    { icon: 'map-pin',        color: '#185FA5', label: 'Visita' },
+  call:     { icon: 'phone',          color: '#7C3AED', label: 'Llamada' },
+  whatsapp: { icon: 'brand-whatsapp', color: '#25D366', label: 'WhatsApp' },
+  quote:    { icon: 'file-text',      color: '#EF9F27', label: 'Cotización' },
+  win:      { icon: 'trophy',         color: '#1D9E75', label: 'Cierre' },
+  stage:    { icon: 'arrow-right',    color: '#1D9E75', label: 'Etapa' },
+  add:      { icon: 'user-plus',      color: '#185FA5', label: 'Alta' },
+  new:      { icon: 'user-plus',      color: '#185FA5', label: 'Alta' },
+  msg:      { icon: 'message',        color: '#7C3AED', label: 'Mensaje' },
+  email:    { icon: 'mail',           color: '#7C3AED', label: 'Email' },
+}
+const kindCfg = k => KIND_CFG[k] || { icon: 'activity', color: '#888', label: k || 'Actividad' }
+
+function fmtDate(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })
+    + ' · ' + d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false })
+}
+
+// ─── History view (inside panel) ──────────────────────────────────────────────
+function HistoryView({ p, onBack }) {
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      const { data } = await supabase
+        .from('visits')
+        .select('id, kind, notes, created_at, seller:profiles(full_name, initials, avatar_color)')
+        .eq('prospect_id', p.id)
+        .order('created_at', { ascending: false })
+        .limit(100)
+      if (!cancelled) {
+        setItems(data || [])
+        setLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [p.id])
+
+  return (
+    <>
+      {/* Header */}
+      <div style={{ padding: '14px 18px', borderBottom: '0.5px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+        <button onClick={onBack} style={{ color: 'var(--fg-tertiary)', display: 'flex', alignItems: 'center' }}>
+          <Icon name="arrow-left" size={16} />
+        </button>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {p.name}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--fg-tertiary)' }}>Historial de actividades</div>
+        </div>
+      </div>
+
+      {/* Timeline */}
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '12px 18px' }}>
+        {loading ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {[1,2,3].map(i => (
+              <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--border)', flexShrink: 0 }} />
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5, paddingTop: 4 }}>
+                  <div style={{ height: 10, width: '60%', background: 'var(--border)', borderRadius: 4 }} />
+                  <div style={{ height: 8, width: '80%', background: 'var(--border)', borderRadius: 4 }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : items.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--fg-tertiary)' }}>
+            <Icon name="clock" size={32} color="var(--border)" />
+            <div style={{ marginTop: 10, fontSize: 13 }}>Sin actividades registradas</div>
+            <div style={{ marginTop: 4, fontSize: 11 }}>Las visitas, llamadas y mensajes aparecerán aquí</div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+            {items.map((item, idx) => {
+              const cfg = kindCfg(item.kind)
+              return (
+                <div key={item.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', position: 'relative' }}>
+                  {/* Vertical line */}
+                  {idx < items.length - 1 && (
+                    <div style={{
+                      position: 'absolute', left: 13, top: 28, bottom: -6,
+                      width: 2, background: 'var(--border)',
+                    }} />
+                  )}
+                  {/* Icon bubble */}
+                  <div style={{
+                    width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                    background: cfg.color + '18', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    border: `1.5px solid ${cfg.color}40`, marginTop: 2,
+                  }}>
+                    <Icon name={cfg.icon} size={13} color={cfg.color} />
+                  </div>
+                  {/* Content */}
+                  <div style={{ flex: 1, minWidth: 0, paddingBottom: 14 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <span style={{
+                        fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 'var(--r-full)',
+                        background: cfg.color + '18', color: cfg.color,
+                      }}>{cfg.label}</span>
+                      {item.seller?.initials && (
+                        <span style={{ fontSize: 11, color: 'var(--fg-tertiary)' }}>
+                          {item.seller.full_name || item.seller.initials}
+                        </span>
+                      )}
+                    </div>
+                    {item.notes && (
+                      <div style={{ fontSize: 12, color: 'var(--fg)', marginTop: 4, lineHeight: 1.45 }}>
+                        {item.notes}
+                      </div>
+                    )}
+                    <div style={{ fontSize: 10, color: 'var(--fg-tertiary)', marginTop: 4 }}>
+                      {fmtDate(item.created_at)}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
+
 // ─── Detail Panel ─────────────────────────────────────────────────────────────
 function DetailPanel({ p, stageById, sellers = [], onClose, onDelete }) {
   const stage = stageById[p.stage] || {}
   const seller = sellers.find(s => s.init === p.owner)
   const [confirming, setConfirming] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
+
+  // Reset history when prospect changes
+  useEffect(() => { setShowHistory(false); setConfirming(false) }, [p.id])
 
   return (
     <div style={{
@@ -239,110 +377,111 @@ function DetailPanel({ p, stageById, sellers = [], onClose, onDelete }) {
       background: 'var(--surface)', display: 'flex', flexDirection: 'column',
       animation: 'slideInRight 0.18s ease', overflow: 'hidden',
     }}>
-      <div style={{ padding: '16px 18px', borderBottom: '0.5px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg)' }}>Detalle</div>
-        <button onClick={onClose} style={{ color: 'var(--fg-tertiary)' }}>
-          <Icon name="x" size={16} />
-        </button>
-      </div>
-      {/* Scrollable info */}
-      <div style={{ flex: 1, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto', minHeight: 0 }}>
-        {/* Stage badge */}
-        <span style={{
-          display: 'inline-block', padding: '4px 12px', borderRadius: 'var(--r-full)',
-          background: (stage.color || '#888') + '20', color: stage.color || '#888',
-          fontSize: 12, fontWeight: 500, alignSelf: 'flex-start',
-        }}>
-          {stage.label || p.stage}
-        </span>
-        <div>
-          <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--fg)' }}>{p.name}</div>
-          <div style={{ fontSize: 13, color: 'var(--fg-secondary)', marginTop: 2 }}>{p.contact}</div>
-        </div>
-        {[
-          { label: 'Teléfono',        value: p.phone },
-          { label: 'Valor estimado',  value: fmt(p.value) },
-          { label: 'Visitas',         value: `${p.visits} registradas` },
-          { label: 'Días en etapa',   value: `${p.days} días` },
-          { label: 'Último contacto', value: p.last },
-          { label: 'Vendedor',        value: seller?.name || p.owner_name || p.owner },
-          ...(p.city    ? [{ label: 'Ciudad',  value: p.city }] : []),
-          ...(p.address ? [{ label: 'Dirección', value: p.address }] : []),
-          ...(p.notes   ? [{ label: 'Notas',   value: p.notes }] : []),
-        ].map(row => (
-          <div key={row.label}>
-            <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginBottom: 2 }}>{row.label}</div>
-            <div style={{ fontSize: 13, color: 'var(--fg)', fontWeight: 500, whiteSpace: 'pre-wrap' }}>{row.value}</div>
+      {showHistory ? (
+        <HistoryView p={p} onBack={() => setShowHistory(false)} />
+      ) : (
+        <>
+          {/* Header */}
+          <div style={{ padding: '16px 18px', borderBottom: '0.5px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg)' }}>Detalle</div>
+            <button onClick={onClose} style={{ color: 'var(--fg-tertiary)' }}>
+              <Icon name="x" size={16} />
+            </button>
           </div>
-        ))}
-      </div>
 
-      {/* Fixed footer: actions */}
-      <div style={{ flexShrink: 0, borderTop: '0.5px solid var(--border)', padding: '12px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <a
-            href={`https://wa.me/52${(p.phone || '').replace(/\D/g, '')}`}
-            target="_blank" rel="noreferrer"
-            style={{
-              width: '100%', padding: '9px 0', borderRadius: 'var(--r-md)',
-              background: '#25D366', color: '#fff', fontSize: 13, fontWeight: 500,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              textDecoration: 'none', boxSizing: 'border-box',
-            }}
-          >
-            <Icon name="brand-whatsapp" size={15} color="#fff" />
-            WhatsApp
-          </a>
-          <button style={{
-            width: '100%', padding: '9px 0', borderRadius: 'var(--r-md)',
-            border: '0.5px solid var(--border)', background: 'var(--bg)',
-            color: 'var(--fg)', fontSize: 13, fontWeight: 500,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            boxSizing: 'border-box',
-          }}>
-            <Icon name="history" size={15} color="var(--fg)" />
-            Ver historial
-          </button>
-
-        {/* Delete */}
-        {confirming ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ fontSize: 12, color: 'var(--fg-secondary)', textAlign: 'center' }}>
-              ¿Eliminar <b style={{ color: 'var(--fg)' }}>{p.name}</b>?<br />
-              <span style={{ color: 'var(--danger)' }}>Esta acción no se puede deshacer.</span>
+          {/* Scrollable info */}
+          <div style={{ flex: 1, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto', minHeight: 0 }}>
+            <span style={{
+              display: 'inline-block', padding: '4px 12px', borderRadius: 'var(--r-full)',
+              background: (stage.color || '#888') + '20', color: stage.color || '#888',
+              fontSize: 12, fontWeight: 500, alignSelf: 'flex-start',
+            }}>
+              {stage.label || p.stage}
+            </span>
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--fg)' }}>{p.name}</div>
+              <div style={{ fontSize: 13, color: 'var(--fg-secondary)', marginTop: 2 }}>{p.contact}</div>
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                onClick={() => setConfirming(false)}
-                style={{
-                  flex: 1, padding: '8px 0', borderRadius: 'var(--r-md)',
-                  border: '0.5px solid var(--border)', background: 'var(--surface)',
-                  color: 'var(--fg)', fontSize: 13,
-                }}
-              >Cancelar</button>
-              <button
-                onClick={() => { onDelete(p.id); onClose() }}
-                style={{
-                  flex: 1, padding: '8px 0', borderRadius: 'var(--r-md)',
-                  background: 'var(--danger)', color: '#fff', fontSize: 13, fontWeight: 500,
-                }}
-              >Eliminar</button>
-            </div>
+            {[
+              { label: 'Teléfono',        value: p.phone },
+              { label: 'Valor estimado',  value: fmt(p.value) },
+              { label: 'Visitas',         value: `${p.visits} registradas` },
+              { label: 'Días en etapa',   value: `${p.days} días` },
+              { label: 'Último contacto', value: p.last },
+              { label: 'Vendedor',        value: seller?.name || p.owner_name || p.owner },
+              ...(p.city    ? [{ label: 'Ciudad',    value: p.city }]    : []),
+              ...(p.address ? [{ label: 'Dirección', value: p.address }] : []),
+              ...(p.notes   ? [{ label: 'Notas',     value: p.notes }]   : []),
+            ].map(row => (
+              <div key={row.label}>
+                <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginBottom: 2 }}>{row.label}</div>
+                <div style={{ fontSize: 13, color: 'var(--fg)', fontWeight: 500, whiteSpace: 'pre-wrap' }}>{row.value}</div>
+              </div>
+            ))}
           </div>
-        ) : (
-          <button
-            onClick={() => setConfirming(true)}
-            style={{
-              width: '100%', padding: '8px 0', borderRadius: 'var(--r-md)',
-              border: '0.5px solid var(--danger-border)', background: 'var(--danger-bg)',
-              color: 'var(--danger-fg)', fontSize: 13, fontWeight: 500,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            }}
-          >
-            <Icon name="trash" size={14} color="var(--danger-fg)" />
-            Eliminar prospecto
-          </button>
-        )}
-      </div>
+
+          {/* Fixed footer */}
+          <div style={{ flexShrink: 0, borderTop: '0.5px solid var(--border)', padding: '12px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <a
+              href={`https://wa.me/52${(p.phone || '').replace(/\D/g, '')}`}
+              target="_blank" rel="noreferrer"
+              style={{
+                width: '100%', padding: '9px 0', borderRadius: 'var(--r-md)',
+                background: '#25D366', color: '#fff', fontSize: 13, fontWeight: 500,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                textDecoration: 'none', boxSizing: 'border-box',
+              }}
+            >
+              <Icon name="brand-whatsapp" size={15} color="#fff" />
+              WhatsApp
+            </a>
+            <button
+              onClick={() => setShowHistory(true)}
+              style={{
+                width: '100%', padding: '9px 0', borderRadius: 'var(--r-md)',
+                border: '0.5px solid var(--border)', background: 'var(--bg)',
+                color: 'var(--fg)', fontSize: 13, fontWeight: 500,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                boxSizing: 'border-box',
+              }}
+            >
+              <Icon name="history" size={15} color="var(--fg)" />
+              Ver historial
+            </button>
+
+            {/* Delete */}
+            {confirming ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ fontSize: 12, color: 'var(--fg-secondary)', textAlign: 'center' }}>
+                  ¿Eliminar <b style={{ color: 'var(--fg)' }}>{p.name}</b>?<br />
+                  <span style={{ color: 'var(--danger)' }}>Esta acción no se puede deshacer.</span>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => setConfirming(false)} style={{ flex: 1, padding: '8px 0', borderRadius: 'var(--r-md)', border: '0.5px solid var(--border)', background: 'var(--surface)', color: 'var(--fg)', fontSize: 13 }}>
+                    Cancelar
+                  </button>
+                  <button onClick={() => { onDelete(p.id); onClose() }} style={{ flex: 1, padding: '8px 0', borderRadius: 'var(--r-md)', background: 'var(--danger)', color: '#fff', fontSize: 13, fontWeight: 500 }}>
+                    Eliminar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirming(true)}
+                style={{
+                  width: '100%', padding: '8px 0', borderRadius: 'var(--r-md)',
+                  border: '0.5px solid var(--danger-border)', background: 'var(--danger-bg)',
+                  color: 'var(--danger-fg)', fontSize: 13, fontWeight: 500,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                }}
+              >
+                <Icon name="trash" size={14} color="var(--danger-fg)" />
+                Eliminar prospecto
+              </button>
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }
