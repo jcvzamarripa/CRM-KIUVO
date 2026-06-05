@@ -258,16 +258,80 @@ function HistoryView({ p, onBack }) {
     let cancelled = false
     async function load() {
       setLoading(true)
-      const { data } = await supabase
-        .from('visits')
-        .select('id, kind, notes, created_at, seller:profiles(full_name, initials, avatar_color)')
-        .eq('prospect_id', p.id)
-        .order('created_at', { ascending: false })
-        .limit(100)
-      if (!cancelled) {
-        setItems(data || [])
-        setLoading(false)
+
+      // Consultar las 3 fuentes en paralelo
+      const [visitsRes, quotesRes, activitiesRes] = await Promise.all([
+        // Visitas de campo (sin 'kind' para evitar error si la columna no existe)
+        supabase
+          .from('visits')
+          .select('id, notes, created_at, seller:profiles(full_name, initials, avatar_color)')
+          .eq('prospect_id', p.id)
+          .order('created_at', { ascending: false })
+          .limit(100),
+
+        // Cotizaciones del prospecto
+        supabase
+          .from('quotes')
+          .select('id, status, total, created_at, seller:profiles(full_name, initials, avatar_color)')
+          .eq('prospect_id', p.id)
+          .order('created_at', { ascending: false })
+          .limit(50),
+
+        // Eventos CRM (activities)
+        supabase
+          .from('activities')
+          .select('id, kind, created_at, seller:profiles(full_name, initials, avatar_color)')
+          .eq('prospect_id', p.id)
+          .order('created_at', { ascending: false })
+          .limit(50),
+      ])
+
+      if (cancelled) return
+
+      const merged = []
+
+      // Visitas → kind siempre 'visit'
+      for (const v of visitsRes.data || []) {
+        merged.push({
+          id:         v.id,
+          kind:       'visit',
+          notes:      v.notes || '',
+          created_at: v.created_at,
+          seller:     v.seller,
+        })
       }
+
+      // Cotizaciones → kind según status
+      for (const q of quotesRes.data || []) {
+        const kind  = q.status === 'approved' ? 'win' : 'quote'
+        const monto = q.total > 0
+          ? ` · $${q.total >= 1000 ? (q.total / 1000).toFixed(0) + 'k' : q.total}`
+          : ''
+        merged.push({
+          id:         q.id,
+          kind,
+          notes:      `${q.status === 'approved' ? 'Cotización aprobada' : 'Cotización enviada'}${monto}`,
+          created_at: q.created_at,
+          seller:     q.seller,
+        })
+      }
+
+      // Activities (CRM events)
+      for (const a of activitiesRes.data || []) {
+        merged.push({
+          id:         a.id,
+          kind:       a.kind || 'visit',
+          notes:      '',
+          created_at: a.created_at,
+          seller:     a.seller,
+        })
+      }
+
+      // Ordenar por fecha descendente
+      merged.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+
+      setItems(merged)
+      setLoading(false)
     }
     load()
     return () => { cancelled = true }
