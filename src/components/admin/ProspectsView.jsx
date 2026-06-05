@@ -821,33 +821,51 @@ export default function ProspectsView() {
 
         {/* Filters bar */}
         <div style={{
-          padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 10,
+          padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 8,
           borderBottom: '0.5px solid var(--border)', background: 'var(--bg)', flexShrink: 0,
-          overflowX: 'auto',
+          flexWrap: 'wrap', rowGap: 8,
         }}>
 
-          {/* + Nuevo prospecto */}
-          <button
-            onClick={() => { setShowNew(true); setSelected(null) }}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '7px 14px', borderRadius: 'var(--r-md)',
-              background: 'var(--kiuvo-blue)', color: '#fff',
-              fontSize: 13, fontWeight: 500, flexShrink: 0,
-            }}
-          >
-            <Icon name="plus" size={15} color="#fff" />
-            Nuevo prospecto
-          </button>
+          {/* Acciones primarias — siempre visibles */}
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+            <button
+              onClick={() => { setShowNew(true); setSelected(null) }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '7px 14px', borderRadius: 'var(--r-md)',
+                background: 'var(--kiuvo-blue)', color: '#fff',
+                fontSize: 13, fontWeight: 500,
+              }}
+            >
+              <Icon name="plus" size={15} color="#fff" />
+              Nuevo prospecto
+            </button>
+
+            <button
+              onClick={handleExportCSV}
+              title="Exportar prospectos filtrados a CSV"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 5,
+                padding: '7px 12px', borderRadius: 'var(--r-md)',
+                border: `0.5px solid ${exportFlash ? 'var(--success)' : 'var(--border)'}`,
+                background: exportFlash ? 'var(--success-bg)' : 'var(--surface)',
+                color: exportFlash ? 'var(--success)' : 'var(--fg-secondary)',
+                fontSize: 12, fontWeight: 500, transition: 'all 0.2s',
+              }}
+            >
+              <Icon name={exportFlash ? 'check' : 'download'} size={13} color={exportFlash ? 'var(--success)' : 'var(--fg-secondary)'} />
+              {exportFlash ? 'Descargado' : 'CSV'}
+            </button>
+          </div>
 
           {/* Separator */}
-          <div style={{ width: '0.5px', height: 24, background: 'var(--border)' }} />
+          <div style={{ width: '0.5px', height: 24, background: 'var(--border)', flexShrink: 0 }} />
 
           {/* Search */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: 6,
             padding: '7px 12px', background: 'var(--surface)',
-            border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)', flex: 1, maxWidth: 260,
+            border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)', flex: 1, minWidth: 160, maxWidth: 260,
           }}>
             <Icon name="search" size={14} color="var(--fg-tertiary)" />
             <input
@@ -859,7 +877,7 @@ export default function ProspectsView() {
           </div>
 
           {/* Stage pills */}
-          <div style={{ display: 'flex', gap: 4 }}>
+          <div style={{ display: 'flex', gap: 4, flexShrink: 0, flexWrap: 'wrap' }}>
             {['all', ...stages.map(s => s.id)].map(sid => {
               const s = stageById[sid]
               const on = stageFilter === sid
@@ -884,7 +902,7 @@ export default function ProspectsView() {
             style={{
               padding: '6px 10px', background: 'var(--surface)',
               border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)',
-              fontSize: 12, color: 'var(--fg)', outline: 'none',
+              fontSize: 12, color: 'var(--fg)', outline: 'none', flexShrink: 0,
             }}
           >
             <option value="all">Todos los vendedores</option>
@@ -894,21 +912,6 @@ export default function ProspectsView() {
           <div style={{ flexShrink: 0, fontSize: 12, color: 'var(--fg-tertiary)', whiteSpace: 'nowrap' }}>
             {filtered.length} prospectos
           </div>
-
-          <button
-            onClick={handleExportCSV}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              padding: '6px 12px', borderRadius: 'var(--r-md)', flexShrink: 0,
-              border: `0.5px solid ${exportFlash ? 'var(--success)' : 'var(--border)'}`,
-              background: exportFlash ? 'var(--success-bg)' : 'var(--surface)',
-              color: exportFlash ? 'var(--success)' : 'var(--fg-secondary)',
-              fontSize: 12, fontWeight: 500, transition: 'all 0.2s',
-            }}
-          >
-            <Icon name={exportFlash ? 'check' : 'download'} size={13} color={exportFlash ? 'var(--success)' : 'var(--fg-secondary)'} />
-            {exportFlash ? 'Descargado' : 'Exportar CSV'}
-          </button>
         </div>
 
         {/* Table */}
