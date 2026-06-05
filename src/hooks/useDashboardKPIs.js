@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
 
-// ─── Fallback cuando no hay Supabase ──────────────────────────────────────────
+// ─── Fallback sin Supabase ─────────────────────────────────────────────────────
 function emptyKPIs() {
   return {
     salesTotal:             { value: '$0',   delta: '', deltaKind: '', sub: '0 cierres este mes' },
@@ -19,64 +19,64 @@ const fmtMXN = n =>
   : n >= 1_000   ? `$${(n / 1_000).toFixed(0)}k`
   : `$${Math.round(n)}`
 
-const pct = (a, b) => b > 0 ? Math.round(((a - b) / b) * 100) : null
-const deltaStr = n => n == null ? '' : `${n >= 0 ? '+' : ''}${n}%`
+const pctDelta = (curr, prev) => prev > 0 ? Math.round(((curr - prev) / prev) * 100) : null
+const deltaStr  = n => n == null ? '' : `${n >= 0 ? '+' : ''}${n}%`
 const deltaKind = n => n == null ? '' : n >= 0 ? 'good' : 'bad'
 
-// ─── Consultas Supabase usando las tablas reales ───────────────────────────────
-// • prospects  → prospectos activos
-// • activities → kind: 'win' (cierres), 'quote' (cotizaciones), details.amount
-// • visits     → visitas de campo
-async function fetchSupabaseKPIs() {
+// ─── Queries usando las tablas reales del schema ───────────────────────────────
+// • prospects        → prospectos activos
+// • quotes (total)   → ventas totales, ticket promedio, cierres (status='approved')
+// • quotes (sent)    → cotizaciones pendientes (status='sent')
+async function fetchKPIs() {
   const now            = new Date()
   const monthStart     = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
   const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString()
 
   const [
-    activeRes,
-    winsMonthRes,
-    winsPrevRes,
-    winsAllRes,
-    quotesRes,
-    quotesPrevRes,
+    activeRes,        // prospects count
+    cierresMesRes,    // approved quotes this month
+    cierresPrevRes,   // approved quotes prev month
+    cierresTotalRes,  // all approved quotes (ventas totales)
+    cotSentRes,       // sent quotes (pendientes)
+    cotSentPrevRes,   // sent quotes prev month
   ] = await Promise.all([
-    // 1. Total prospectos activos
+    // 1. Prospectos activos
     supabase
       .from('prospects')
       .select('id', { count: 'exact', head: true }),
 
-    // 2. Cierres este mes (kind = 'win')
+    // 2. Cierres este mes (aprobados)
     supabase
-      .from('activities')
-      .select('id, details')
-      .eq('kind', 'win')
-      .gte('created_at', monthStart),
+      .from('quotes')
+      .select('id, total')
+      .eq('status', 'approved')
+      .gte('updated_at', monthStart),
 
-    // 3. Cierres mes anterior (para delta)
+    // 3. Cierres mes anterior
     supabase
-      .from('activities')
-      .select('id, details')
-      .eq('kind', 'win')
-      .gte('created_at', prevMonthStart)
-      .lt('created_at', monthStart),
+      .from('quotes')
+      .select('id, total')
+      .eq('status', 'approved')
+      .gte('updated_at', prevMonthStart)
+      .lt('updated_at', monthStart),
 
-    // 4. Todos los cierres (ventas totales + tasa conversión)
+    // 4. Todas las ventas cerradas (acumulado)
     supabase
-      .from('activities')
-      .select('id, details')
-      .eq('kind', 'win'),
+      .from('quotes')
+      .select('id, total')
+      .eq('status', 'approved'),
 
-    // 5. Cotizaciones enviadas
+    // 5. Cotizaciones enviadas (pendientes de respuesta)
     supabase
-      .from('activities')
+      .from('quotes')
       .select('id', { count: 'exact', head: true })
-      .eq('kind', 'quote'),
+      .eq('status', 'sent'),
 
-    // 6. Cotizaciones mes anterior (para delta)
+    // 6. Cotizaciones enviadas mes anterior (para delta)
     supabase
-      .from('activities')
+      .from('quotes')
       .select('id', { count: 'exact', head: true })
-      .eq('kind', 'quote')
+      .eq('status', 'sent')
       .gte('created_at', prevMonthStart)
       .lt('created_at', monthStart),
   ])
@@ -84,35 +84,33 @@ async function fetchSupabaseKPIs() {
   // ── Prospectos activos ──────────────────────────────────────────────────────
   const activeCount = activeRes.count ?? 0
 
-  // ── Cierres este mes ────────────────────────────────────────────────────────
-  const winsMonth      = winsMonthRes.data || []
-  const cierresMes     = winsMonth.length
-  const cierresMontoM  = winsMonth.reduce((s, a) => s + Number(a.details?.amount || 0), 0)
+  // ── Cierres del mes ─────────────────────────────────────────────────────────
+  const cierresMes    = cierresMesRes.data  || []
+  const cierresPrev   = cierresPrevRes.data || []
+  const cierresCount  = cierresMes.length
+  const cierresPrevCt = cierresPrev.length
+  const cierresMonto  = cierresMes.reduce((s, q) => s + Number(q.total || 0), 0)
+  const cierresPrevM  = cierresPrev.reduce((s, q) => s + Number(q.total || 0), 0)
+  const cierresDelta  = pctDelta(cierresCount, cierresPrevCt)
 
-  const winsPrev       = winsPrevRes.data || []
-  const cierresPrev    = winsPrev.length
-  const cierresDelta   = pct(cierresMes, cierresPrev)
+  // ── Ventas totales acumuladas ────────────────────────────────────────────────
+  const cierresAll    = cierresTotalRes.data || []
+  const totalWins     = cierresAll.length
+  const salesTotalAmt = cierresAll.reduce((s, q) => s + Number(q.total || 0), 0)
+  const salesDelta    = pctDelta(cierresMonto, cierresPrevM)
 
-  // ── Ventas totales (acumuladas) ─────────────────────────────────────────────
-  const winsAll        = winsAllRes.data || []
-  const totalWins      = winsAll.length
-  const salesTotalAmt  = winsAll.reduce((s, a) => s + Number(a.details?.amount || 0), 0)
+  // ── Cotizaciones enviadas ────────────────────────────────────────────────────
+  const cotPend     = cotSentRes.count  ?? 0
+  const cotPrevCt   = cotSentPrevRes.count ?? 0
+  const cotDeltaNum = cotPrevCt > 0 ? cotPend - cotPrevCt : null
+  const cotDeltaStr = cotDeltaNum == null ? '' : `${cotDeltaNum >= 0 ? '+' : ''}${cotDeltaNum}`
 
-  const prevMontoM     = winsPrev.reduce((s, a) => s + Number(a.details?.amount || 0), 0)
-  const salesDelta     = pct(cierresMontoM, prevMontoM)
-
-  // ── Cotizaciones ────────────────────────────────────────────────────────────
-  const cotsPend       = quotesRes.count ?? 0
-  const cotsPrev       = quotesPrevRes.count ?? 0
-  const cotsDeltaNum   = cotsPrev > 0 ? cotsPend - cotsPrev : null
-  const cotsDeltaStr   = cotsDeltaNum == null ? '' : `${cotsDeltaNum >= 0 ? '+' : ''}${cotsDeltaNum}`
-
-  // ── Tasa de conversión ──────────────────────────────────────────────────────
+  // ── Tasa de conversión ───────────────────────────────────────────────────────
   const pool    = activeCount + totalWins
   const tasaNum = pool > 0 ? ((totalWins / pool) * 100).toFixed(1) : '0.0'
 
-  // ── Ticket promedio (mes actual) ────────────────────────────────────────────
-  const ticketNum = cierresMes > 0 ? cierresMontoM / cierresMes : 0
+  // ── Ticket promedio (mes actual) ─────────────────────────────────────────────
+  const ticketNum = cierresCount > 0 ? cierresMonto / cierresCount : 0
   const ticketFmt = ticketNum > 0 ? fmtMXN(ticketNum) : '—'
 
   return {
@@ -120,43 +118,43 @@ async function fetchSupabaseKPIs() {
       value:     fmtMXN(salesTotalAmt),
       delta:     deltaStr(salesDelta),
       deltaKind: deltaKind(salesDelta),
-      sub:       `${cierresMes} cierre${cierresMes !== 1 ? 's' : ''} este mes`,
+      sub:       `${cierresCount} cierre${cierresCount !== 1 ? 's' : ''} este mes`,
     },
     prospectosActivos: {
-      value:    String(activeCount),
-      delta:    '',
-      deltaKind:'',
-      sub:      'en seguimiento activo',
+      value:     String(activeCount),
+      delta:     '',
+      deltaKind: '',
+      sub:       'en seguimiento activo',
     },
     tasaConversion: {
-      value:    `${tasaNum}%`,
-      delta:    '',
-      deltaKind:'',
-      sub:      'prospectos → cierre',
+      value:     `${tasaNum}%`,
+      delta:     '',
+      deltaKind: '',
+      sub:       'prospectos → cierre',
     },
     ticketPromedio: {
-      value:    ticketFmt,
-      delta:    '',
-      deltaKind:'',
-      sub:      'ticket promedio · este mes',
+      value:     ticketFmt,
+      delta:     '',
+      deltaKind: '',
+      sub:       'ticket promedio · este mes',
     },
     cierresMes: {
-      value:     String(cierresMes),
+      value:     String(cierresCount),
       delta:     deltaStr(cierresDelta),
       deltaKind: deltaKind(cierresDelta),
-      sub:       cierresMontoM > 0 ? `${fmtMXN(cierresMontoM)} este mes` : 'este mes',
+      sub:       cierresMonto > 0 ? `${fmtMXN(cierresMonto)} este mes` : 'este mes',
     },
     cotizacionesPendientes: {
-      value:     String(cotsPend),
-      delta:     cotsDeltaStr,
-      deltaKind: cotsDeltaNum == null ? '' : cotsDeltaNum <= 0 ? 'good' : 'bad',
+      value:     String(cotPend),
+      delta:     cotDeltaStr,
+      deltaKind: cotDeltaNum == null ? '' : cotDeltaNum <= 0 ? 'good' : 'bad',
       sub:       'cotizaciones enviadas',
     },
     cumplimientoSeguimiento: {
-      value:    '0%',
-      delta:    '',
-      deltaKind:'',
-      sub:      'prospectos con ≥ 1 visita',
+      value:     '0%',
+      delta:     '',
+      deltaKind: '',
+      sub:       'prospectos con ≥ 1 visita',
     },
   }
 }
@@ -174,7 +172,7 @@ export default function useDashboardKPIs() {
       return
     }
 
-    fetchSupabaseKPIs()
+    fetchKPIs()
       .then(data => { setKpis(data); setLoading(false) })
       .catch(err  => {
         console.error('[useDashboardKPIs]', err)
