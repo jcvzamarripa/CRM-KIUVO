@@ -39,11 +39,11 @@ export function useActivities({ limit = 50 } = {}) {
 
     setLoading(true)
 
-    // Consulta 1: visits (sin 'kind' para evitar error si la columna no existe en la BD)
+    // Consulta 1: visits — incluye kind para distinguir visita/llamada/whatsapp/email
     const visitsPromise = supabase
       .from('visits')
       .select(`
-        id, notes, created_at,
+        id, kind, notes, created_at,
         seller:profiles ( full_name, initials, avatar_color ),
         prospect:prospects ( name )
       `)
@@ -85,7 +85,7 @@ export function useActivities({ limit = 50 } = {}) {
     for (const v of visitsRes.data || []) {
       items.push({
         id:          v.id + '-visit',
-        kind:        'visit',
+        kind:        v.kind || 'visit',
         who:         v.seller?.full_name  || 'Vendedor',
         what:        KIND_LABELS.visit,
         target:      v.prospect?.name    || '',
