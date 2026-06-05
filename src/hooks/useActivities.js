@@ -20,6 +20,7 @@ const KIND_LABELS = {
   win:      'cerró venta en',
   quote:    'envió cotización a',
   add:      'agregó prospecto',
+  new:      'agregó prospecto',
   stage:    'avanzó etapa de',
   msg:      'envió mensaje a',
   sent:     'envió cotización a',

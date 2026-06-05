@@ -907,6 +907,10 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
     }
 
     setProspects(prev => prev.map(p => p.id === tempId ? normalize(data) : p))
+
+    supabase.from('activities').insert({
+      prospect_id: data.id, seller_id: user.id, kind: 'new',
+    }).then(() => {})
   }
 
   // ── Update stage ──────────────────────────────────────────────────
@@ -933,6 +937,11 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
           : p
       ))
       addToast({ message: 'No se pudo mover el prospecto. Cambio revertido.', kind: 'warning' })
+    } else {
+      supabase.from('activities').insert({
+        prospect_id: prospectId, seller_id: user.id, kind: 'stage',
+        details: { from: old.stage_id, to: newStageId },
+      }).then(() => {})
     }
   }
 

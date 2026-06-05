@@ -375,6 +375,10 @@ export default function NewProspectModal({ onClose, onCreated }) {
 
       if (error) throw error
 
+      supabase.from('activities').insert({
+        prospect_id: data.id, seller_id: user.id, kind: 'new',
+      }).then(() => {})
+
       onCreated?.(data)
       setStep('success')
       setTimeout(onClose, 1800)
