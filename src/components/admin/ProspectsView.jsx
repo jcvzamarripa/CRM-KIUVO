@@ -284,20 +284,19 @@ function DetailPanel({ p, stageById, sellers = [], onClose, onDelete }) {
             href={`https://wa.me/52${(p.phone || '').replace(/\D/g, '')}`}
             target="_blank" rel="noreferrer"
             style={{
-              flex: 1, minWidth: 0, padding: '9px 6px', borderRadius: 'var(--r-md)',
+              flex: 1, padding: '9px 8px', borderRadius: 'var(--r-md)',
               background: '#25D366', color: '#fff', fontSize: 12, fontWeight: 500,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-              textDecoration: 'none', whiteSpace: 'nowrap', overflow: 'hidden',
+              textDecoration: 'none',
             }}
           >
             <Icon name="brand-whatsapp" size={14} color="#fff" />
             WhatsApp
           </a>
           <button style={{
-            flex: 1, minWidth: 0, padding: '9px 6px', borderRadius: 'var(--r-md)',
+            flex: 1, padding: '9px 8px', borderRadius: 'var(--r-md)',
             border: '0.5px solid var(--border)', background: 'var(--bg)',
             color: 'var(--fg)', fontSize: 12, fontWeight: 500,
-            whiteSpace: 'nowrap', overflow: 'hidden',
           }}>
             Ver historial
           </button>
@@ -403,7 +402,7 @@ export default function ProspectsView() {
 
   // Ancho real de la tabla según si el panel está abierto en modo lateral
   const panelVisible = !isNarrow && (showNew || !!selected)
-  const panelW  = panelVisible ? Math.min(420, Math.max(280, containerW * 0.30)) : 0
+  const panelW  = panelVisible ? Math.min(400, Math.max(300, containerW * 0.32)) : 0
   const tableW  = containerW - panelW
   // Ocultar columnas progresivamente para no aplastar la tabla
   const hideSalud  = tableW < 820   // col "Salud"
@@ -628,12 +627,12 @@ export default function ProspectsView() {
       {rightPanel && (
         <div style={isNarrow ? {
           position: 'absolute', top: 0, right: 0, bottom: 0, zIndex: 10,
-          width: Math.min(420, containerW * 0.92),
+          width: Math.min(400, containerW * 0.90),
           boxShadow: '-4px 0 24px rgba(0,0,0,0.18)',
           display: 'flex', flexDirection: 'column',
         } : {
-          // 30% del contenedor real, entre 280px y 420px
-          width: Math.min(420, Math.max(280, containerW * 0.30)),
+          // 32% del contenedor real, entre 300px y 400px
+          width: Math.min(400, Math.max(300, containerW * 0.32)),
           flexShrink: 0,
           display: 'flex', flexDirection: 'column',
         }}>
