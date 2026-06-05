@@ -273,7 +273,7 @@ export default function AdminApp({ dark, onToggleDark }) {
           {kpiLoading ? (
             <><ChartSkeleton span={8} h={160} /><SmallSkeleton span={4} /></>
           ) : (<>
-            <div className="admin-col-8"><GeoHeatmap /></div>
+            <div className="admin-col-8"><GeoHeatmap onOpenMap={() => handleNavChange('map')} /></div>
             <div className="admin-col-4"><AlertsPanel /></div>
           </>)}
         </div>

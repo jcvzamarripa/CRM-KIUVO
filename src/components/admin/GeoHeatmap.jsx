@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Icon from '../shared/Icon'
 import { supabase, isSupabaseConfigured } from '../../lib/supabase'
 
@@ -10,67 +10,122 @@ function useProspectGeo() {
   useEffect(() => {
     if (!isSupabaseConfigured) { setLoading(false); return }
 
-    async function load() {
-      const { data } = await supabase
-        .from('prospects')
-        .select('lat, lng')
-        .not('lat', 'is', null)
-        .not('lng', 'is', null)
-        .limit(200)
-
-      setPoints(data || [])
-      setLoading(false)
-    }
-
-    load()
+    supabase
+      .from('prospects')
+      .select('id, name, lat, lng, health, stage_id')
+      .not('lat', 'is', null)
+      .not('lng', 'is', null)
+      .limit(300)
+      .then(({ data }) => {
+        setPoints(data || [])
+        setLoading(false)
+      })
   }, [])
 
   return { points, loading }
 }
 
-// ── helpers ───────────────────────────────────────────────────────────────────
-// Normalize lat/lng values to a 0–100% canvas space.
-// Querétaro bounding box ~: lat 20.4–20.7, lng -100.5 – -100.1
-function normalizePoints(pts) {
-  if (!pts.length) return []
-  const lats = pts.map(p => p.lat)
-  const lngs = pts.map(p => p.lng)
-  const minLat = Math.min(...lats), maxLat = Math.max(...lats)
-  const minLng = Math.min(...lngs), maxLng = Math.max(...lngs)
-  const latSpan = (maxLat - minLat) || 1
-  const lngSpan = (maxLng - minLng) || 1
+const HEALTH_HEX = {
+  green: '#1D9E75',
+  amber: '#EF9F27',
+  red:   '#D85A30',
+  black: '#888780',
+}
 
-  return pts.map(p => ({
-    top:  `${(1 - (p.lat - minLat) / latSpan) * 80 + 10}%`,
-    left: `${((p.lng - minLng) / lngSpan) * 80 + 10}%`,
-  }))
+// ── Mini Leaflet map ──────────────────────────────────────────────────────────
+function MiniMap({ points }) {
+  const containerRef = useRef(null)
+  const mapRef       = useRef(null)
+
+  useEffect(() => {
+    if (mapRef.current || !containerRef.current) return
+
+    import('leaflet').then(mod => {
+      const Lf = mod.default || mod
+
+      const map = Lf.map(containerRef.current, {
+        center:           [21.88, -102.28],   // Aguascalientes
+        zoom:             11,
+        zoomControl:      true,
+        attributionControl: false,
+        scrollWheelZoom:  false,             // no scroll accidental en dashboard
+      })
+      mapRef.current = map
+
+      Lf.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+      }).addTo(map)
+
+      // Dibujar marcadores
+      const markers = []
+      for (const p of points) {
+        const color = HEALTH_HEX[p.health] || HEALTH_HEX.green
+        const icon = Lf.divIcon({
+          className: '',
+          html: `<div style="
+            width:10px;height:10px;border-radius:50%;
+            background:${color};border:2px solid #fff;
+            box-shadow:0 1px 3px rgba(0,0,0,0.35);
+          "></div>`,
+          iconSize:   [10, 10],
+          iconAnchor: [5, 5],
+        })
+        const marker = Lf.marker([p.lat, p.lng], { icon })
+        marker.bindPopup(`<b>${p.name}</b>`)
+        marker.addTo(map)
+        markers.push(marker)
+      }
+
+      // Ajustar vista a los puntos si hay varios
+      if (points.length > 1) {
+        const bounds = Lf.latLngBounds(points.map(p => [p.lat, p.lng]))
+        map.fitBounds(bounds, { padding: [20, 20], maxZoom: 13 })
+      }
+
+      setTimeout(() => map.invalidateSize(), 120)
+
+      return () => markers.forEach(m => m.remove())
+    }).catch(err => console.error('[GeoHeatmap] Leaflet error:', err))
+
+    return () => {
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null }
+    }
+  }, [points])
+
+  return (
+    <div
+      ref={containerRef}
+      style={{ height: '100%', width: '100%', borderRadius: 'var(--r-md)', overflow: 'hidden' }}
+    />
+  )
 }
 
 // ── component ─────────────────────────────────────────────────────────────────
-export default function GeoHeatmap() {
+export default function GeoHeatmap({ onOpenMap }) {
   const { points, loading } = useProspectGeo()
-  const normalized          = normalizePoints(points)
 
   return (
     <div className="card" style={{ padding: 20, gridColumn: 'span 6', background: 'var(--surface)' }}>
+      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
         <div>
           <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg)' }}>Actividad geográfica</div>
           <div style={{ fontSize: 11, color: 'var(--fg-secondary)' }}>
-            {loading ? 'Cargando…' : `${points.length} prospecto${points.length !== 1 ? 's' : ''} con ubicación registrada`}
+            {loading
+              ? 'Cargando…'
+              : `${points.length} prospecto${points.length !== 1 ? 's' : ''} con ubicación registrada`}
           </div>
         </div>
-        <button style={{ fontSize: 12, color: 'var(--kiuvo-blue)', fontWeight: 500 }}>
+        <button
+          onClick={onOpenMap}
+          style={{ fontSize: 12, color: 'var(--kiuvo-blue)', fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer' }}
+        >
           Abrir mapa →
         </button>
       </div>
 
-      <div style={{
-        height: 200, borderRadius: 'var(--r-md)', overflow: 'hidden',
-        background: 'var(--bg-secondary)', position: 'relative',
-        backgroundImage: `linear-gradient(0deg, var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px)`,
-        backgroundSize: '40px 40px',
-      }}>
+      {/* Map area */}
+      <div style={{ height: 200, borderRadius: 'var(--r-md)', overflow: 'hidden', position: 'relative', background: 'var(--bg-secondary)' }}>
         {loading ? (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-tertiary)', fontSize: 13 }}>
             Cargando…
@@ -82,17 +137,25 @@ export default function GeoHeatmap() {
             <div style={{ fontSize: 11 }}>Agrega lat/lng a los prospectos para ver el mapa.</div>
           </div>
         ) : (
-          normalized.map((c, i) => (
-            <div key={i} style={{
-              position: 'absolute', top: c.top, left: c.left,
-              transform: 'translate(-50%, -50%)',
-              width: 14, height: 14, borderRadius: '50%',
-              background: 'var(--kiuvo-blue)', opacity: 0.55,
-              border: '2px solid #fff',
-            }} />
-          ))
+          <MiniMap points={points} />
         )}
       </div>
+
+      {/* Leyenda */}
+      {!loading && points.length > 0 && (
+        <div style={{ display: 'flex', gap: 14, marginTop: 10, flexWrap: 'wrap' }}>
+          {[
+            { color: HEALTH_HEX.green, label: 'Al día' },
+            { color: HEALTH_HEX.amber, label: 'En riesgo' },
+            { color: HEALTH_HEX.red,   label: 'Urgente' },
+          ].map(({ color, label }) => (
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--fg-secondary)' }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block' }} />
+              {label}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
