@@ -23,7 +23,7 @@ export function useSellers() {
   async function fetchSellers() {
     setLoading(true)
 
-    // Traer perfiles de vendedores
+    // Perfiles de vendedores
     const { data: profiles, error } = await supabase
       .from('profiles')
       .select('id, full_name, initials, avatar_color, goal_amount, position')
@@ -37,54 +37,88 @@ export function useSellers() {
       return
     }
 
-    // Conteo de prospectos por vendedor
-    const { data: prospectCounts } = await supabase
-      .from('prospects')
-      .select('owner_id')
-
-    // Ventas totales (all-time) por vendedor — tabla sales puede no existir aún
-    const { data: allSales } = await supabase
-      .from('sales')
-      .select('seller_id, amount')
-
-    // Ventas del mes actual por vendedor → campo "current"
     const monthStart = new Date()
     monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
-    const { data: monthlySales } = await supabase
-      .from('sales')
-      .select('seller_id, amount')
-      .gte('closed_at', monthStart.toISOString())
 
+    // Cotizaciones aprobadas (reemplaza tabla sales)
+    const [
+      { data: allQuotes },
+      { data: prospectCounts },
+      { data: lastVisits },
+      { data: lastQuotes },
+    ] = await Promise.all([
+      supabase
+        .from('quotes')
+        .select('seller_id, total, created_at')
+        .eq('status', 'approved'),
+      supabase
+        .from('prospects')
+        .select('owner_id'),
+      supabase
+        .from('visits')
+        .select('seller_id, created_at')
+        .order('created_at', { ascending: false })
+        .limit(500),
+      supabase
+        .from('quotes')
+        .select('seller_id, created_at')
+        .order('created_at', { ascending: false })
+        .limit(500),
+    ])
+
+    // Mapa: prospectos por vendedor
     const prospectMap = {}
     ;(prospectCounts || []).forEach(p => {
       prospectMap[p.owner_id] = (prospectMap[p.owner_id] || 0) + 1
     })
 
-    const wonMap = {}
-    ;(allSales || []).forEach(s => {
-      wonMap[s.seller_id] = (wonMap[s.seller_id] || 0) + Number(s.amount || 0)
+    // Mapa: ganado total y del mes actual
+    const wonMap     = {}
+    const currentMap = {}
+    ;(allQuotes || []).forEach(q => {
+      const amt = Number(q.total || 0)
+      wonMap[q.seller_id] = (wonMap[q.seller_id] || 0) + amt
+      if (q.created_at >= monthStart.toISOString()) {
+        currentMap[q.seller_id] = (currentMap[q.seller_id] || 0) + amt
+      }
     })
 
-    const currentMap = {}
-    ;(monthlySales || []).forEach(s => {
-      currentMap[s.seller_id] = (currentMap[s.seller_id] || 0) + Number(s.amount || 0)
-    })
+    // Mapa: último acceso = max(última visita, última cotización)
+    const lastSeenMap = {}
+    const trackDate = (id, iso) => {
+      if (!iso) return
+      if (!lastSeenMap[id] || iso > lastSeenMap[id]) lastSeenMap[id] = iso
+    }
+    ;(lastVisits || []).forEach(v => trackDate(v.seller_id, v.created_at))
+    ;(lastQuotes || []).forEach(q => trackDate(q.seller_id, q.created_at))
+
+    function fmtLastSeen(iso) {
+      if (!iso) return '—'
+      const d    = new Date(iso)
+      const now  = new Date()
+      const diff = Math.floor((now - d) / 86400000)
+      if (diff === 0) return 'Hoy'
+      if (diff === 1) return 'Ayer'
+      if (diff < 7)  return `Hace ${diff} días`
+      return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })
+    }
 
     const mapped = profiles.map((p, i) => {
-      const goal    = p.goal_amount || 100000
+      const goal    = p.goal_amount || 150000
       const current = currentMap[p.id] || 0
       return {
-        id:          p.id,
-        name:        p.full_name,
-        init:        p.initials,
-        color:       p.avatar_color || COLORS[i % COLORS.length],
+        id:         p.id,
+        name:       p.full_name,
+        init:       p.initials,
+        color:      p.avatar_color || COLORS[i % COLORS.length],
         goal,
         current,
-        compliance:  goal > 0 ? Math.round((current / goal) * 100) : 0,
-        prospects:   prospectMap[p.id] || 0,
-        stuck:       0,
-        won:         wonMap[p.id] || 0,
-        position:    p.position || 'Vendedor',
+        compliance: goal > 0 ? Math.round((current / goal) * 100) : 0,
+        prospects:  prospectMap[p.id] || 0,
+        stuck:      0,
+        won:        wonMap[p.id] || 0,
+        position:   p.position || 'Vendedor',
+        lastSeen:   fmtLastSeen(lastSeenMap[p.id]),
       }
     })
 

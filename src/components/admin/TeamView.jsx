@@ -639,7 +639,7 @@ export default function TeamView() {
 
   const sellers = sellerList.map(s => ({
     ...s,
-    ext: exts[s.init] || { role: 'seller', status: 'active', zone: '—', email: '', lastSeen: '—', meta: s.goal },
+    ext: exts[s.init] || { role: 'seller', status: 'active', zone: '—', email: '', lastSeen: s.lastSeen || '—', meta: s.goal },
   }))
 
   const filtered = sellers.filter(s => {
