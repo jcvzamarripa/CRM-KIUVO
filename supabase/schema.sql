@@ -280,3 +280,16 @@ create policy "avatars: delete own"
 create policy "avatars: public read"
   on storage.objects for select
   using (bucket_id = 'avatars');
+
+-- ─── Trigger: updated_at automático en quotes ────────────────────────────────
+create or replace function public.set_updated_at()
+returns trigger language plpgsql as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+create trigger quotes_set_updated_at
+  before update on public.quotes
+  for each row execute procedure public.set_updated_at();
