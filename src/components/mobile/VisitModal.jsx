@@ -99,6 +99,13 @@ export default function VisitModal({ onClose, onSaved }) {
     try {
       const { error } = await supabase.from('visits').insert(payload)
       if (error) throw error
+
+      // Actualizar last_contact_at en el prospecto
+      await supabase
+        .from('prospects')
+        .update({ last_contact_at: new Date().toISOString() })
+        .eq('id', selected)
+
       onSaved?.()
       setStep('success')
       setTimeout(onClose, 1800)
