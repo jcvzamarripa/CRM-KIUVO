@@ -13,11 +13,12 @@ function buildPeriods() {
   const toISO  = d => d.toISOString().slice(0, 10)
   const todayS = toISO(today)
   const monday = new Date(today); monday.setDate(today.getDate() - ((today.getDay() + 6) % 7))
-  const last30 = new Date(today); last30.setDate(today.getDate() - 30)
+  const q90    = new Date(today); q90.setDate(today.getDate() - 90)
   return [
-    { id: 'week',   label: 'Esta semana',     from: toISO(monday), to: todayS },
-    { id: 'month',  label: 'Este mes',        from: todayS.slice(0, 8) + '01', to: todayS },
-    { id: 'last30', label: 'Últimos 30 días', from: toISO(last30), to: todayS },
+    { id: 'today',  label: 'Hoy',             from: todayS,                    to: todayS },
+    { id: 'week',   label: 'Semana',           from: toISO(monday),             to: todayS },
+    { id: 'month',  label: 'Mes',              from: todayS.slice(0, 8) + '01', to: todayS },
+    { id: 'q90',    label: 'Trimestre',        from: toISO(q90),                to: todayS },
   ]
 }
 const PERIODS = buildPeriods()

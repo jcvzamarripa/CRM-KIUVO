@@ -1,11 +1,8 @@
-import React, { useState } from 'react'
+import React from 'react'
 import Icon from '../shared/Icon'
 import EnvBadge from '../shared/EnvBadge'
 
-const PERIODS = ['Hoy', 'Semana', 'Mes', 'Trimestre']
-
 export default function AdminTopBar({ title = 'Dashboard', subtitle = '', dark, onToggleDark, onMenuClick }) {
-  const [period, setPeriod] = useState('Semana')
 
   return (
     <div style={{
@@ -48,24 +45,6 @@ export default function AdminTopBar({ title = 'Dashboard', subtitle = '', dark, 
         }}>
           <Icon name="search" size={14} />
           <span style={{ fontSize: 12 }}>Buscar…</span>
-        </div>
-
-        {/* Period selector */}
-        <div className="admin-topbar-period" style={{
-          display: 'inline-flex', background: 'var(--surface)',
-          border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)', padding: 2, gap: 1,
-        }}>
-          {PERIODS.map(p => (
-            <button key={p} onClick={() => setPeriod(p)} style={{
-              padding: '5px 11px', fontSize: 12,
-              fontWeight: period === p ? 500 : 400,
-              color: period === p ? 'var(--fg)' : 'var(--fg-secondary)',
-              background: period === p ? 'var(--bg)' : 'transparent',
-              borderRadius: 'var(--r-sm)',
-              border: period === p ? '0.5px solid var(--border)' : 'none',
-              transition: 'background 0.12s',
-            }}>{p}</button>
-          ))}
         </div>
 
         {/* Dark mode toggle */}
