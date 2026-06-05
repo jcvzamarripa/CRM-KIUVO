@@ -425,15 +425,155 @@ function HistoryView({ p, onBack }) {
   )
 }
 
+// ─── Contact history hook (inline) ───────────────────────────────────────────
+function useContactHistory(prospectId) {
+  const [items, setItems]   = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      const [visitsRes, quotesRes, activitiesRes] = await Promise.all([
+        supabase
+          .from('visits')
+          .select('id, notes, created_at, seller:profiles(full_name, initials, avatar_color)')
+          .eq('prospect_id', prospectId)
+          .order('created_at', { ascending: false })
+          .limit(100),
+        supabase
+          .from('quotes')
+          .select('id, status, total, created_at, seller:profiles(full_name, initials, avatar_color)')
+          .eq('prospect_id', prospectId)
+          .order('created_at', { ascending: false })
+          .limit(50),
+        supabase
+          .from('activities')
+          .select('id, kind, notes, created_at, seller:profiles(full_name, initials, avatar_color)')
+          .eq('prospect_id', prospectId)
+          .order('created_at', { ascending: false })
+          .limit(50),
+      ])
+      if (cancelled) return
+
+      const merged = []
+      for (const v of visitsRes.data || []) {
+        merged.push({ id: v.id, kind: 'visit', notes: v.notes || '', created_at: v.created_at, seller: v.seller })
+      }
+      for (const q of quotesRes.data || []) {
+        const kind  = q.status === 'approved' ? 'win' : 'quote'
+        const monto = q.total > 0 ? ` · $${q.total >= 1000 ? (q.total / 1000).toFixed(0) + 'k' : q.total}` : ''
+        merged.push({
+          id: q.id, kind,
+          notes: `${q.status === 'approved' ? 'Cotización aprobada' : 'Cotización enviada'}${monto}`,
+          created_at: q.created_at, seller: q.seller,
+        })
+      }
+      for (const a of activitiesRes.data || []) {
+        merged.push({ id: a.id, kind: a.kind || 'visit', notes: a.notes || '', created_at: a.created_at, seller: a.seller })
+      }
+      merged.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      setItems(merged)
+      setLoading(false)
+    }
+    load()
+    return () => { cancelled = true }
+  }, [prospectId])
+
+  return { items, loading }
+}
+
+// ─── Inline contact history section ──────────────────────────────────────────
+function ContactHistorySection({ prospectId }) {
+  const { items, loading } = useContactHistory(prospectId)
+
+  return (
+    <div style={{ marginTop: 4 }}>
+      {/* Section header */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        marginBottom: 10,
+      }}>
+        <Icon name="history" size={13} color="var(--fg-tertiary)" />
+        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-tertiary)', letterSpacing: 0.4, textTransform: 'uppercase' }}>
+          Historial de contactos
+        </span>
+        {!loading && items.length > 0 && (
+          <span style={{
+            fontSize: 10, padding: '1px 6px', borderRadius: 'var(--r-full)',
+            background: 'var(--border)', color: 'var(--fg-secondary)',
+          }}>{items.length}</span>
+        )}
+      </div>
+
+      {loading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {[1, 2].map(i => (
+            <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--border)', flexShrink: 0 }} />
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5, paddingTop: 3 }}>
+                <div style={{ height: 9, width: '55%', background: 'var(--border)', borderRadius: 4 }} />
+                <div style={{ height: 7, width: '75%', background: 'var(--border)', borderRadius: 4 }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '16px 0', color: 'var(--fg-tertiary)' }}>
+          <div style={{ fontSize: 12 }}>Sin contactos registrados</div>
+          <div style={{ fontSize: 11, marginTop: 3, color: 'var(--border)' }}>Las visitas, llamadas y mensajes aparecerán aquí</div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {items.map((item, idx) => {
+            const cfg = kindCfg(item.kind)
+            return (
+              <div key={item.id} style={{ display: 'flex', gap: 9, alignItems: 'flex-start', position: 'relative' }}>
+                {idx < items.length - 1 && (
+                  <div style={{ position: 'absolute', left: 11, top: 24, bottom: -4, width: 1.5, background: 'var(--border)' }} />
+                )}
+                <div style={{
+                  width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
+                  background: cfg.color + '18', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  border: `1.5px solid ${cfg.color}40`, marginTop: 1,
+                }}>
+                  <Icon name={cfg.icon} size={11} color={cfg.color} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0, paddingBottom: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+                    <span style={{
+                      fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 'var(--r-full)',
+                      background: cfg.color + '18', color: cfg.color,
+                    }}>{cfg.label}</span>
+                    {item.seller?.full_name && (
+                      <span style={{ fontSize: 10, color: 'var(--fg-tertiary)' }}>{item.seller.full_name}</span>
+                    )}
+                  </div>
+                  {item.notes && (
+                    <div style={{ fontSize: 12, color: 'var(--fg)', marginTop: 3, lineHeight: 1.45 }}>
+                      {item.notes}
+                    </div>
+                  )}
+                  <div style={{ fontSize: 10, color: 'var(--fg-tertiary)', marginTop: 3 }}>
+                    {fmtDate(item.created_at)}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Detail Panel ─────────────────────────────────────────────────────────────
 function DetailPanel({ p, stageById, sellers = [], onClose, onDelete }) {
   const stage = stageById[p.stage] || {}
   const seller = sellers.find(s => s.init === p.owner)
   const [confirming, setConfirming] = useState(false)
-  const [showHistory, setShowHistory] = useState(false)
 
-  // Reset history when prospect changes
-  useEffect(() => { setShowHistory(false); setConfirming(false) }, [p.id])
+  useEffect(() => { setConfirming(false) }, [p.id])
 
   return (
     <div style={{
@@ -441,111 +581,98 @@ function DetailPanel({ p, stageById, sellers = [], onClose, onDelete }) {
       background: 'var(--surface)', display: 'flex', flexDirection: 'column',
       animation: 'slideInRight 0.18s ease', overflow: 'hidden',
     }}>
-      {showHistory ? (
-        <HistoryView p={p} onBack={() => setShowHistory(false)} />
-      ) : (
-        <>
-          {/* Header */}
-          <div style={{ padding: '16px 18px', borderBottom: '0.5px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg)' }}>Detalle</div>
-            <button onClick={onClose} style={{ color: 'var(--fg-tertiary)' }}>
-              <Icon name="x" size={16} />
-            </button>
-          </div>
+      {/* Header */}
+      <div style={{ padding: '16px 18px', borderBottom: '0.5px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg)' }}>Detalle</div>
+        <button onClick={onClose} style={{ color: 'var(--fg-tertiary)' }}>
+          <Icon name="x" size={16} />
+        </button>
+      </div>
 
-          {/* Scrollable info */}
-          <div style={{ flex: 1, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto', minHeight: 0 }}>
-            <span style={{
-              display: 'inline-block', padding: '4px 12px', borderRadius: 'var(--r-full)',
-              background: (stage.color || '#888') + '20', color: stage.color || '#888',
-              fontSize: 12, fontWeight: 500, alignSelf: 'flex-start',
-            }}>
-              {stage.label || p.stage}
-            </span>
-            <div>
-              <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--fg)' }}>{p.name}</div>
-              <div style={{ fontSize: 13, color: 'var(--fg-secondary)', marginTop: 2 }}>{p.contact}</div>
+      {/* Scrollable info */}
+      <div style={{ flex: 1, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto', minHeight: 0 }}>
+        <span style={{
+          display: 'inline-block', padding: '4px 12px', borderRadius: 'var(--r-full)',
+          background: (stage.color || '#888') + '20', color: stage.color || '#888',
+          fontSize: 12, fontWeight: 500, alignSelf: 'flex-start',
+        }}>
+          {stage.label || p.stage}
+        </span>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--fg)' }}>{p.name}</div>
+          <div style={{ fontSize: 13, color: 'var(--fg-secondary)', marginTop: 2 }}>{p.contact}</div>
+        </div>
+        {[
+          { label: 'Teléfono',        value: p.phone },
+          { label: 'Valor estimado',  value: fmt(p.value) },
+          { label: 'Visitas',         value: `${p.visits} registradas` },
+          { label: 'Días en etapa',   value: `${p.days} días` },
+          { label: 'Último contacto', value: p.last },
+          { label: 'Vendedor',        value: seller?.name || p.owner_name || p.owner },
+          ...(p.city    ? [{ label: 'Ciudad',    value: p.city }]    : []),
+          ...(p.address ? [{ label: 'Dirección', value: p.address }] : []),
+          ...(p.notes   ? [{ label: 'Notas',     value: p.notes }]   : []),
+        ].map(row => (
+          <div key={row.label}>
+            <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginBottom: 2 }}>{row.label}</div>
+            <div style={{ fontSize: 13, color: 'var(--fg)', fontWeight: 500, whiteSpace: 'pre-wrap' }}>{row.value}</div>
+          </div>
+        ))}
+
+        {/* Divider */}
+        <div style={{ borderTop: '0.5px solid var(--border)', marginTop: 2 }} />
+
+        {/* Inline contact history */}
+        <ContactHistorySection prospectId={p.id} />
+      </div>
+
+      {/* Fixed footer */}
+      <div style={{ flexShrink: 0, borderTop: '0.5px solid var(--border)', padding: '12px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <a
+          href={`https://wa.me/52${(p.phone || '').replace(/\D/g, '')}`}
+          target="_blank" rel="noreferrer"
+          style={{
+            width: '100%', padding: '9px 0', borderRadius: 'var(--r-md)',
+            background: '#25D366', color: '#fff', fontSize: 13, fontWeight: 500,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            textDecoration: 'none', boxSizing: 'border-box',
+          }}
+        >
+          <Icon name="brand-whatsapp" size={15} color="#fff" />
+          WhatsApp
+        </a>
+
+        {/* Delete */}
+        {confirming ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ fontSize: 12, color: 'var(--fg-secondary)', textAlign: 'center' }}>
+              ¿Eliminar <b style={{ color: 'var(--fg)' }}>{p.name}</b>?<br />
+              <span style={{ color: 'var(--danger)' }}>Esta acción no se puede deshacer.</span>
             </div>
-            {[
-              { label: 'Teléfono',        value: p.phone },
-              { label: 'Valor estimado',  value: fmt(p.value) },
-              { label: 'Visitas',         value: `${p.visits} registradas` },
-              { label: 'Días en etapa',   value: `${p.days} días` },
-              { label: 'Último contacto', value: p.last },
-              { label: 'Vendedor',        value: seller?.name || p.owner_name || p.owner },
-              ...(p.city    ? [{ label: 'Ciudad',    value: p.city }]    : []),
-              ...(p.address ? [{ label: 'Dirección', value: p.address }] : []),
-              ...(p.notes   ? [{ label: 'Notas',     value: p.notes }]   : []),
-            ].map(row => (
-              <div key={row.label}>
-                <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginBottom: 2 }}>{row.label}</div>
-                <div style={{ fontSize: 13, color: 'var(--fg)', fontWeight: 500, whiteSpace: 'pre-wrap' }}>{row.value}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Fixed footer */}
-          <div style={{ flexShrink: 0, borderTop: '0.5px solid var(--border)', padding: '12px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <a
-              href={`https://wa.me/52${(p.phone || '').replace(/\D/g, '')}`}
-              target="_blank" rel="noreferrer"
-              style={{
-                width: '100%', padding: '9px 0', borderRadius: 'var(--r-md)',
-                background: '#25D366', color: '#fff', fontSize: 13, fontWeight: 500,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                textDecoration: 'none', boxSizing: 'border-box',
-              }}
-            >
-              <Icon name="brand-whatsapp" size={15} color="#fff" />
-              WhatsApp
-            </a>
-            <button
-              onClick={() => setShowHistory(true)}
-              style={{
-                width: '100%', padding: '9px 0', borderRadius: 'var(--r-md)',
-                border: '0.5px solid var(--border)', background: 'var(--bg)',
-                color: 'var(--fg)', fontSize: 13, fontWeight: 500,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                boxSizing: 'border-box',
-              }}
-            >
-              <Icon name="history" size={15} color="var(--fg)" />
-              Ver historial
-            </button>
-
-            {/* Delete */}
-            {confirming ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ fontSize: 12, color: 'var(--fg-secondary)', textAlign: 'center' }}>
-                  ¿Eliminar <b style={{ color: 'var(--fg)' }}>{p.name}</b>?<br />
-                  <span style={{ color: 'var(--danger)' }}>Esta acción no se puede deshacer.</span>
-                </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={() => setConfirming(false)} style={{ flex: 1, padding: '8px 0', borderRadius: 'var(--r-md)', border: '0.5px solid var(--border)', background: 'var(--surface)', color: 'var(--fg)', fontSize: 13 }}>
-                    Cancelar
-                  </button>
-                  <button onClick={() => { onDelete(p.id); onClose() }} style={{ flex: 1, padding: '8px 0', borderRadius: 'var(--r-md)', background: 'var(--danger)', color: '#fff', fontSize: 13, fontWeight: 500 }}>
-                    Eliminar
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <button
-                onClick={() => setConfirming(true)}
-                style={{
-                  width: '100%', padding: '8px 0', borderRadius: 'var(--r-md)',
-                  border: '0.5px solid var(--danger-border)', background: 'var(--danger-bg)',
-                  color: 'var(--danger-fg)', fontSize: 13, fontWeight: 500,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                }}
-              >
-                <Icon name="trash" size={14} color="var(--danger-fg)" />
-                Eliminar prospecto
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setConfirming(false)} style={{ flex: 1, padding: '8px 0', borderRadius: 'var(--r-md)', border: '0.5px solid var(--border)', background: 'var(--surface)', color: 'var(--fg)', fontSize: 13 }}>
+                Cancelar
               </button>
-            )}
+              <button onClick={() => { onDelete(p.id); onClose() }} style={{ flex: 1, padding: '8px 0', borderRadius: 'var(--r-md)', background: 'var(--danger)', color: '#fff', fontSize: 13, fontWeight: 500 }}>
+                Eliminar
+              </button>
+            </div>
           </div>
-        </>
-      )}
+        ) : (
+          <button
+            onClick={() => setConfirming(true)}
+            style={{
+              width: '100%', padding: '8px 0', borderRadius: 'var(--r-md)',
+              border: '0.5px solid var(--danger-border)', background: 'var(--danger-bg)',
+              color: 'var(--danger-fg)', fontSize: 13, fontWeight: 500,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            }}
+          >
+            <Icon name="trash" size={14} color="var(--danger-fg)" />
+            Eliminar prospecto
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -614,6 +741,7 @@ export default function ProspectsView() {
   const hideVisitas= tableW < 660   // col "Visitas"
 
   const sellerInits = [...new Set(prospects.map(p => p.owner))]
+  const [exportFlash, setExportFlash] = useState(false)
 
   const filtered = prospects.filter(p => {
     const q = search.toLowerCase()
@@ -622,6 +750,27 @@ export default function ProspectsView() {
     const matchO  = ownerFilter === 'all' || p.owner === ownerFilter
     return matchQ && matchS && matchO
   })
+
+  function handleExportCSV() {
+    const esc = s => `"${String(s ?? '').replace(/"/g, '""')}"`
+    const headers = ['Empresa', 'Contacto', 'Teléfono', 'Ciudad', 'Etapa', 'Valor', 'Vendedor', 'Visitas', 'Último contacto', 'Salud']
+    const rows = filtered.map(p => [
+      esc(p.name), esc(p.contact), esc(p.phone || ''), esc(p.city || ''),
+      esc(stageById[p.stage]?.label || p.stage),
+      p.value,
+      esc(sellerName(p.owner)),
+      p.visits,
+      p.last || '',
+      p.health || '',
+    ].join(','))
+    const csv = '﻿' + [headers.join(','), ...rows].join('\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+    const a = document.createElement('a')
+    a.href = url; a.download = `prospectos_kiuvo_${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(a); a.click()
+    document.body.removeChild(a); URL.revokeObjectURL(url)
+    setExportFlash(true); setTimeout(() => setExportFlash(false), 2200)
+  }
 
   function handleNewProspect(p) {
     reload()
@@ -745,6 +894,21 @@ export default function ProspectsView() {
           <div style={{ flexShrink: 0, fontSize: 12, color: 'var(--fg-tertiary)', whiteSpace: 'nowrap' }}>
             {filtered.length} prospectos
           </div>
+
+          <button
+            onClick={handleExportCSV}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              padding: '6px 12px', borderRadius: 'var(--r-md)', flexShrink: 0,
+              border: `0.5px solid ${exportFlash ? 'var(--success)' : 'var(--border)'}`,
+              background: exportFlash ? 'var(--success-bg)' : 'var(--surface)',
+              color: exportFlash ? 'var(--success)' : 'var(--fg-secondary)',
+              fontSize: 12, fontWeight: 500, transition: 'all 0.2s',
+            }}
+          >
+            <Icon name={exportFlash ? 'check' : 'download'} size={13} color={exportFlash ? 'var(--success)' : 'var(--fg-secondary)'} />
+            {exportFlash ? 'Descargado' : 'Exportar CSV'}
+          </button>
         </div>
 
         {/* Table */}

@@ -25,15 +25,21 @@ const fmtDate = iso => {
 
 function exportCSV(rows) {
   const header = ['Fecha', 'Hora', 'Vendedor', 'Prospecto', 'Tipo', 'Detalle', 'Monto']
-  const escape = s => `"${String(s).replace(/"/g, '""')}"`
+  const escape = s => `"${String(s ?? '').replace(/"/g, '""')}"`
   const lines = [
     header.join(','),
-    ...rows.map(r => [
-      r.date, r.time, r.sellerName, r.prospect,
-      KIND_CFG[r.kind]?.label || r.kind,
-      escape(r.detail),
-      r.amount,
-    ].join(',')),
+    ...rows.map(r => {
+      const dateStr = r.date || (r.created_at ? r.created_at.slice(0, 10) : '')
+      const timeStr = r.timeStr || r.time || ''
+      const prospectStr = r.prospect || r.target || ''
+      return [
+        dateStr, timeStr, r.sellerName,
+        escape(prospectStr),
+        KIND_CFG[r.kind]?.label || r.kind,
+        escape(r.detail),
+        r.amount,
+      ].join(',')
+    }),
   ]
   const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
@@ -242,7 +248,7 @@ export default function ActivitiesView() {
   const filtered = useMemo(() => activities.filter(a => {
     if (seller   && a.sellerInit !== seller) return false
     if (kinds.length > 0 && !kinds.includes(a.kind)) return false
-    if (prospect && !a.prospect.toLowerCase().includes(prospect.toLowerCase())) return false
+    if (prospect && !(a.prospect || a.target || '').toLowerCase().includes(prospect.toLowerCase())) return false
     if (dateFrom && a.date < dateFrom) return false
     if (dateTo   && a.date > dateTo)   return false
     return true

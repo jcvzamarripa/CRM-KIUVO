@@ -99,16 +99,6 @@ export default function AdminTopBar({ title = 'Dashboard', subtitle = '', dark, 
           </button>
         )}
 
-        {/* Export */}
-        <button className="admin-topbar-export" style={{
-          padding: '7px 14px', background: 'var(--kiuvo-blue)', color: '#fff',
-          borderRadius: 'var(--r-md)', fontSize: 12, fontWeight: 500,
-          display: 'flex', alignItems: 'center', gap: 6,
-          boxShadow: '0 2px 8px #185FA530',
-        }}>
-          <Icon name="download" size={13} color="#fff" />
-          Exportar
-        </button>
       </div>
     </div>
   )
