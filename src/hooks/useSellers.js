@@ -23,11 +23,12 @@ export function useSellers() {
   async function fetchSellers() {
     setLoading(true)
 
-    // Perfiles de vendedores
+    // Perfiles de vendedores: traer todos y luego filtrar los que no son admin
+    // (el rol puede estar en user_metadata o en profiles.role — acepta ambos)
     const { data: profiles, error } = await supabase
       .from('profiles')
-      .select('id, full_name, initials, avatar_color, goal_amount, position')
-      .eq('role', 'seller')
+      .select('id, full_name, initials, avatar_color, goal_amount, position, role')
+      .not('initials', 'is', null)
       .order('full_name')
 
     if (error || !profiles) {
@@ -37,8 +38,11 @@ export function useSellers() {
       return
     }
 
-    const monthStart = new Date()
-    monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
+    // Excluir perfiles con role explícitamente 'admin'
+    const sellerProfiles = profiles.filter(p => !p.role || p.role !== 'admin')
+
+    // Ventana de 30 días corridos (no mes calendario) para no perder cierres de fin de mes anterior
+    const monthStart = new Date(Date.now() - 30 * 86400000)
 
     // Cotizaciones aprobadas (reemplaza tabla sales)
     const [
@@ -103,7 +107,7 @@ export function useSellers() {
       return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })
     }
 
-    const mapped = profiles.map((p, i) => {
+    const mapped = sellerProfiles.map((p, i) => {
       const goal    = p.goal_amount || 150000
       const current = currentMap[p.id] || 0
       return {
