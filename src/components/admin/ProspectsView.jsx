@@ -279,28 +279,29 @@ function DetailPanel({ p, stageById, sellers = [], onClose, onDelete }) {
 
       {/* Fixed footer: actions */}
       <div style={{ flexShrink: 0, borderTop: '0.5px solid var(--border)', padding: '12px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div style={{ display: 'flex', gap: 8 }}>
           <a
             href={`https://wa.me/52${(p.phone || '').replace(/\D/g, '')}`}
             target="_blank" rel="noreferrer"
             style={{
-              flex: 1, padding: '9px 8px', borderRadius: 'var(--r-md)',
-              background: '#25D366', color: '#fff', fontSize: 12, fontWeight: 500,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-              textDecoration: 'none',
+              width: '100%', padding: '9px 0', borderRadius: 'var(--r-md)',
+              background: '#25D366', color: '#fff', fontSize: 13, fontWeight: 500,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              textDecoration: 'none', boxSizing: 'border-box',
             }}
           >
-            <Icon name="brand-whatsapp" size={14} color="#fff" />
+            <Icon name="brand-whatsapp" size={15} color="#fff" />
             WhatsApp
           </a>
           <button style={{
-            flex: 1, padding: '9px 8px', borderRadius: 'var(--r-md)',
+            width: '100%', padding: '9px 0', borderRadius: 'var(--r-md)',
             border: '0.5px solid var(--border)', background: 'var(--bg)',
-            color: 'var(--fg)', fontSize: 12, fontWeight: 500,
+            color: 'var(--fg)', fontSize: 13, fontWeight: 500,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            boxSizing: 'border-box',
           }}>
+            <Icon name="history" size={15} color="var(--fg)" />
             Ver historial
           </button>
-        </div>
 
         {/* Delete */}
         {confirming ? (
