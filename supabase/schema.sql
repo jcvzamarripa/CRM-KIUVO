@@ -139,6 +139,27 @@ create policy "weekly_goals: update own or admin"
 create policy "weekly_goals: delete admin only"
   on weekly_goals for delete using (is_admin());
 
+-- ─── Seller goals (period-specific) ──────────────────────────────
+create table if not exists public.seller_goals (
+  id               uuid primary key default gen_random_uuid(),
+  seller_id        uuid references profiles(id) on delete cascade,
+  period           text not null, -- 'Semana' | 'Mes' | 'Trimestre' | 'Año'
+  goal_ventas      numeric not null default 80000,
+  goal_prospectos  integer not null default 20,
+  goal_visitas     integer not null default 25,
+  updated_at       timestamptz default now(),
+  unique(seller_id, period)
+);
+alter table public.seller_goals enable row level security;
+create policy "seller_goals: select own or admin"
+  on seller_goals for select using (seller_id = auth.uid() or is_admin());
+create policy "seller_goals: insert admin only"
+  on seller_goals for insert with check (is_admin());
+create policy "seller_goals: update admin only"
+  on seller_goals for update using (is_admin());
+create policy "seller_goals: delete admin only"
+  on seller_goals for delete using (is_admin());
+
 -- ─── Stage history ─────────────────────────────────────────────────
 create table if not exists public.stage_history (
   id            uuid primary key default gen_random_uuid(),

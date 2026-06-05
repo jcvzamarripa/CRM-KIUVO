@@ -258,6 +258,16 @@ function MetasTab({ sellers = [] }) {
     const { error } = await supabase
       .from('seller_goals')
       .upsert(rows, { onConflict: 'seller_id,period' })
+
+    // Sincronizar profiles.goal_amount para que TeamView lea la misma meta
+    if (!error && period === 'Mes') {
+      await Promise.all(sellers.map(s =>
+        supabase.from('profiles')
+          .update({ goal_amount: metas[s.init]?.ventas ?? s.goal })
+          .eq('id', s.id)
+      ))
+    }
+
     setSaving(false)
     if (error) {
       setSaveError('Error al guardar: ' + error.message)

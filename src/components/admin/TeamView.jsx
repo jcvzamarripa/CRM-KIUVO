@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import Icon from '../shared/Icon'
 import { useSellers } from '../../hooks/useSellers'
+import { supabase, isSupabaseConfigured } from '../../lib/supabase'
 
 // Extended seller data — populated from state when admin edits (starts empty for real sellers)
 const INIT_EXT = {}
@@ -628,7 +629,7 @@ function Section({ label, children }) {
 
 // ─── Main view ────────────────────────────────────────────────────────────────
 export default function TeamView() {
-  const { sellers: sellerList } = useSellers()
+  const { sellers: sellerList, reload: reloadSellers } = useSellers()
   const [exts,        setExts]        = useState(INIT_EXT)
   const [search,      setSearch]      = useState('')
   const [roleFilter,  setRoleFilter]  = useState('all')
@@ -654,6 +655,15 @@ export default function TeamView() {
     setExts(prev => ({ ...prev, [init]: { ...prev[init], [key]: val } }))
     if (selected?.init === init) {
       setSelected(prev => prev ? { ...prev, ext: { ...prev.ext, [key]: val } } : null)
+    }
+    if (key === 'meta' && isSupabaseConfigured) {
+      const seller = sellerList.find(s => s.init === init)
+      if (seller) {
+        supabase.from('profiles')
+          .update({ goal_amount: val })
+          .eq('id', seller.id)
+          .then(({ error }) => { if (!error) reloadSellers() })
+      }
     }
   }
 
