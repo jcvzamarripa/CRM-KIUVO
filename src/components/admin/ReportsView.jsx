@@ -25,7 +25,12 @@ const PERIODS = buildPeriods()
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const fmt    = n  => '$' + Math.round(n).toLocaleString('es-MX')
 const pctFmt = n  => `${n}%`
-const parseAmount = str => parseInt((str || '').replace(/[$,]/g, ''), 10) || 0
+const parseAmount = str => {
+  if (!str) return 0
+  const clean = str.replace(/[$,\s]/g, '')
+  if (clean.toLowerCase().endsWith('k')) return (parseFloat(clean) || 0) * 1000
+  return parseFloat(clean) || 0
+}
 
 // ─── Hook: gráficas de tendencias desde Supabase ─────────────────────────────
 const WEEK_DAYS  = ['L','M','X','J','V','S','D']
@@ -123,9 +128,12 @@ function computeSellerStats(sellers, activities, from, to, allQuotes = [], allPr
       ? quoteActs.reduce((s, a) => s + parseAmount(a.amount), 0)
       : quotesFromDB.reduce((s, q) => s + (q.total || 0), 0)
 
-    const winActs   = acts.filter(a => a.kind === 'win')
-    const wins      = winActs.length
-    const wonAmt    = winActs.reduce((s, a) => s + parseAmount(a.amount), 0)
+    const winActs      = acts.filter(a => a.kind === 'win')
+    const approvedDB   = quotesInPeriod.filter(q => q.sellerInit === seller.init && q.status === 'approved')
+    const wins         = winActs.length > 0 ? winActs.length : approvedDB.length
+    const wonAmt       = winActs.length > 0
+      ? winActs.reduce((s, a) => s + parseAmount(a.amount), 0)
+      : approvedDB.reduce((s, q) => s + (q.total || 0), 0)
     const stageAdv  = acts.filter(a => a.kind === 'stage').length
 
     // Nuevos prospectos: usar datos reales de prospects si visits está vacío
