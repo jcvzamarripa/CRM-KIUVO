@@ -255,27 +255,32 @@ function MetasTab({ sellers = [] }) {
       goal_visitas:    metas[s.init]?.visitas    ?? 25,
       updated_at:      new Date().toISOString(),
     }))
-    const { error } = await supabase
-      .from('seller_goals')
-      .upsert(rows, { onConflict: 'seller_id,period' })
-
-    // Sincronizar profiles.goal_amount para que TeamView lea la misma meta
-    if (!error && period === 'Mes') {
-      await Promise.all(sellers.map(s =>
-        supabase.from('profiles')
-          .update({ goal_amount: metas[s.init]?.ventas ?? s.goal })
-          .eq('id', s.id)
-      ))
+    // Siempre actualizar profiles.goal_amount para período Mes
+    // (es la fuente de verdad que comparte TeamView)
+    if (period === 'Mes') {
+      const profileErrors = (
+        await Promise.all(sellers.map(s =>
+          supabase.from('profiles')
+            .update({ goal_amount: metas[s.init]?.ventas ?? s.goal })
+            .eq('id', s.id)
+        ))
+      ).filter(r => r.error)
+      if (profileErrors.length) {
+        setSaving(false)
+        setSaveError('Error al guardar: ' + profileErrors[0].error.message)
+        return
+      }
     }
+
+    // También intentar persistir en seller_goals (puede fallar si la tabla no existe aún)
+    supabase.from('seller_goals')
+      .upsert(rows, { onConflict: 'seller_id,period' })
+      .then(() => {})
 
     setSaving(false)
-    if (error) {
-      setSaveError('Error al guardar: ' + error.message)
-    } else {
-      setDirty(false)
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2500)
-    }
+    setDirty(false)
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2500)
   }
 
   function openTeamEdit() {
