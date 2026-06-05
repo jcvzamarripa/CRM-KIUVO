@@ -27,12 +27,13 @@ export function useSalesTrend({ days = 14 } = {}) {
       const fromISO = from.toISOString().slice(0, 10)
       const toISO   = to.toISOString().slice(0, 10)
 
-      // Query the sales table (canonical source) for closed_at + amount
+      // quotes aprobadas — fuente real de cierres (tabla 'sales' no existe)
       const { data, error } = await supabase
-        .from('sales')
-        .select('closed_at, amount')
-        .gte('closed_at', fromISO)
-        .lte('closed_at', toISO + 'T23:59:59Z')
+        .from('quotes')
+        .select('created_at, total')
+        .eq('status', 'approved')
+        .gte('created_at', fromISO)
+        .lte('created_at', toISO + 'T23:59:59Z')
 
       if (error || !data) {
         setTrend(zeros)
@@ -48,8 +49,8 @@ export function useSalesTrend({ days = 14 } = {}) {
       }
 
       for (const s of data) {
-        const d = s.closed_at.slice(0, 10)
-        if (d in byDay) byDay[d] += Number(s.amount) || 0
+        const d = s.created_at.slice(0, 10)
+        if (d in byDay) byDay[d] += Number(s.total) || 0
       }
 
       setTrend(Object.values(byDay))
