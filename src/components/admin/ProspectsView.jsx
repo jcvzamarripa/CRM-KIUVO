@@ -452,7 +452,7 @@ export default function ProspectsView() {
   const panelOpen = showNew || !!selected
 
   return (
-    <div ref={containerRef} style={{ display: 'flex', height: '100%', minHeight: 0, position: 'relative' }}>
+    <div ref={containerRef} style={{ display: 'flex', flex: 1, width: 0, minWidth: 0, height: '100%', minHeight: 0, overflow: 'hidden', position: 'relative' }}>
       {/* ── Overlay backdrop for narrow screens ── */}
       {isNarrow && panelOpen && (
         <div
