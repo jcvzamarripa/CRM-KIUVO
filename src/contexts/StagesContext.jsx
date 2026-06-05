@@ -70,15 +70,17 @@ export function StagesProvider({ children }) {
 
     setSaving(true)
     try {
-      const rows = newStages.map(s => ({
+      const rows = newStages.map((s, i) => ({
         id:         s.id,
         label:      s.label,
         color:      s.color,
         min_visits: s.min,
+        sort_order: i,
       }))
-      for (const row of rows) {
-        await supabase.from('pipeline_stages').update(row).eq('id', row.id)
-      }
+      const { error } = await supabase
+        .from('pipeline_stages')
+        .upsert(rows, { onConflict: 'id' })
+      if (error) console.error('StagesContext saveAllStages error:', error)
     } finally {
       setSaving(false)
     }
