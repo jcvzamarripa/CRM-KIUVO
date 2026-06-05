@@ -174,23 +174,29 @@ function MetasTab({ sellers = [] }) {
   const loadGoals = useCallback(async () => {
     if (!isSupabaseConfigured || !sellers.length) return
     setLoadingGoals(true)
-    const sellerIds = sellers.map(s => s.id)
-    const { data } = await supabase
-      .from('seller_goals')
-      .select('seller_id, goal_ventas, goal_prospectos, goal_visitas')
-      .in('seller_id', sellerIds)
-      .eq('period', period)
 
     const next = {}
-    // Seed defaults first (from profiles.goal_amount)
-    sellers.forEach(s => {
-      next[s.init] = { ventas: s.goal || 80000, prospectos: 20, visitas: 25 }
-    })
-    // Override with saved values
-    ;(data || []).forEach(g => {
-      const sel = sellers.find(s => s.id === g.seller_id)
-      if (sel) next[sel.init] = { ventas: g.goal_ventas, prospectos: g.goal_prospectos, visitas: g.goal_visitas }
-    })
+    // Período Mes: usar profiles.goal_amount como fuente única (igual que TeamView)
+    if (period === 'Mes') {
+      sellers.forEach(s => {
+        next[s.init] = { ventas: s.goal || 100000, prospectos: 20, visitas: 25 }
+      })
+    } else {
+      // Otros períodos: leer de seller_goals
+      sellers.forEach(s => {
+        next[s.init] = { ventas: s.goal || 100000, prospectos: 20, visitas: 25 }
+      })
+      const { data } = await supabase
+        .from('seller_goals')
+        .select('seller_id, goal_ventas, goal_prospectos, goal_visitas')
+        .in('seller_id', sellers.map(s => s.id))
+        .eq('period', period)
+      ;(data || []).forEach(g => {
+        const sel = sellers.find(s => s.id === g.seller_id)
+        if (sel) next[sel.init] = { ventas: g.goal_ventas, prospectos: g.goal_prospectos, visitas: g.goal_visitas }
+      })
+    }
+
     setMetas(next)
     setDirty(false)
     setLoadingGoals(false)
