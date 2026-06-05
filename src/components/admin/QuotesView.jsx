@@ -455,6 +455,7 @@ export default function QuotesView() {
   const [selected,      setSelected]      = useState(null)
   const [showNew,       setShowNew]       = useState(false)
   const [downloading,   setDownloading]   = useState(null)
+  const [exportFlash,   setExportFlash]   = useState(false)
   const [deleting,      setDeleting]      = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [quoteItems,    setQuoteItems]    = useState([])
@@ -512,6 +513,28 @@ export default function QuotesView() {
   })
 
   function handleNewQuote(q) { setSelected(q) }
+
+  function handleExportCSV() {
+    const esc = s => `"${String(s ?? '').replace(/"/g, '""')}"`
+    const headers = ['#', 'Prospecto', 'Vendedor', 'Total', 'Productos', 'Estado', 'Creada', 'Vencimiento']
+    const rows = filtered.map(q => [
+      esc(q.shortId || q.id.slice(0, 8)),
+      esc(q.prospect),
+      esc(q.seller_full_name),
+      q.total,
+      q.items,
+      esc(STATUS[q.status]?.label || q.status),
+      esc(q.created),
+      esc(q.due),
+    ].join(','))
+    const csv = '﻿' + [headers.join(','), ...rows].join('\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+    const a = document.createElement('a')
+    a.href = url; a.download = `cotizaciones_kiuvo_${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(a); a.click()
+    document.body.removeChild(a); URL.revokeObjectURL(url)
+    setExportFlash(true); setTimeout(() => setExportFlash(false), 2200)
+  }
 
   function selectQuote(q) {
     setSelected(prev => prev?.id === q.id ? null : q)
@@ -635,7 +658,22 @@ export default function QuotesView() {
             </>
           )}
 
-          <div style={{ marginLeft: 'auto' }}>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+            <button
+              onClick={handleExportCSV}
+              title="Exportar cotizaciones filtradas a CSV"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 5,
+                padding: '7px 12px', borderRadius: 'var(--r-md)',
+                border: `0.5px solid ${exportFlash ? 'var(--success)' : 'var(--border)'}`,
+                background: exportFlash ? 'var(--success-bg)' : 'var(--surface)',
+                color: exportFlash ? 'var(--success)' : 'var(--fg-secondary)',
+                fontSize: 12, fontWeight: 500, transition: 'all 0.2s',
+              }}
+            >
+              <Icon name={exportFlash ? 'check' : 'download'} size={13} color={exportFlash ? 'var(--success)' : 'var(--fg-secondary)'} />
+              {exportFlash ? 'Descargado' : 'CSV'}
+            </button>
             <button
               onClick={() => { setShowNew(true); setSelected(null) }}
               style={{
