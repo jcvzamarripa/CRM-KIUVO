@@ -184,7 +184,7 @@ function AddProspectModal({ stage, onClose, onSave }) {
 }
 
 // ─── ActionSheet ──────────────────────────────────────────────────────────────
-function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, onNewProposal, isAdmin }) {
+function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, onUpdateProspect, onNewProposal, isAdmin }) {
   const [confirming,       setConfirming]       = useState(false)
   const [localNotes,       setLocalNotes]       = useState(prospect.notes || '')
   const [notesDirty,       setNotesDirty]       = useState(false)
@@ -196,6 +196,16 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, on
   const [loadingQuotes,    setLoadingQuotes]    = useState(true)
   const [downloadingQuote, setDownloadingQuote] = useState(null)
   const [updatingQuote,    setUpdatingQuote]    = useState(null)
+  // ── Edit prospect fields ──
+  const [editMode,   setEditMode]   = useState(false)
+  const [editData,   setEditData]   = useState({
+    name:    prospect.name    || '',
+    phone:   prospect.phone   || '',
+    email:   prospect.email   || '',
+    address: prospect.address || '',
+    value:   prospect.value   != null ? String(prospect.value) : '0',
+  })
+  const [savingEdit, setSavingEdit] = useState(false)
   const fileInputRef   = useRef(null)
   const cameraInputRef = useRef(null)
 
@@ -256,6 +266,24 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, on
     setNotesDirty(false)
   }
 
+  async function handleSaveEdit() {
+    setSavingEdit(true)
+    const parsed = parseInt(String(editData.value).replace(/\D/g, ''), 10) || 0
+    const fields = {
+      name:    editData.name.trim()    || prospect.name,
+      phone:   editData.phone.trim()   || null,
+      email:   editData.email.trim()   || null,
+      address: editData.address.trim() || null,
+      value:   parsed,
+    }
+    const ok = await onUpdateProspect(prospect.id, fields)
+    setSavingEdit(false)
+    if (ok !== false) {
+      setEditMode(false)
+      setEditData(d => ({ ...d, value: String(parsed) }))
+    }
+  }
+
   async function handleUpload(e) {
     const file = e.target.files?.[0]
     if (!file || !isSupabaseConfigured) return
@@ -306,13 +334,82 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, on
           <div style={{ width: 40, height: 4, borderRadius: 2, background: 'var(--border-strong)' }} />
         </div>
 
-        {/* Prospect name */}
-        <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--fg)', padding: '8px 16px 12px', flexShrink: 0 }}>
-          {prospect.name}
+        {/* Prospect name + edit toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px 12px', flexShrink: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--fg)' }}>{prospect.name}</div>
+          <button
+            onClick={() => { setEditMode(m => !m) }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 4,
+              padding: '5px 10px', borderRadius: 'var(--r-md)',
+              background: editMode ? 'var(--bg-secondary)' : 'var(--kiuvo-blue-soft)',
+              color: editMode ? 'var(--fg-secondary)' : 'var(--kiuvo-blue)',
+              fontSize: 11, fontWeight: 500,
+            }}
+          >
+            <Icon name={editMode ? 'x' : 'pencil'} size={12} />
+            {editMode ? 'Cancelar' : 'Editar datos'}
+          </button>
         </div>
 
         {/* Scrollable content */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px 32px' }}>
+
+          {/* ── Datos del cliente ── */}
+          {editMode && (
+            <div style={{ marginBottom: 20, padding: '14px', borderRadius: 'var(--r-md)', border: '0.5px solid var(--kiuvo-blue)', background: 'var(--kiuvo-blue-soft)' }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--kiuvo-blue)', letterSpacing: 0.5, marginBottom: 12 }}>
+                EDITAR INFORMACIÓN
+              </div>
+              {[
+                { key: 'name',    label: 'Nombre',       icon: 'building-store', type: 'text',   mode: 'text',    placeholder: 'Nombre del negocio' },
+                { key: 'phone',   label: 'Teléfono',     icon: 'phone',          type: 'tel',    mode: 'tel',     placeholder: 'Ej. 442 123 4567' },
+                { key: 'email',   label: 'Correo',       icon: 'mail',           type: 'email',  mode: 'email',   placeholder: 'correo@negocio.com' },
+                { key: 'address', label: 'Dirección',    icon: 'map-pin',        type: 'text',   mode: 'text',    placeholder: 'Calle y número' },
+                { key: 'value',   label: 'Valor estimado', icon: 'currency-dollar', type: 'text', mode: 'numeric', placeholder: '0' },
+              ].map(f => (
+                <div key={f.key} style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 10, fontWeight: 500, color: 'var(--kiuvo-blue)', letterSpacing: 0.3, marginBottom: 4 }}>{f.label.toUpperCase()}</div>
+                  <div style={{ position: 'relative' }}>
+                    <Icon name={f.icon} size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--fg-tertiary)', pointerEvents: 'none' }} />
+                    <input
+                      type={f.type}
+                      inputMode={f.mode}
+                      value={editData[f.key]}
+                      onChange={e => setEditData(d => ({ ...d, [f.key]: e.target.value }))}
+                      placeholder={f.placeholder}
+                      style={{
+                        width: '100%', boxSizing: 'border-box',
+                        padding: '9px 10px 9px 30px',
+                        background: 'var(--bg)', border: '0.5px solid var(--border)',
+                        borderRadius: 'var(--r-md)', fontSize: 13, color: 'var(--fg)',
+                        outline: 'none', fontFamily: 'inherit',
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+              <button
+                onClick={handleSaveEdit}
+                disabled={savingEdit}
+                style={{
+                  marginTop: 4, width: '100%', padding: '10px',
+                  background: savingEdit ? 'var(--bg-secondary)' : 'var(--kiuvo-blue)',
+                  color: savingEdit ? 'var(--fg-tertiary)' : '#fff',
+                  borderRadius: 'var(--r-md)', fontSize: 13, fontWeight: 500,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  opacity: savingEdit ? 0.7 : 1,
+                }}
+              >
+                <Icon
+                  name={savingEdit ? 'loader' : 'device-floppy'}
+                  size={14}
+                  style={savingEdit ? { animation: 'spin 0.7s linear infinite' } : {}}
+                />
+                {savingEdit ? 'Guardando…' : 'Guardar cambios'}
+              </button>
+            </div>
+          )}
 
           {/* ── Cotizaciones ── */}
           <div style={{ marginBottom: 20 }}>
@@ -974,6 +1071,28 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
     }
   }
 
+  // ── Update prospect fields ────────────────────────────────────────
+  async function handleUpdateProspect(prospectId, fields) {
+    const old = prospects.find(p => p.id === prospectId)
+    if (!old) return false
+
+    setProspects(ps => ps.map(p => p.id === prospectId ? { ...p, ...fields } : p))
+    setActionTarget(at => at?.id === prospectId ? { ...at, ...fields } : at)
+
+    const { error } = await supabase
+      .from('prospects')
+      .update({ ...fields, updated_at: new Date().toISOString() })
+      .eq('id', prospectId)
+
+    if (error) {
+      setProspects(ps => ps.map(p => p.id === prospectId ? old : p))
+      setActionTarget(at => at?.id === prospectId ? { ...at, ...old } : at)
+      addToast({ message: 'No se pudo actualizar el prospecto. Intenta de nuevo.', kind: 'error' })
+      return false
+    }
+    return true
+  }
+
   // ── New proposal from ActionSheet ────────────────────────────────
   function handleNewProposal(prospect) {
     setQuoteProspect(prospect)
@@ -1134,6 +1253,7 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
           onMoveStage={handleMoveStage}
           onDelete={handleDelete}
           onSaveNotes={handleSaveNotes}
+          onUpdateProspect={handleUpdateProspect}
           onNewProposal={handleNewProposal}
           isAdmin={isAdmin}
         />
