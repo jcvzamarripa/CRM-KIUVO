@@ -1,11 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { pdf } from '@react-pdf/renderer'
 import Icon from '../shared/Icon'
 import { useSellers } from '../../hooks/useSellers'
 import { useAdminProspects } from '../../hooks/useAdminProspects'
 import { useProducts } from '../../hooks/useProducts'
 import { rules } from '../../lib/validation'
 import { supabase } from '../../lib/supabase'
-import { useQuoteHistory, downloadStoredPDF } from '../../hooks/useQuoteHistory'
+import { useQuoteHistory } from '../../hooks/useQuoteHistory'
+import { QuotePDFDoc } from '../../lib/quotePDF'
 
 
 const STATUS = {
@@ -488,6 +490,49 @@ export default function QuotesView() {
     else console.error('[delete quote]', error.message)
   }
 
+  async function generateAndDownloadPDF(quote) {
+    setDownloading(quote.id)
+    try {
+      const { data: items } = await supabase
+        .from('quote_items')
+        .select('product_name, sku, unit, quantity, unit_price, discount_pct')
+        .eq('quote_id', quote.id)
+
+      const pdfItems = (items || []).map((item, idx) => ({
+        id:          idx,
+        name:        item.product_name,
+        sku:         item.sku  || '',
+        unit:        item.unit || 'u.',
+        qty:         item.quantity,
+        price:       item.unit_price,
+        discountPct: item.discount_pct || 0,
+      }))
+
+      const blob = await pdf(
+        <QuotePDFDoc
+          quoteId={quote.id}
+          prospectName={quote.prospect}
+          sellerName={quote.seller_full_name}
+          items={pdfItems}
+          date={quote.createdAt ? new Date(quote.createdAt) : new Date()}
+        />
+      ).toBlob()
+
+      const url = URL.createObjectURL(blob)
+      const a   = document.createElement('a')
+      a.href     = url
+      a.download = `cotizacion-${quote.shortId || quote.id.slice(0, 8)}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('[generateAndDownloadPDF]', err)
+    } finally {
+      setDownloading(null)
+    }
+  }
+
   // Normalizar al shape que espera esta vista
   const quotes = rawQuotes.map(q => {
     const createdAt = new Date(q.createdAt)
@@ -507,6 +552,7 @@ export default function QuotesView() {
       total:            q.total,
       items:            q.itemCount,
       created:          q.dateStr,
+      createdAt:        q.createdAt,
       due:              dueLabel,
       pdfPath:          q.pdfPath,
     }
@@ -783,28 +829,25 @@ export default function QuotesView() {
                     </td>
                     <td style={{ padding: '11px 10px', borderBottom: '0.5px solid var(--border)', textAlign: 'center' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
-                        {q.pdfPath && (
-                          <button
-                            onClick={async e => {
-                              e.stopPropagation()
-                              setDownloading(q.id)
-                              await downloadStoredPDF(q.pdfPath, q.shortId)
-                              setDownloading(null)
-                            }}
-                            title="Descargar PDF"
-                            style={{
-                              width: 28, height: 28, borderRadius: 'var(--r-md)',
-                              background: downloading === q.id ? 'var(--bg-secondary)' : 'var(--kiuvo-blue)',
-                              border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              cursor: 'pointer', flexShrink: 0,
-                            }}
-                          >
-                            {downloading === q.id
-                              ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--fg-tertiary)" strokeWidth="2.5" strokeLinecap="round" style={{animation:'spin 0.7s linear infinite'}}><path d="M12 2a10 10 0 0 1 10 10"/></svg>
-                              : <Icon name="download" size={13} color="#fff" />
-                            }
-                          </button>
-                        )}
+                        <button
+                          onClick={async e => {
+                            e.stopPropagation()
+                            await generateAndDownloadPDF(q)
+                          }}
+                          title="Descargar PDF"
+                          disabled={downloading === q.id}
+                          style={{
+                            width: 28, height: 28, borderRadius: 'var(--r-md)',
+                            background: downloading === q.id ? 'var(--bg-secondary)' : 'var(--kiuvo-blue)',
+                            border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            cursor: downloading === q.id ? 'default' : 'pointer', flexShrink: 0,
+                          }}
+                        >
+                          {downloading === q.id
+                            ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--fg-tertiary)" strokeWidth="2.5" strokeLinecap="round" style={{animation:'spin 0.7s linear infinite'}}><path d="M12 2a10 10 0 0 1 10 10"/></svg>
+                            : <Icon name="download" size={13} color="#fff" />
+                          }
+                        </button>
                         <Icon name="chevron-right" size={14} color="var(--fg-tertiary)" />
                       </div>
                     </td>
@@ -865,25 +908,20 @@ export default function QuotesView() {
             ))}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
               <button
-                onClick={async () => {
-                  if (!selected.pdfPath) return
-                  setDownloading(selected.id)
-                  await downloadStoredPDF(selected.pdfPath, selected.shortId || selected.id.slice(0,8))
-                  setDownloading(null)
-                }}
-                disabled={!selected.pdfPath || downloading === selected.id}
+                onClick={() => generateAndDownloadPDF(selected)}
+                disabled={downloading === selected.id}
                 style={{
                   width: '100%', padding: '10px 0', borderRadius: 'var(--r-md)',
-                  background: selected.pdfPath ? 'var(--kiuvo-blue)' : 'var(--bg-secondary)',
-                  color: selected.pdfPath ? '#fff' : 'var(--fg-tertiary)',
+                  background: downloading === selected.id ? 'var(--bg-secondary)' : 'var(--kiuvo-blue)',
+                  color: downloading === selected.id ? 'var(--fg-tertiary)' : '#fff',
                   fontSize: 13, fontWeight: 500,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                  cursor: selected.pdfPath ? 'pointer' : 'not-allowed',
+                  cursor: downloading === selected.id ? 'default' : 'pointer',
                 }}
               >
                 {downloading === selected.id
-                  ? <><Icon name="loader" size={14} color="#fff" /> Descargando…</>
-                  : <><Icon name="download" size={14} color={selected.pdfPath ? '#fff' : 'var(--fg-tertiary)'} /> {selected.pdfPath ? 'Descargar PDF' : 'PDF no disponible'}</>
+                  ? <><Icon name="loader" size={14} color="var(--fg-tertiary)" /> Generando PDF…</>
+                  : <><Icon name="download" size={14} color="#fff" /> Descargar PDF</>
                 }
               </button>
               <button
