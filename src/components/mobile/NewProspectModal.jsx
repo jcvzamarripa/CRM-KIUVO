@@ -70,7 +70,7 @@ async function nominatimGeocode(address) {
 
 // ── LocationField ─────────────────────────────────────────────────
 function LocationField({ value, onChange, onCoords }) {
-  const [gpsState,  setGpsState]  = useState('idle') // idle | loading | done | error
+  const [gpsState,  setGpsState]  = useState('idle') // idle | loading | done | error | denied
   const [geocoding, setGeocoding] = useState(false)
   const [geocoded,  setGeocoded]  = useState(false)
 
@@ -96,8 +96,11 @@ function LocationField({ value, onChange, onCoords }) {
         onCoords?.({ lat, lng })
         setGeocoded(true)
       },
-      () => setGpsState('error'),
-      { timeout: 10000 }
+      err => {
+        // code 1 = PERMISSION_DENIED, code 2 = UNAVAILABLE, code 3 = TIMEOUT
+        setGpsState(err?.code === 1 ? 'denied' : 'error')
+      },
+      { timeout: 20000, maximumAge: 60000, enableHighAccuracy: false }
     )
   }
 
@@ -118,8 +121,9 @@ function LocationField({ value, onChange, onCoords }) {
     if (gpsState !== 'idle') setGpsState('idle')
   }
 
-  const gpsColor = gpsState === 'done' ? 'var(--success)' : gpsState === 'error' ? 'var(--danger)' : 'var(--kiuvo-blue)'
-  const gpsIcon  = gpsState === 'loading' ? 'loader' : gpsState === 'done' ? 'check' : gpsState === 'error' ? 'alert-circle' : null
+  const isGpsErr = gpsState === 'error' || gpsState === 'denied'
+  const gpsColor = gpsState === 'done' ? 'var(--success)' : isGpsErr ? 'var(--danger)' : 'var(--kiuvo-blue)'
+  const gpsIcon  = gpsState === 'loading' ? 'loader' : gpsState === 'done' ? 'check' : isGpsErr ? 'alert-circle' : null
 
   return (
     <div style={{ marginBottom: 14 }}>
@@ -143,19 +147,18 @@ function LocationField({ value, onChange, onCoords }) {
         <button
           onClick={handleGPS}
           disabled={gpsState === 'loading'}
-          title={gpsState === 'error' ? 'No se pudo obtener ubicación' : 'Usar mi ubicación actual'}
+          title={isGpsErr ? 'No se pudo obtener ubicación' : 'Usar mi ubicación actual'}
           style={{
             flexShrink: 0, width: 42, height: 42,
             borderRadius: 'var(--r-md)',
-            border: `0.5px solid ${gpsState === 'error' ? 'var(--danger-border)' : gpsState === 'done' ? 'var(--success)' : 'var(--border)'}`,
-            background: gpsState === 'done' ? 'var(--success-bg)' : gpsState === 'error' ? 'var(--danger-bg)' : 'var(--surface)',
+            border: `0.5px solid ${isGpsErr ? 'var(--danger-border)' : gpsState === 'done' ? 'var(--success)' : 'var(--border)'}`,
+            background: gpsState === 'done' ? 'var(--success-bg)' : isGpsErr ? 'var(--danger-bg)' : 'var(--surface)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: gpsColor,
-            animation: gpsState === 'loading' ? 'spin 1s linear infinite' : 'none',
           }}
         >
           {gpsIcon
-            ? <Icon name={gpsIcon} size={18} />
+            ? <Icon name={gpsIcon} size={18} style={gpsState === 'loading' ? { animation: 'spin 1s linear infinite' } : {}} />
             : <GpsPinIcon size={18} color={gpsColor} />
           }
         </button>
@@ -174,9 +177,14 @@ function LocationField({ value, onChange, onCoords }) {
           Ubicación geocodificada
         </div>
       )}
+      {gpsState === 'denied' && (
+        <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4 }}>
+          Permiso de ubicación denegado. Actívalo en Ajustes → Privacidad → Ubicación.
+        </div>
+      )}
       {gpsState === 'error' && (
         <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4 }}>
-          No se pudo obtener la ubicación. Escríbela manualmente.
+          No se pudo obtener la ubicación. Intenta de nuevo o escríbela manualmente.
         </div>
       )}
 
