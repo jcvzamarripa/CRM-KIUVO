@@ -508,6 +508,18 @@ export default function QuotesView() {
         discountPct: item.discount_pct || 0,
       }))
 
+      // Pre-fetch logo as base64 so the PDF worker doesn't need a separate request
+      let logoDataUrl = null
+      try {
+        const logoRes = await fetch(window.location.origin + '/kiuvo-logo.png')
+        if (logoRes.ok) {
+          const logoBytes = new Uint8Array(await logoRes.arrayBuffer())
+          let binary = ''
+          logoBytes.forEach(b => { binary += String.fromCharCode(b) })
+          logoDataUrl = `data:image/png;base64,${btoa(binary)}`
+        }
+      } catch (_) { /* logo fetch failed — PDF will use fallback K box */ }
+
       const blob = await pdf(
         <QuotePDFDoc
           quoteId={quote.id}
@@ -515,6 +527,7 @@ export default function QuotesView() {
           sellerName={quote.seller_full_name}
           items={pdfItems}
           date={quote.createdAt ? new Date(quote.createdAt) : new Date()}
+          logoUrl={logoDataUrl}
         />
       ).toBlob()
 
