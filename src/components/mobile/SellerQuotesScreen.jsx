@@ -1,7 +1,10 @@
 import React, { useState } from 'react'
+import { pdf } from '@react-pdf/renderer'
 import Icon from '../shared/Icon'
 import { useAuth } from '../../contexts/AuthContext'
-import { useQuoteHistory, downloadStoredPDF } from '../../hooks/useQuoteHistory'
+import { useQuoteHistory } from '../../hooks/useQuoteHistory'
+import { QuotePDFDoc } from '../../lib/quotePDF'
+import { supabase } from '../../lib/supabase'
 
 const fmt = n => '$' + Number(n).toLocaleString('es-MX', { minimumFractionDigits: 0 })
 
@@ -30,12 +33,46 @@ export default function SellerQuotesScreen({ onBack }) {
   const [search, setSearch] = useState('')
 
   async function handleDownload(q) {
-    if (!q.pdfPath) return
     setDownloading(q.id)
-    const safeName = (q.prospectName || 'cotizacion').replace(/[/\\:*?"<>|]/g, '').trim()
-    const filename = q.quoteNumber ? `${safeName} - ${q.quoteNumber}` : `${safeName} - ${q.shortId}`
-    await downloadStoredPDF(q.pdfPath, filename)
-    setDownloading(null)
+    try {
+      const { data: items } = await supabase
+        .from('quote_items')
+        .select('product_name, sku, unit, quantity, unit_price, discount_pct')
+        .eq('quote_id', q.id)
+      const pdfItems = (items || []).map((item, idx) => ({
+        id: idx,
+        name: item.product_name,
+        sku: item.sku || '',
+        unit: item.unit || 'u.',
+        qty: item.quantity,
+        price: item.unit_price,
+        discountPct: item.discount_pct || 0,
+      }))
+      const blob = await pdf(
+        <QuotePDFDoc
+          quoteId={q.id}
+          prospectName={q.prospectName}
+          sellerName={q.sellerName}
+          items={pdfItems}
+          date={q.createdAt ? new Date(q.createdAt) : new Date()}
+        />
+      ).toBlob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const safeName = (q.prospectName || 'cotizacion').replace(/[/\\:*?"<>|]/g, '').trim()
+      a.download = q.quoteNumber
+        ? `${safeName} - ${q.quoteNumber}.pdf`
+        : `${safeName} - ${q.shortId}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('[handleDownload]', err)
+    } finally {
+      setDownloading(null)
+    }
   }
 
   const filtered = quotes.filter(q => {
@@ -51,8 +88,6 @@ export default function SellerQuotesScreen({ onBack }) {
     acc[key].push(q)
     return acc
   }, {})
-
-  const hasPDF = q => Boolean(q.pdfPath)
 
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -161,13 +196,13 @@ export default function SellerQuotesScreen({ onBack }) {
                       borderRadius: 'var(--r-md)',
                       display: 'flex', alignItems: 'center', gap: 10,
                     }}>
-                      {/* PDF icon or placeholder */}
+                      {/* PDF icon */}
                       <div style={{
                         width: 38, height: 38, borderRadius: 'var(--r-md)', flexShrink: 0,
-                        background: hasPDF(q) ? '#FEF3E2' : 'var(--bg-secondary)',
+                        background: '#FEF3E2',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                       }}>
-                        <Icon name="file-invoice" size={20} color={hasPDF(q) ? '#854F0B' : 'var(--border-strong)'} />
+                        <Icon name="file-invoice" size={20} color="#854F0B" />
                       </div>
 
                       {/* Info */}
@@ -191,32 +226,23 @@ export default function SellerQuotesScreen({ onBack }) {
                       </div>
 
                       {/* Download button */}
-                      {hasPDF(q) ? (
-                        <button
-                          onClick={() => handleDownload(q)}
-                          disabled={isDown}
-                          title="Descargar PDF"
-                          style={{
-                            width: 36, height: 36, borderRadius: 'var(--r-md)', flexShrink: 0,
-                            background: isDown ? 'var(--bg-secondary)' : 'var(--kiuvo-blue)',
-                            border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            opacity: isDown ? 0.7 : 1,
-                          }}
-                        >
-                          {isDown
-                            ? <Spinner size={14} />
-                            : <Icon name="download" size={16} color="#fff" />
-                          }
-                        </button>
-                      ) : (
-                        <div style={{
+                      <button
+                        onClick={() => handleDownload(q)}
+                        disabled={isDown}
+                        title="Descargar PDF"
+                        style={{
                           width: 36, height: 36, borderRadius: 'var(--r-md)', flexShrink: 0,
-                          background: 'var(--bg-secondary)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }} title="PDF no disponible">
-                          <Icon name="file-off" size={16} color="var(--border-strong)" />
-                        </div>
-                      )}
+                          background: isDown ? 'var(--bg-secondary)' : 'var(--kiuvo-blue)',
+                          border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          cursor: isDown ? 'default' : 'pointer',
+                          opacity: isDown ? 0.7 : 1,
+                        }}
+                      >
+                        {isDown
+                          ? <Spinner size={14} />
+                          : <Icon name="download" size={16} color="#fff" />
+                        }
+                      </button>
                     </div>
                   )
                 })}
