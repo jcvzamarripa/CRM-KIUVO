@@ -78,23 +78,22 @@ function LocationField({ value, onChange, onCoords }) {
     if (!navigator.geolocation) { setGpsState('error'); return }
     setGpsState('loading')
     navigator.geolocation.getCurrentPosition(
-      async pos => {
+      pos => {
         const { latitude: lat, longitude: lng } = pos.coords
-        try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
-            { headers: { 'User-Agent': 'KIUVO-CRM/1.0' } }
-          )
-          const data = await res.json()
-          const addr = data.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`
-          onChange(addr)
-          setGpsState('done')
-        } catch {
-          onChange(`${lat.toFixed(5)}, ${lng.toFixed(5)}`)
-          setGpsState('done')
-        }
+        // ── Guardar coords y marcar done INMEDIATAMENTE ──
         onCoords?.({ lat, lng })
+        onChange(`${lat.toFixed(5)}, ${lng.toFixed(5)}`)
+        setGpsState('done')
         setGeocoded(true)
+
+        // ── Reverse geocode en segundo plano (sólo actualiza el texto) ──
+        fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+          { headers: { 'User-Agent': 'KIUVO-CRM/1.0' } }
+        )
+          .then(r => r.json())
+          .then(data => { if (data.display_name) onChange(data.display_name) })
+          .catch(() => { /* mantiene las coordenadas como dirección */ })
       },
       err => {
         // code 1 = PERMISSION_DENIED, code 2 = UNAVAILABLE, code 3 = TIMEOUT

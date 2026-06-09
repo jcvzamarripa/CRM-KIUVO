@@ -4,7 +4,9 @@ import { STAGES, STAGE_BY_ID } from '../../constants/stages'
 import { supabase, isSupabaseConfigured } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../../contexts/ToastContext'
-import { updateQuoteStatus, downloadStoredPDF } from '../../hooks/useQuoteHistory'
+import { updateQuoteStatus } from '../../hooks/useQuoteHistory'
+import { pdf } from '@react-pdf/renderer'
+import { QuotePDFDoc } from '../../lib/quotePDF'
 
 // Lazy: evita cargar react-pdf (~1.4 MB) hasta que el usuario abre cotizaciones
 const QuoteModal           = lazy(() => import('./QuoteModal'))
@@ -185,6 +187,7 @@ function AddProspectModal({ stage, onClose, onSave }) {
 
 // ─── ActionSheet ──────────────────────────────────────────────────────────────
 function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, onUpdateProspect, onNewProposal, isAdmin }) {
+  const { addToast } = useToast()
   const [confirming,       setConfirming]       = useState(false)
   const [localNotes,       setLocalNotes]       = useState(prospect.notes || '')
   const [notesDirty,       setNotesDirty]       = useState(false)
@@ -214,7 +217,7 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, on
     if (!isSupabaseConfigured) { setLoadingQuotes(false); return }
     supabase
       .from('quotes')
-      .select('id, status, total, created_at, pdf_path, quote_number')
+      .select('id, status, total, created_at, quote_number')
       .eq('prospect_id', prospect.id)
       .order('created_at', { ascending: false })
       .then(({ data }) => {
@@ -224,7 +227,6 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, on
           quoteNumber: q.quote_number || null,
           status:      q.status || 'draft',
           total:       q.total  || 0,
-          pdfPath:     q.pdf_path || null,
           dateStr:     new Date(q.created_at).toLocaleDateString('es-MX'),
         })))
         setLoadingQuotes(false)
@@ -232,20 +234,68 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, on
   }, [prospect.id])
 
   async function handleQuoteStatus(quoteId, newStatus) {
+    // Optimistic update — cambia el estado en UI de inmediato
+    const prevStatus = quotes.find(q => q.id === quoteId)?.status
+    setQuotes(qs => qs.map(q => q.id === quoteId ? { ...q, status: newStatus } : q))
     setUpdatingQuote(quoteId)
-    const ok = await updateQuoteStatus(quoteId, newStatus)
-    if (ok) {
-      setQuotes(qs => qs.map(q => q.id === quoteId ? { ...q, status: newStatus } : q))
+    try {
+      const ok = await updateQuoteStatus(quoteId, newStatus)
+      if (!ok) {
+        // Revertir si el servidor rechazó el cambio
+        setQuotes(qs => qs.map(q => q.id === quoteId ? { ...q, status: prevStatus } : q))
+        addToast({ message: 'No se pudo actualizar la cotización. Intenta de nuevo.', kind: 'error' })
+      }
+    } catch {
+      setQuotes(qs => qs.map(q => q.id === quoteId ? { ...q, status: prevStatus } : q))
+      addToast({ message: 'Error de conexión al actualizar la cotización.', kind: 'error' })
+    } finally {
+      setUpdatingQuote(null)
     }
-    setUpdatingQuote(null)
   }
 
   async function handleDownloadQuote(q) {
     setDownloadingQuote(q.shortId)
-    const safeName = (prospect.name || 'cotizacion').replace(/[/\\:*?"<>|]/g, '').trim()
-    const filename = q.quoteNumber ? `${safeName} - ${q.quoteNumber}` : `${safeName} - ${q.shortId}`
-    await downloadStoredPDF(q.pdfPath, filename)
-    setDownloadingQuote(null)
+    try {
+      const { data: items } = await supabase
+        .from('quote_items')
+        .select('product_name, sku, unit, quantity, unit_price, discount_pct')
+        .eq('quote_id', q.id)
+      const pdfItems = (items || []).map((item, idx) => ({
+        id: idx, name: item.product_name, sku: item.sku || '',
+        unit: item.unit || 'u.', qty: item.quantity,
+        price: item.unit_price, discountPct: item.discount_pct || 0,
+      }))
+      let logoDataUrl = null
+      try {
+        const r = await fetch(window.location.origin + '/kiuvo-logo.png')
+        if (r.ok) {
+          const bytes = new Uint8Array(await r.arrayBuffer())
+          let bin = ''; bytes.forEach(b => { bin += String.fromCharCode(b) })
+          logoDataUrl = `data:image/png;base64,${btoa(bin)}`
+        }
+      } catch (_) {}
+      const blob = await pdf(
+        <QuotePDFDoc
+          quoteId={q.id}
+          prospectName={prospect.name}
+          items={pdfItems}
+          date={q.dateStr ? new Date(q.dateStr.split('/').reverse().join('-')) : new Date()}
+          logoUrl={logoDataUrl}
+        />
+      ).toBlob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const safe = (prospect.name || 'cotizacion').replace(/[/\\:*?"<>|]/g, '').trim()
+      a.download = q.quoteNumber ? `${safe} - ${q.quoteNumber}.pdf` : `${safe} - ${q.shortId}.pdf`
+      document.body.appendChild(a); a.click(); document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('[handleDownloadQuote]', err)
+      addToast({ message: 'No se pudo generar el PDF.', kind: 'error' })
+    } finally {
+      setDownloadingQuote(null)
+    }
   }
 
   // Load images on mount
@@ -470,24 +520,22 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, on
                           <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)' }}>
                             {'$' + (q.total ?? 0).toLocaleString('es-MX')}
                           </span>
-                          {q.pdfPath && (
-                            <button
-                              onClick={() => handleDownloadQuote(q)}
-                              disabled={downloadingQuote === q.shortId}
-                              style={{
-                                width: 26, height: 26, borderRadius: 'var(--r-sm)',
-                                background: 'var(--kiuvo-blue-soft)',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                color: 'var(--kiuvo-blue)', opacity: downloadingQuote === q.shortId ? 0.6 : 1,
-                              }}
-                            >
-                              <Icon
-                                name={downloadingQuote === q.shortId ? 'loader' : 'download'}
-                                size={13}
-                                style={downloadingQuote === q.shortId ? { animation: 'spin 0.7s linear infinite' } : {}}
-                              />
-                            </button>
-                          )}
+                          <button
+                            onClick={() => handleDownloadQuote(q)}
+                            disabled={downloadingQuote === q.shortId}
+                            style={{
+                              width: 26, height: 26, borderRadius: 'var(--r-sm)',
+                              background: 'var(--kiuvo-blue-soft)',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              color: 'var(--kiuvo-blue)', opacity: downloadingQuote === q.shortId ? 0.6 : 1,
+                            }}
+                          >
+                            <Icon
+                              name={downloadingQuote === q.shortId ? 'loader' : 'download'}
+                              size={13}
+                              style={downloadingQuote === q.shortId ? { animation: 'spin 0.7s linear infinite' } : {}}
+                            />
+                          </button>
                         </div>
                       </div>
 
