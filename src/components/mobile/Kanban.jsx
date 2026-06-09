@@ -4,7 +4,7 @@ import { STAGES, STAGE_BY_ID } from '../../constants/stages'
 import { supabase, isSupabaseConfigured } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../../contexts/ToastContext'
-import { updateQuoteStatus } from '../../hooks/useQuoteHistory'
+// useQuoteHistory ya no se usa directamente en Kanban (updates van inline)
 import { pdf } from '@react-pdf/renderer'
 import { QuotePDFDoc } from '../../lib/quotePDF'
 
@@ -187,6 +187,7 @@ function AddProspectModal({ stage, onClose, onSave }) {
 
 // ─── ActionSheet ──────────────────────────────────────────────────────────────
 function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, onUpdateProspect, onNewProposal, isAdmin }) {
+  const { user } = useAuth()
   const { addToast } = useToast()
   const [confirming,       setConfirming]       = useState(false)
   const [localNotes,       setLocalNotes]       = useState(prospect.notes || '')
@@ -239,15 +240,21 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, on
     setQuotes(qs => qs.map(q => q.id === quoteId ? { ...q, status: newStatus } : q))
     setUpdatingQuote(quoteId)
     try {
-      const ok = await updateQuoteStatus(quoteId, newStatus)
-      if (!ok) {
-        // Revertir si el servidor rechazó el cambio
+      // Usar seller_id explícito para que el UPDATE no dependa solo de RLS
+      const { error } = await supabase
+        .from('quotes')
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', quoteId)
+        .eq('seller_id', user.id)
+      if (error) {
+        console.error('[handleQuoteStatus]', error.code, error.message, error.details)
         setQuotes(qs => qs.map(q => q.id === quoteId ? { ...q, status: prevStatus } : q))
-        addToast({ message: 'No se pudo actualizar la cotización. Intenta de nuevo.', kind: 'error' })
+        addToast({ message: `No se pudo actualizar: ${error.message}`, kind: 'error' })
       }
-    } catch {
+    } catch (err) {
+      console.error('[handleQuoteStatus] catch', err)
       setQuotes(qs => qs.map(q => q.id === quoteId ? { ...q, status: prevStatus } : q))
-      addToast({ message: 'Error de conexión al actualizar la cotización.', kind: 'error' })
+      addToast({ message: 'Error de conexión. Intenta de nuevo.', kind: 'error' })
     } finally {
       setUpdatingQuote(null)
     }
