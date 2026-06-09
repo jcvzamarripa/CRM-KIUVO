@@ -243,7 +243,7 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, on
       // Usar seller_id explícito para que el UPDATE no dependa solo de RLS
       const { error } = await supabase
         .from('quotes')
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .update({ status: newStatus })
         .eq('id', quoteId)
         .eq('seller_id', user.id)
       if (error) {
