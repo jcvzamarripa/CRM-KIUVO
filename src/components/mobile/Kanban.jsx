@@ -267,11 +267,17 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, on
         .from('quote_items')
         .select('product_name, sku, unit, quantity, unit_price, discount_pct')
         .eq('quote_id', q.id)
-      const pdfItems = (items || []).map((item, idx) => ({
-        id: idx, name: item.product_name, sku: item.sku || '',
-        unit: item.unit || 'u.', qty: item.quantity,
-        price: item.unit_price, discountPct: item.discount_pct || 0,
-      }))
+      const pdfItems = (items || []).map((item, idx) => {
+        const discountPct = item.discount_pct || 0
+        const listPrice = discountPct > 0
+          ? item.unit_price / (1 - discountPct / 100)
+          : item.unit_price
+        return {
+          id: idx, name: item.product_name, sku: item.sku || '',
+          unit: item.unit || 'u.', qty: item.quantity,
+          price: listPrice, discountPct,
+        }
+      })
       let logoDataUrl = null
       try {
         const r = await fetch(window.location.origin + '/kiuvo-logo.png')

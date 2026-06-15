@@ -39,15 +39,17 @@ export default function SellerQuotesScreen({ onBack }) {
         .from('quote_items')
         .select('product_name, sku, unit, quantity, unit_price, discount_pct')
         .eq('quote_id', q.id)
-      const pdfItems = (items || []).map((item, idx) => ({
-        id: idx,
-        name: item.product_name,
-        sku: item.sku || '',
-        unit: item.unit || 'u.',
-        qty: item.quantity,
-        price: item.unit_price,
-        discountPct: item.discount_pct || 0,
-      }))
+      const pdfItems = (items || []).map((item, idx) => {
+        const discountPct = item.discount_pct || 0
+        const listPrice = discountPct > 0
+          ? item.unit_price / (1 - discountPct / 100)
+          : item.unit_price
+        return {
+          id: idx, name: item.product_name, sku: item.sku || '',
+          unit: item.unit || 'u.', qty: item.quantity,
+          price: listPrice, discountPct,
+        }
+      })
 
       // Pre-fetch logo as base64 so the PDF worker doesn't need a separate request
       let logoDataUrl = null

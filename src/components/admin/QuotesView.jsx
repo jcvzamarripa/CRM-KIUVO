@@ -498,15 +498,18 @@ export default function QuotesView() {
         .select('product_name, sku, unit, quantity, unit_price, discount_pct')
         .eq('quote_id', quote.id)
 
-      const pdfItems = (items || []).map((item, idx) => ({
-        id:          idx,
-        name:        item.product_name,
-        sku:         item.sku  || '',
-        unit:        item.unit || 'u.',
-        qty:         item.quantity,
-        price:       item.unit_price,
-        discountPct: item.discount_pct || 0,
-      }))
+      const pdfItems = (items || []).map((item, idx) => {
+        const discountPct = item.discount_pct || 0
+        // unit_price in DB is the effective price; QuotePDFDoc expects the list price
+        const listPrice = discountPct > 0
+          ? item.unit_price / (1 - discountPct / 100)
+          : item.unit_price
+        return {
+          id: idx, name: item.product_name, sku: item.sku || '',
+          unit: item.unit || 'u.', qty: item.quantity,
+          price: listPrice, discountPct,
+        }
+      })
 
       // Pre-fetch logo as base64 so the PDF worker doesn't need a separate request
       let logoDataUrl = null
