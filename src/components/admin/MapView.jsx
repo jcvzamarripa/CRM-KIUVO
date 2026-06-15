@@ -209,7 +209,7 @@ export default function MapView() {
     return true
   })
 
-  const totalValue  = prospects.reduce((s, p) => s + p.value, 0)
+  const totalValue  = prospects.filter(p => p.stage !== 'cierre').reduce((s, p) => s + p.value, 0)
   const atRisk      = prospects.filter(p => p.health !== 'green').length
   const noCoords    = allProspects.filter(p => p.lat == null || p.lng == null).length
 

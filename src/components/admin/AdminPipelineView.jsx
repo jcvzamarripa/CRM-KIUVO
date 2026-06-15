@@ -629,7 +629,7 @@ export default function AdminPipelineView() {
             display: 'flex', alignItems: 'center', gap: 6,
           }}>
             <Icon name="target" size={13} color="var(--fg-secondary)" />
-            <span style={{ color: 'var(--fg)', fontWeight: 500 }}>{fmt(filtered.reduce((s, p) => s + p.value, 0))}</span>
+            <span style={{ color: 'var(--fg)', fontWeight: 500 }}>{fmt(filtered.filter(p => p.stage !== 'cierre').reduce((s, p) => s + p.value, 0))}</span>
             <span style={{ color: 'var(--fg-tertiary)' }}>potencial</span>
           </div>
           {atRisk > 0 && (

@@ -1018,7 +1018,7 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
   const stage      = STAGE_BY_ID[activeStage] ?? STAGES[0]
   const counts     = Object.fromEntries(STAGES.map(s => [s.id, prospects.filter(p => p.stage === s.id).length]))
   const totalAll   = prospects.length
-  const totalPot   = prospects.reduce((s, p) => s + (p.value ?? 0), 0)
+  const totalPot   = prospects.filter(p => p.stage !== 'cierre').reduce((s, p) => s + (p.value ?? 0), 0)
   const rawList    = prospects.filter(p => p.stage === activeStage)
   const list       = [...rawList].sort((a, b) => sortMode === 'value' ? (b.value ?? 0) - (a.value ?? 0) : (b.days ?? 0) - (a.days ?? 0))
   const totalValue = rawList.reduce((s, p) => s + (p.value ?? 0), 0)
