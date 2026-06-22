@@ -614,7 +614,12 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
             prospectName={prospectName}
             contactName={contactName}
             sellerName={profile?.full_name}
-            items={items.map(i => ({ ...i, isSpecialPrice: i.specialPrice != null }))}
+            items={items.map(i => ({
+                ...i,
+                price:        i.specialPrice != null ? i.specialPrice : i.price,
+                discountPct:  i.specialPrice != null ? 0 : i.discountPct,
+                isSpecialPrice: i.specialPrice != null,
+              }))}
             date={new Date()}
             paymentTerms={paymentTerms}
             deliveryTime={deliveryTime}
@@ -723,7 +728,12 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
           prospectName={prospectName}
           contactName={contactName}
           sellerName={profile?.full_name}
-          items={items.map(i => ({ ...i, isSpecialPrice: i.specialPrice != null }))}
+          items={items.map(i => ({
+                ...i,
+                price:        i.specialPrice != null ? i.specialPrice : i.price,
+                discountPct:  i.specialPrice != null ? 0 : i.discountPct,
+                isSpecialPrice: i.specialPrice != null,
+              }))}
           date={new Date()}
           paymentTerms={paymentTerms}
           deliveryTime={deliveryTime}
