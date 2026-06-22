@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
-import { STAGES as DEFAULT_STAGES } from '../constants/stages'
+import { STAGES as DEFAULT_STAGES, REPOSITORIO_STAGE } from '../constants/stages'
 
 const LS_KEY = 'kiuvo_pipeline_stages'
 
@@ -16,6 +16,13 @@ function lsSave(stages) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(stages)) } catch (_) {}
 }
 
+// Always ensure repositorio is the last stage
+function withRepositorio(stages) {
+  const withoutRepo = stages.filter(s => s.id !== 'repositorio')
+  const existing = stages.find(s => s.id === 'repositorio')
+  return [...withoutRepo, existing || REPOSITORIO_STAGE]
+}
+
 // ─── Context ──────────────────────────────────────────────────────────────────
 const StagesContext = createContext(null)
 
@@ -27,7 +34,7 @@ export function useStages() {
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
 export function StagesProvider({ children }) {
-  const [stages,  setStages]  = useState(() => lsLoad() || DEFAULT_STAGES)
+  const [stages,  setStages]  = useState(() => withRepositorio(lsLoad() || DEFAULT_STAGES))
   const [saving,  setSaving]  = useState(false)
   const [loaded,  setLoaded]  = useState(false)
 
@@ -48,9 +55,11 @@ export function StagesProvider({ children }) {
             label: r.label,
             color: r.color,
             min:   r.min_visits,
+            ...(r.id === 'repositorio' ? { isRepository: true } : {}),
           }))
-          setStages(loaded)
-          lsSave(loaded)
+          const withRepo = withRepositorio(loaded)
+          setStages(withRepo)
+          lsSave(withRepo)
         }
         setLoaded(true)
       })
@@ -58,18 +67,19 @@ export function StagesProvider({ children }) {
 
   // Batch save: localStorage inmediato + Supabase async
   const saveAllStages = useCallback(async (newStages) => {
-    setStages(newStages)
-    lsSave(newStages)                       // persiste aunque Supabase falle
+    const withRepo = withRepositorio(newStages)
+    setStages(withRepo)
+    lsSave(withRepo)
 
     if (!isSupabaseConfigured) return
 
     setSaving(true)
     try {
-      const rows = newStages.map((s, i) => ({
+      const rows = withRepo.map((s, i) => ({
         id:         s.id,
         label:      s.label,
         color:      s.color,
-        min_visits: s.min,
+        min_visits: s.min ?? 0,
         sort_order: i,
       }))
       const { error } = await supabase
@@ -108,10 +118,65 @@ export function StagesProvider({ children }) {
     }
   }, [])
 
+  // Add a new custom stage (inserted before repositorio)
+  const addStage = useCallback(async (label = 'Nueva etapa', color = '#7C5CBF') => {
+    const id = 'custom_' + Date.now()
+    const newStage = { id, label, color, min: 1 }
+    setStages(prev => {
+      const withoutRepo = prev.filter(s => s.id !== 'repositorio')
+      const repo = prev.find(s => s.id === 'repositorio') || REPOSITORIO_STAGE
+      const next = [...withoutRepo, newStage, repo]
+      lsSave(next)
+      return next
+    })
+
+    if (!isSupabaseConfigured) return
+
+    setSaving(true)
+    try {
+      // Re-fetch current stages to get correct sort_order
+      const { data } = await supabase
+        .from('pipeline_stages')
+        .select('id, sort_order')
+        .order('sort_order')
+      const maxOrder = data ? Math.max(...data.map(r => r.sort_order ?? 0)) : 10
+      const repoOrder = data?.find(r => r.id === 'repositorio')?.sort_order ?? maxOrder
+      // Insert new stage before repositorio
+      await supabase.from('pipeline_stages').upsert([
+        { id, label, color, min_visits: 1, sort_order: repoOrder },
+        { id: 'repositorio', label: stages.find(s => s.id === 'repositorio')?.label || 'Repositorio',
+          color: stages.find(s => s.id === 'repositorio')?.color || '#6B7280',
+          min_visits: 0, sort_order: repoOrder + 1 },
+      ], { onConflict: 'id' })
+    } finally {
+      setSaving(false)
+    }
+  }, [stages])
+
+  // Delete a custom (non-system) stage
+  const deleteStage = useCallback(async (id) => {
+    setStages(prev => {
+      const next = prev.filter(s => s.id !== id)
+      lsSave(next)
+      return next
+    })
+
+    if (!isSupabaseConfigured) return
+
+    setSaving(true)
+    try {
+      await supabase.from('pipeline_stages').delete().eq('id', id)
+    } finally {
+      setSaving(false)
+    }
+  }, [])
+
   const stageById = Object.fromEntries(stages.map(s => [s.id, s]))
 
   return (
-    <StagesContext.Provider value={{ stages, stageById, updateStage, saveAllStages, saving, loaded }}>
+    <StagesContext.Provider value={{
+      stages, stageById, updateStage, saveAllStages, addStage, deleteStage, saving, loaded,
+    }}>
       {children}
     </StagesContext.Provider>
   )

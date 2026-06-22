@@ -4,6 +4,7 @@ import { STAGES, STAGE_BY_ID } from '../../constants/stages'
 import { supabase, isSupabaseConfigured } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../../contexts/ToastContext'
+import { useStages } from '../../contexts/StagesContext'
 // useQuoteHistory ya no se usa directamente en Kanban (updates van inline)
 import { pdf } from '@react-pdf/renderer'
 import { QuotePDFDoc } from '../../lib/quotePDF'
@@ -189,6 +190,7 @@ function AddProspectModal({ stage, onClose, onSave }) {
 function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, onUpdateProspect, onNewProposal, isAdmin }) {
   const { user } = useAuth()
   const { addToast } = useToast()
+  const { stages: allStages } = useStages()
   const [confirming,       setConfirming]       = useState(false)
   const [localNotes,       setLocalNotes]       = useState(prospect.notes || '')
   const [notesDirty,       setNotesDirty]       = useState(false)
@@ -747,7 +749,7 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, on
             MOVER A ETAPA
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 18 }}>
-            {STAGES.filter(s => s.id !== prospect.stage_id).map(s => (
+            {allStages.filter(s => s.id !== prospect.stage_id && s.id !== 'repositorio').map(s => (
               <button
                 key={s.id}
                 onClick={() => { onMoveStage(prospect.id, s.id); onClose() }}
@@ -762,6 +764,36 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, on
                 <span style={{ fontSize: 14, color: 'var(--fg)' }}>{s.label}</span>
               </button>
             ))}
+            {/* Repositorio — archive option */}
+            {prospect.stage_id !== 'repositorio' && (
+              <button
+                onClick={() => { onMoveStage(prospect.id, 'repositorio'); onClose() }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '12px 14px', borderRadius: 'var(--r-md)',
+                  border: '0.5px solid var(--border)', background: 'var(--bg-secondary)',
+                  textAlign: 'left',
+                }}
+              >
+                <Icon name="archive" size={14} color="#6B7280" />
+                <span style={{ fontSize: 14, color: 'var(--fg-secondary)' }}>Archivar en Repositorio</span>
+              </button>
+            )}
+            {/* Reactivate from repositorio */}
+            {prospect.stage_id === 'repositorio' && (
+              <button
+                onClick={() => { onMoveStage(prospect.id, 'prospeccion'); onClose() }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '12px 14px', borderRadius: 'var(--r-md)',
+                  border: '0.5px solid var(--kiuvo-blue)', background: 'var(--kiuvo-blue-soft)',
+                  textAlign: 'left',
+                }}
+              >
+                <Icon name="arrow-up-right" size={14} color="var(--kiuvo-blue)" />
+                <span style={{ fontSize: 14, color: 'var(--kiuvo-blue)', fontWeight: 500 }}>Reactivar prospecto</span>
+              </button>
+            )}
           </div>
 
           {/* ── Delete (admin only) ── */}
@@ -803,9 +835,11 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, on
 
 // ─── ProspectCard ─────────────────────────────────────────────────────────────
 function ProspectCard({ p, onAction, onAdvance, onODP }) {
-  const stageIdx  = STAGES.findIndex(s => s.id === p.stage)
-  const stage     = STAGE_BY_ID[p.stage] ?? STAGES[0]
-  const nextStage = STAGES[stageIdx + 1] ?? null
+  const { stages: ctxStages, stageById: ctxStageById } = useStages()
+  const stageIdx  = ctxStages.findIndex(s => s.id === p.stage)
+  const stage     = ctxStageById[p.stage] ?? STAGES[0]
+  // Don't show "advance" button for repositorio or cierre
+  const nextStage = (!stage.isRepository && p.stage !== 'cierre') ? (ctxStages[stageIdx + 1] ?? null) : null
   const visitPct  = Math.min(1, p.visits / Math.max(stage.min, 1))
   const hc        = healthColor[p.health] || 'var(--fg-tertiary)'
 
@@ -903,7 +937,7 @@ function ProspectCard({ p, onAction, onAdvance, onODP }) {
               <Icon name="arrow-right" size={12} color={nextStage.color} />
               {nextStage.label}
             </button>
-          ) : !nextStage && !p._optimistic ? (
+          ) : !nextStage && !p._optimistic && p.stage !== 'repositorio' ? (
             <button
               onClick={() => onODP(p)}
               title="Generar orden de producción"
@@ -929,6 +963,7 @@ function ProspectCard({ p, onAction, onAdvance, onODP }) {
 export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 }) {
   const { user, profile } = useAuth()
   const { addToast } = useToast()
+  const { stages: contextStages, stageById: contextStageById } = useStages()
   const isAdmin = profile?.role === 'admin'
 
   const [activeStage,      setActiveStage]      = useState('presentacion')
@@ -1017,10 +1052,10 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
   }, [user.id])
 
   // ── Derived ───────────────────────────────────────────────────────
-  const stage      = STAGE_BY_ID[activeStage] ?? STAGES[0]
-  const counts     = Object.fromEntries(STAGES.map(s => [s.id, prospects.filter(p => p.stage === s.id).length]))
+  const stage      = contextStageById[activeStage] ?? contextStages[0] ?? STAGES[0]
+  const counts     = Object.fromEntries(contextStages.map(s => [s.id, prospects.filter(p => p.stage === s.id).length]))
   const totalAll   = prospects.length
-  const totalPot   = prospects.filter(p => p.stage !== 'cierre').reduce((s, p) => s + (p.value ?? 0), 0)
+  const totalPot   = prospects.filter(p => p.stage !== 'cierre' && p.stage !== 'repositorio').reduce((s, p) => s + (p.value ?? 0), 0)
   const rawList    = prospects.filter(p => p.stage === activeStage)
   const list       = [...rawList].sort((a, b) => sortMode === 'value' ? (b.value ?? 0) - (a.value ?? 0) : (b.days ?? 0) - (a.days ?? 0))
   const totalValue = rawList.reduce((s, p) => s + (p.value ?? 0), 0)
@@ -1193,7 +1228,7 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
 
       {/* Stage pills */}
       <div style={{ display: 'flex', gap: 6, padding: '0 16px 12px', overflowX: 'auto', scrollSnapType: 'x mandatory' }}>
-        {STAGES.map(s => {
+        {contextStages.map(s => {
           const on = s.id === activeStage
           return (
             <button key={s.id} onClick={() => setActiveStage(s.id)} style={{
@@ -1204,14 +1239,17 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
               color: on ? '#fff' : 'var(--fg)',
               fontSize: 12, fontWeight: 500, flexShrink: 0, scrollSnapAlign: 'start',
             }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: on ? '#fff' : s.color }} />
+              {s.isRepository
+                ? <Icon name="archive" size={11} color={on ? '#fff' : s.color} />
+                : <span style={{ width: 6, height: 6, borderRadius: '50%', background: on ? '#fff' : s.color }} />
+              }
               {s.label}
               <span style={{
                 fontSize: 11, fontWeight: 500, padding: '0 5px', borderRadius: 'var(--r-full)',
                 background: on ? 'rgba(255,255,255,0.22)' : 'var(--bg-secondary)',
                 color: on ? '#fff' : 'var(--fg-secondary)',
               }}>
-                {loading ? '·' : counts[s.id]}
+                {loading ? '·' : (counts[s.id] ?? 0)}
               </span>
             </button>
           )
@@ -1221,21 +1259,29 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
       {/* Column summary */}
       <div style={{ margin: '0 16px 10px', padding: '10px 12px', background: stage.color + '14', borderRadius: 'var(--r-md)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <div style={{ fontSize: 12, fontWeight: 500, color: stage.color }}>{stage.label}</div>
+          <div style={{ fontSize: 12, fontWeight: 500, color: stage.color, display: 'flex', alignItems: 'center', gap: 5 }}>
+            {stage.isRepository && <Icon name="archive" size={12} color={stage.color} />}
+            {stage.label}
+          </div>
           <div style={{ fontSize: 11, color: 'var(--fg-secondary)', marginTop: 2 }}>
-            Mínimo {stage.min} visita{stage.min > 1 ? 's' : ''} · {fmt(totalValue)} potencial
+            {stage.isRepository
+              ? 'Prospectos archivados — reactivables'
+              : `Mínimo ${stage.min} visita${stage.min > 1 ? 's' : ''} · ${fmt(totalValue)} potencial`
+            }
           </div>
         </div>
-        <button
-          onClick={() => activeStage === 'cotizacion' ? setShowQuote(true) : setShowAdd(true)}
-          style={{
-            padding: '6px 10px', borderRadius: 'var(--r-md)',
-            background: stage.color, color: '#fff', fontSize: 12, fontWeight: 500,
-            display: 'flex', alignItems: 'center', gap: 4,
-          }}>
-          <Icon name={activeStage === 'cotizacion' ? 'receipt' : 'plus'} size={13} />
-          {activeStage === 'cotizacion' ? 'Cotizar' : 'Añadir'}
-        </button>
+        {!stage.isRepository && (
+          <button
+            onClick={() => activeStage === 'cotizacion' ? setShowQuote(true) : setShowAdd(true)}
+            style={{
+              padding: '6px 10px', borderRadius: 'var(--r-md)',
+              background: stage.color, color: '#fff', fontSize: 12, fontWeight: 500,
+              display: 'flex', alignItems: 'center', gap: 4,
+            }}>
+            <Icon name={activeStage === 'cotizacion' ? 'receipt' : 'plus'} size={13} />
+            {activeStage === 'cotizacion' ? 'Cotizar' : 'Añadir'}
+          </button>
+        )}
       </div>
 
       {/* Cards */}

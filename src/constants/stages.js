@@ -6,4 +6,15 @@ export const STAGES = [
   { id: 'cierre',       label: 'Cierre',       color: '#1D9E75', min: 2 },
 ]
 
-export const STAGE_BY_ID = Object.fromEntries(STAGES.map(s => [s.id, s]))
+export const REPOSITORIO_STAGE = {
+  id: 'repositorio', label: 'Repositorio', color: '#6B7280', min: 0, isRepository: true,
+}
+
+// Stage IDs that cannot be deleted by admins
+export const SYSTEM_STAGE_IDS = new Set([
+  'prospeccion', 'presentacion', 'cotizacion', 'negociacion', 'cierre', 'repositorio',
+])
+
+export const STAGE_BY_ID = Object.fromEntries(
+  [...STAGES, REPOSITORIO_STAGE].map(s => [s.id, s])
+)

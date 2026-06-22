@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import Icon from '../shared/Icon'
 import { useStages } from '../../contexts/StagesContext'
+import { SYSTEM_STAGE_IDS } from '../../constants/stages'
 import { useAdminProspects } from '../../hooks/useAdminProspects'
 import { useSellers } from '../../hooks/useSellers'
 
@@ -29,7 +30,7 @@ function MoveDropdown({ currentStage, onMove, onClose }) {
       <div style={{ fontSize: 10, fontWeight: 500, color: 'var(--fg-tertiary)', padding: '2px 8px 6px', letterSpacing: 0.5 }}>
         MOVER A ETAPA
       </div>
-      {stages.filter(s => s.id !== currentStage).map(s => (
+      {stages.filter(s => s.id !== currentStage && !s.isRepository).map(s => (
         <button key={s.id} onClick={() => { onMove(s.id); onClose() }} style={{
           display: 'flex', alignItems: 'center', gap: 8, width: '100%',
           padding: '7px 8px', borderRadius: 'var(--r-sm)', textAlign: 'left',
@@ -43,6 +44,40 @@ function MoveDropdown({ currentStage, onMove, onClose }) {
           {s.label}
         </button>
       ))}
+      {currentStage !== 'repositorio' && (
+        <>
+          <div style={{ borderTop: '0.5px solid var(--border)', margin: '4px 2px' }} />
+          <button onClick={() => { onMove('repositorio'); onClose() }} style={{
+            display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+            padding: '7px 8px', borderRadius: 'var(--r-sm)', textAlign: 'left',
+            color: 'var(--fg-secondary)', fontSize: 12,
+            transition: 'background 0.1s',
+          }}
+            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-secondary)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          >
+            <Icon name="archive" size={12} color="#6B7280" />
+            Archivar en Repositorio
+          </button>
+        </>
+      )}
+      {currentStage === 'repositorio' && (
+        <>
+          <div style={{ borderTop: '0.5px solid var(--border)', margin: '4px 2px' }} />
+          <button onClick={() => { onMove('prospeccion'); onClose() }} style={{
+            display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+            padding: '7px 8px', borderRadius: 'var(--r-sm)', textAlign: 'left',
+            color: 'var(--kiuvo-blue)', fontSize: 12, fontWeight: 500,
+            transition: 'background 0.1s',
+          }}
+            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-secondary)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          >
+            <Icon name="arrow-up-right" size={12} color="var(--kiuvo-blue)" />
+            Reactivar prospecto
+          </button>
+        </>
+      )}
     </div>
   )
 }
@@ -411,6 +446,147 @@ function StageConfigPanel({ stages: initialStages, saving, onSave, onClose }) {
   const setField = (id, key, val) =>
     setDraft(prev => prev.map(s => s.id === id ? { ...s, [key]: val } : s))
 
+  function addNewStage() {
+    const id = 'custom_' + Date.now()
+    const newStage = { id, label: 'Nueva etapa', color: '#7C5CBF', min: 1 }
+    setDraft(prev => {
+      const withoutRepo = prev.filter(s => s.id !== 'repositorio')
+      const repo = prev.find(s => s.id === 'repositorio')
+      return repo ? [...withoutRepo, newStage, repo] : [...withoutRepo, newStage]
+    })
+  }
+
+  function removeStage(id) {
+    setDraft(prev => prev.filter(s => s.id !== id))
+  }
+
+  const repoStage = draft.find(s => s.id === 'repositorio')
+  const regularStages = draft.filter(s => s.id !== 'repositorio')
+
+  function StageCard({ s }) {
+    const isSystem = SYSTEM_STAGE_IDS.has(s.id)
+    return (
+      <div key={s.id} style={{
+        background: 'var(--bg)', border: '0.5px solid var(--border)',
+        borderRadius: 'var(--r-md)', padding: '14px', borderTop: `3px solid ${s.color}`,
+      }}>
+        {/* Label input + delete */}
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+            <div style={{ fontSize: 10, fontWeight: 500, color: 'var(--fg-tertiary)', letterSpacing: 0.3 }}>
+              NOMBRE DE ETAPA
+            </div>
+            {!isSystem && (
+              <button
+                onClick={() => removeStage(s.id)}
+                title="Eliminar etapa"
+                style={{ color: 'var(--danger-fg)', padding: 2, display: 'flex', alignItems: 'center' }}
+              >
+                <Icon name="trash" size={13} />
+              </button>
+            )}
+          </div>
+          <input
+            value={s.label}
+            onChange={e => setField(s.id, 'label', e.target.value)}
+            style={{
+              width: '100%', padding: '7px 10px', fontSize: 13,
+              background: 'var(--surface)', border: '0.5px solid var(--border)',
+              borderRadius: 'var(--r-md)', color: 'var(--fg)', outline: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
+        </div>
+
+        {/* Color picker */}
+        <div style={{ marginBottom: s.isRepository ? 0 : 10 }}>
+          <div style={{ fontSize: 10, fontWeight: 500, color: 'var(--fg-tertiary)', marginBottom: 5, letterSpacing: 0.3 }}>
+            COLOR
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            {PRESET_COLORS.map(c => (
+              <button
+                key={c}
+                onClick={() => setField(s.id, 'color', c)}
+                title={c}
+                style={{
+                  width: 22, height: 22, borderRadius: 6, background: c, flexShrink: 0,
+                  border: s.color === c ? '2.5px solid var(--fg)' : '2px solid transparent',
+                  outline: s.color === c ? `2px solid ${c}40` : 'none',
+                  transition: 'border-color 0.12s',
+                }}
+              />
+            ))}
+            <div style={{ position: 'relative', marginLeft: 2 }}>
+              <input
+                type="color"
+                value={s.color}
+                onChange={e => setField(s.id, 'color', e.target.value)}
+                style={{ opacity: 0, position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: 'pointer' }}
+              />
+              <div title="Color personalizado" style={{
+                width: 22, height: 22, borderRadius: 6,
+                background: `conic-gradient(#f43,#0cf,#3f0,#f43)`,
+                border: '0.5px solid var(--border)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Icon name="pencil" size={10} color="#fff" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Min visits — hidden for repositorio */}
+        {!s.isRepository && (
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 500, color: 'var(--fg-tertiary)', marginBottom: 5, letterSpacing: 0.3 }}>
+              VISITAS MÍNIMAS REQUERIDAS
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button
+                onClick={() => setField(s.id, 'min', Math.max(1, s.min - 1))}
+                style={{
+                  width: 28, height: 28, borderRadius: 'var(--r-md)',
+                  background: 'var(--surface)', border: '0.5px solid var(--border)',
+                  color: 'var(--fg)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                <Icon name="minus" size={13} />
+              </button>
+              <span style={{
+                minWidth: 28, textAlign: 'center', fontSize: 15, fontWeight: 600,
+                color: s.color, fontVariantNumeric: 'tabular-nums',
+              }}>
+                {s.min}
+              </span>
+              <button
+                onClick={() => setField(s.id, 'min', Math.min(10, s.min + 1))}
+                style={{
+                  width: 28, height: 28, borderRadius: 'var(--r-md)',
+                  background: 'var(--surface)', border: '0.5px solid var(--border)',
+                  color: 'var(--fg)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                <Icon name="plus" size={13} />
+              </button>
+              <span style={{ fontSize: 11, color: 'var(--fg-tertiary)' }}>
+                visita{s.min !== 1 ? 's' : ''} antes de avanzar
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Repositorio description */}
+        {s.isRepository && (
+          <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginTop: 10, display: 'flex', alignItems: 'center', gap: 5 }}>
+            <Icon name="archive" size={12} color="var(--fg-tertiary)" />
+            Etapa de archivo — los prospectos perdidos o vencidos caen aquí
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div style={{
       width: 360, flexShrink: 0, borderLeft: '0.5px solid var(--border)',
@@ -433,106 +609,33 @@ function StageConfigPanel({ stages: initialStages, saving, onSave, onClose }) {
 
       {/* Stage rows */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {draft.map(s => (
-          <div key={s.id} style={{
-            background: 'var(--bg)', border: '0.5px solid var(--border)',
-            borderRadius: 'var(--r-md)', padding: '14px', borderTop: `3px solid ${s.color}`,
-          }}>
-            {/* Label input */}
-            <div style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 10, fontWeight: 500, color: 'var(--fg-tertiary)', marginBottom: 5, letterSpacing: 0.3 }}>
-                NOMBRE DE ETAPA
-              </div>
-              <input
-                value={s.label}
-                onChange={e => setField(s.id, 'label', e.target.value)}
-                style={{
-                  width: '100%', padding: '7px 10px', fontSize: 13,
-                  background: 'var(--surface)', border: '0.5px solid var(--border)',
-                  borderRadius: 'var(--r-md)', color: 'var(--fg)', outline: 'none',
-                  boxSizing: 'border-box',
-                }}
-              />
-            </div>
+        {regularStages.map(s => <StageCard key={s.id} s={s} />)}
 
-            {/* Color picker */}
-            <div style={{ marginBottom: 10 }}>
-              <div style={{ fontSize: 10, fontWeight: 500, color: 'var(--fg-tertiary)', marginBottom: 5, letterSpacing: 0.3 }}>
-                COLOR
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                {PRESET_COLORS.map(c => (
-                  <button
-                    key={c}
-                    onClick={() => setField(s.id, 'color', c)}
-                    title={c}
-                    style={{
-                      width: 22, height: 22, borderRadius: 6, background: c, flexShrink: 0,
-                      border: s.color === c ? '2.5px solid var(--fg)' : '2px solid transparent',
-                      outline: s.color === c ? `2px solid ${c}40` : 'none',
-                      transition: 'border-color 0.12s',
-                    }}
-                  />
-                ))}
-                {/* Custom color input */}
-                <div style={{ position: 'relative', marginLeft: 2 }}>
-                  <input
-                    type="color"
-                    value={s.color}
-                    onChange={e => setField(s.id, 'color', e.target.value)}
-                    style={{ opacity: 0, position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: 'pointer' }}
-                  />
-                  <div title="Color personalizado" style={{
-                    width: 22, height: 22, borderRadius: 6,
-                    background: `conic-gradient(#f43,#0cf,#3f0,#f43)`,
-                    border: '0.5px solid var(--border)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <Icon name="pencil" size={10} color="#fff" />
-                  </div>
-                </div>
-              </div>
-            </div>
+        {/* Nueva etapa button */}
+        <button
+          onClick={addNewStage}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            padding: '10px', borderRadius: 'var(--r-md)',
+            border: '1.5px dashed var(--border)', background: 'transparent',
+            color: 'var(--kiuvo-blue)', fontSize: 13, fontWeight: 500,
+            cursor: 'pointer',
+          }}
+        >
+          <Icon name="plus" size={15} color="var(--kiuvo-blue)" />
+          Nueva etapa
+        </button>
 
-            {/* Min visits */}
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 500, color: 'var(--fg-tertiary)', marginBottom: 5, letterSpacing: 0.3 }}>
-                VISITAS MÍNIMAS REQUERIDAS
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <button
-                  onClick={() => setField(s.id, 'min', Math.max(1, s.min - 1))}
-                  style={{
-                    width: 28, height: 28, borderRadius: 'var(--r-md)',
-                    background: 'var(--surface)', border: '0.5px solid var(--border)',
-                    color: 'var(--fg)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}
-                >
-                  <Icon name="minus" size={13} />
-                </button>
-                <span style={{
-                  minWidth: 28, textAlign: 'center', fontSize: 15, fontWeight: 600,
-                  color: s.color, fontVariantNumeric: 'tabular-nums',
-                }}>
-                  {s.min}
-                </span>
-                <button
-                  onClick={() => setField(s.id, 'min', Math.min(10, s.min + 1))}
-                  style={{
-                    width: 28, height: 28, borderRadius: 'var(--r-md)',
-                    background: 'var(--surface)', border: '0.5px solid var(--border)',
-                    color: 'var(--fg)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}
-                >
-                  <Icon name="plus" size={13} />
-                </button>
-                <span style={{ fontSize: 11, color: 'var(--fg-tertiary)' }}>
-                  visita{s.min !== 1 ? 's' : ''} antes de avanzar
-                </span>
-              </div>
+        {/* Repositorio — always last, special */}
+        {repoStage && (
+          <>
+            <div style={{ borderTop: '0.5px solid var(--border)', margin: '4px 0' }} />
+            <div style={{ fontSize: 10, fontWeight: 500, color: 'var(--fg-tertiary)', letterSpacing: 0.5, padding: '0 2px' }}>
+              ETAPA DE ARCHIVO
             </div>
-          </div>
-        ))}
+            <StageCard s={repoStage} />
+          </>
+        )}
       </div>
 
       {/* Footer */}
@@ -571,7 +674,7 @@ function StageConfigPanel({ stages: initialStages, saving, onSave, onClose }) {
 
 // ─── Main view ────────────────────────────────────────────────────────────────
 export default function AdminPipelineView() {
-  const { stages, stageById, saveAllStages, saving } = useStages()
+  const { stages, stageById, saveAllStages, deleteStage, saving } = useStages()
   const { prospects, reload } = useAdminProspects()
   const { sellers: sellerList } = useSellers()
   const [sellerFilter,   setSellerFilter]   = useState('all')
@@ -629,7 +732,7 @@ export default function AdminPipelineView() {
             display: 'flex', alignItems: 'center', gap: 6,
           }}>
             <Icon name="target" size={13} color="var(--fg-secondary)" />
-            <span style={{ color: 'var(--fg)', fontWeight: 500 }}>{fmt(filtered.filter(p => p.stage !== 'cierre').reduce((s, p) => s + p.value, 0))}</span>
+            <span style={{ color: 'var(--fg)', fontWeight: 500 }}>{fmt(filtered.filter(p => p.stage !== 'cierre' && p.stage !== 'repositorio').reduce((s, p) => s + p.value, 0))}</span>
             <span style={{ color: 'var(--fg-tertiary)' }}>potencial</span>
           </div>
           {atRisk > 0 && (

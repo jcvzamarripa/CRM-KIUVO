@@ -57,6 +57,9 @@ import {
 
   // Misc
   IconCamera,
+
+  // Archive / Repository
+  IconArchive,
 } from '@tabler/icons-react'
 
 const ICON_MAP = {
@@ -134,6 +137,9 @@ const ICON_MAP = {
   'brand-google':       IconBrandGoogle,
   'phone':              IconPhone,
   'bell':               IconBell,
+
+  // ── Archive ────────────────────────────────────────
+  'archive':            IconArchive,
 
   // ── Status & Alerts ────────────────────────────────
   'alert-circle':       IconAlertCircle,

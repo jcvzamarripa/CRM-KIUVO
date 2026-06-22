@@ -209,7 +209,7 @@ export default function MapView() {
     return true
   })
 
-  const totalValue  = prospects.filter(p => p.stage !== 'cierre').reduce((s, p) => s + p.value, 0)
+  const totalValue  = prospects.filter(p => p.stage !== 'cierre' && p.stage !== 'repositorio').reduce((s, p) => s + p.value, 0)
   const atRisk      = prospects.filter(p => p.health !== 'green').length
   const noCoords    = allProspects.filter(p => p.lat == null || p.lng == null).length
 
@@ -306,7 +306,7 @@ export default function MapView() {
               <span style={{ color: '#555' }}>{HEALTH_LABEL[h]}</span>
             </div>
           ))}
-          {colorBy === 'stage' && ['prospeccion','presentacion','cotizacion','negociacion','cierre'].map(id => (
+          {colorBy === 'stage' && ['prospeccion','presentacion','cotizacion','negociacion','cierre','repositorio'].map(id => (
             <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
               <div style={{ width: 10, height: 10, borderRadius: '50%', background: STAGE_BY_ID[id].color }} />
               <span style={{ color: '#555' }}>{STAGE_BY_ID[id].label}</span>
