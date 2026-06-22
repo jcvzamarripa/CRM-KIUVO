@@ -105,7 +105,10 @@ function Spinner({ size = 16 }) {
 // ── SuccessView ───────────────────────────────────────────────────
 function SuccessView({ items, prospectName, prospectEmail, prospectPhone, sellerName, pdfUrl, onClose }) {
   const total   = items.reduce((s, i) => s + effectivePrice(i) * i.qty, 0)
-  const savings = items.reduce((s, i) => i.discountPct > 0 ? s + (i.price - effectivePrice(i)) * i.qty : s, 0)
+  const savings = items.reduce((s, i) => {
+    if (i.specialPrice != null) return s
+    return i.discountPct > 0 ? s + (i.price - effectivePrice(i)) * i.qty : s
+  }, 0)
   const [sharing, setSharing]   = useState(false)
   const [shareMsg, setShareMsg] = useState('')
 
@@ -219,20 +222,27 @@ function SuccessView({ items, prospectName, prospectEmail, prospectPhone, seller
       {/* Items summary */}
       <div style={{ width: '100%', background: 'var(--bg-secondary)', borderRadius: 'var(--r-md)', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {items.map(i => {
-          const disc = i.discountPct || 0
+          const disc = i.specialPrice != null ? 0 : (i.discountPct || 0)
           const effP = effectivePrice(i)
           return (
             <div key={i.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, alignItems: 'flex-start', gap: 8 }}>
               <span style={{ color: 'var(--fg)', flex: 1 }}>
                 {i.qty}× {i.name}
-                {disc > 0 && (
+                {i.specialPrice != null ? (
+                  <span style={{
+                    marginLeft: 6, fontSize: 10, fontWeight: 700,
+                    padding: '1px 5px', borderRadius: 99,
+                    background: '#EDE9FE', color: '#6D28D9',
+                    verticalAlign: 'middle',
+                  }}>Precio esp.</span>
+                ) : disc > 0 ? (
                   <span style={{
                     marginLeft: 6, fontSize: 10, fontWeight: 700,
                     padding: '1px 5px', borderRadius: 99,
                     background: 'var(--success-bg)', color: 'var(--success-fg)',
                     verticalAlign: 'middle',
                   }}>−{disc}%</span>
-                )}
+                ) : null}
               </span>
               <span style={{ color: 'var(--fg-secondary)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
                 {fmt(effP * i.qty)}
