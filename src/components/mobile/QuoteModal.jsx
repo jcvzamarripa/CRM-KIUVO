@@ -449,6 +449,8 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
   const [pdfUrl, setPdfUrl]               = useState(null)
   const [specialPriceEditing, setSpecialPriceEditing] = useState(null)
   const [specialPriceInput, setSpecialPriceInput]     = useState('')
+  const [nameEditing, setNameEditing]   = useState(null)
+  const [nameEditData, setNameEditData] = useState({ name: '', sku: '' })
   // Extra quote fields
   const [contactName, setContactName]     = useState(initialContactName)
   const [paymentSel, setPaymentSel]       = useState('')          // selected option
@@ -517,6 +519,19 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
     }))
   }
   const removeItem = id => setItems(prev => prev.filter(i => i.id !== id))
+
+  function openNameEdit(item) {
+    setNameEditing(item.id)
+    setNameEditData({ name: item.name, sku: item.sku || '' })
+  }
+  function confirmNameEdit(id) {
+    setItems(prev => prev.map(i => {
+      if (i.id !== id) return i
+      const trimmed = nameEditData.name.trim()
+      return trimmed ? { ...i, name: trimmed, sku: nameEditData.sku.trim() } : i
+    }))
+    setNameEditing(null)
+  }
 
   function openSpecialPrice(item) {
     setSpecialPriceEditing(item.id)
@@ -946,45 +961,72 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
                       }}>
                         {/* Fila principal */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0 }}>
-                                {item.name}
+                          {nameEditing === item.id ? (
+                            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                              <input
+                                value={nameEditData.name}
+                                onChange={e => setNameEditData(d => ({ ...d, name: e.target.value }))}
+                                onKeyDown={e => { if (e.key === 'Enter') confirmNameEdit(item.id) }}
+                                autoFocus
+                                placeholder="Nombre del producto"
+                                style={{ padding: '6px 9px', background: 'var(--bg-secondary)', border: '0.5px solid var(--kiuvo-blue)', borderRadius: 'var(--r-md)', fontSize: 13, color: 'var(--fg)', outline: 'none', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' }}
+                              />
+                              <input
+                                value={nameEditData.sku}
+                                onChange={e => setNameEditData(d => ({ ...d, sku: e.target.value }))}
+                                onKeyDown={e => { if (e.key === 'Enter') confirmNameEdit(item.id) }}
+                                placeholder="Descripción o SKU (opcional)"
+                                style={{ padding: '6px 9px', background: 'var(--bg-secondary)', border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)', fontSize: 12, color: 'var(--fg)', outline: 'none', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' }}
+                              />
+                              <div style={{ display: 'flex', gap: 6 }}>
+                                <button onClick={() => confirmNameEdit(item.id)} style={{ flex: 1, padding: '5px', background: 'var(--kiuvo-blue)', color: '#fff', borderRadius: 'var(--r-md)', fontSize: 12, fontWeight: 500, border: 'none' }}>Listo</button>
+                                <button onClick={() => setNameEditing(null)} style={{ padding: '5px 10px', background: 'var(--bg-secondary)', color: 'var(--fg-secondary)', borderRadius: 'var(--r-md)', fontSize: 12, border: '0.5px solid var(--border)' }}>Cancelar</button>
                               </div>
-                              {item.specialPrice != null ? (
-                                <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: '#EDE9FE', color: '#6D28D9', border: '0.5px solid #7C3AED' }}>
-                                  Precio esp.
-                                </span>
-                              ) : disc > 0 ? (
-                                <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: 'var(--success-bg)', color: 'var(--success-fg)', border: '0.5px solid var(--success)' }}>
-                                  −{disc}%
-                                </span>
-                              ) : null}
                             </div>
-                            <div style={{ fontSize: 11, color: 'var(--fg-secondary)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 5 }}>
-                              {item.specialPrice != null ? (
-                                <>
-                                  <span style={{ color: '#7C3AED', fontWeight: 500 }}>{fmt(item.specialPrice)}/{item.unit}</span>
-                                  <span>·</span>
-                                  <span style={{ color: 'var(--kiuvo-blue)', fontWeight: 500 }}>{fmt(lineTotal)}</span>
-                                </>
-                              ) : disc > 0 ? (
-                                <>
-                                  <span style={{ textDecoration: 'line-through', color: 'var(--fg-tertiary)' }}>{fmt(item.price)}</span>
-                                  <span style={{ color: 'var(--success-fg)', fontWeight: 500 }}>{fmt(effP)}</span>
-                                  <span>/{item.unit}</span>
-                                  <span>·</span>
-                                  <span style={{ color: 'var(--kiuvo-blue)', fontWeight: 500 }}>{fmt(lineTotal)}</span>
-                                </>
-                              ) : (
-                                <>
-                                  <span>{fmt(item.price)}/{item.unit}</span>
-                                  <span>·</span>
-                                  <span style={{ color: 'var(--kiuvo-blue)', fontWeight: 500 }}>{fmt(lineTotal)}</span>
-                                </>
-                              )}
+                          ) : (
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0 }}>
+                                  {item.name}
+                                </div>
+                                <button onClick={() => openNameEdit(item)} title="Editar nombre" style={{ flexShrink: 0, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-tertiary)', background: 'transparent', border: 'none', padding: 0 }}>
+                                  <Icon name="edit" size={11} />
+                                </button>
+                                {item.specialPrice != null ? (
+                                  <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: '#EDE9FE', color: '#6D28D9', border: '0.5px solid #7C3AED' }}>
+                                    Precio esp.
+                                  </span>
+                                ) : disc > 0 ? (
+                                  <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: 'var(--success-bg)', color: 'var(--success-fg)', border: '0.5px solid var(--success)' }}>
+                                    −{disc}%
+                                  </span>
+                                ) : null}
+                              </div>
+                              <div style={{ fontSize: 11, color: 'var(--fg-secondary)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 5 }}>
+                                {item.specialPrice != null ? (
+                                  <>
+                                    <span style={{ color: '#7C3AED', fontWeight: 500 }}>{fmt(item.specialPrice)}/{item.unit}</span>
+                                    <span>·</span>
+                                    <span style={{ color: 'var(--kiuvo-blue)', fontWeight: 500 }}>{fmt(lineTotal)}</span>
+                                  </>
+                                ) : disc > 0 ? (
+                                  <>
+                                    <span style={{ textDecoration: 'line-through', color: 'var(--fg-tertiary)' }}>{fmt(item.price)}</span>
+                                    <span style={{ color: 'var(--success-fg)', fontWeight: 500 }}>{fmt(effP)}</span>
+                                    <span>/{item.unit}</span>
+                                    <span>·</span>
+                                    <span style={{ color: 'var(--kiuvo-blue)', fontWeight: 500 }}>{fmt(lineTotal)}</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span>{fmt(item.price)}/{item.unit}</span>
+                                    <span>·</span>
+                                    <span style={{ color: 'var(--kiuvo-blue)', fontWeight: 500 }}>{fmt(lineTotal)}</span>
+                                  </>
+                                )}
+                              </div>
                             </div>
-                          </div>
+                          )}
                           <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-secondary)', borderRadius: 'var(--r-md)', border: '0.5px solid var(--border)' }}>
                             <button onClick={() => setQty(item.id, item.qty - 1)}
                               style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-secondary)' }}>
