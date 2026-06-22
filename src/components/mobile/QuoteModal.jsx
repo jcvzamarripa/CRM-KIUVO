@@ -12,8 +12,8 @@ import { enqueue } from '../../lib/offlineQueue'
 const fmt  = n => '$' + n.toLocaleString('es-MX', { minimumFractionDigits: 0 })
 const fmtPct = n => `${n}%`
 
-/** Effective unit price after applying volume discount. */
 function effectivePrice(item) {
+  if (item.specialPrice != null) return item.specialPrice
   return item.discountPct > 0 ? item.price * (1 - item.discountPct / 100) : item.price
 }
 
@@ -437,6 +437,8 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
   const [submitting, setSubmitting]       = useState(false)
   const [serverError, setServerError]     = useState('')
   const [pdfUrl, setPdfUrl]               = useState(null)
+  const [specialPriceEditing, setSpecialPriceEditing] = useState(null)
+  const [specialPriceInput, setSpecialPriceInput]     = useState('')
   // Extra quote fields
   const [contactName, setContactName]     = useState(initialContactName)
   const [paymentSel, setPaymentSel]       = useState('')          // selected option
@@ -492,7 +494,7 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
         return prev.map(i => i.id === product.id ? { ...i, qty: newQty, discountPct: disc } : i)
       }
       const disc = computeDiscount(product, 1)
-      return [...prev, { ...product, qty: 1, discountPct: disc }]
+      return [...prev, { ...product, qty: 1, discountPct: disc, specialPrice: null }]
     })
   }
   const setQty = (id, qty) => {
@@ -506,8 +508,26 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
   }
   const removeItem = id => setItems(prev => prev.filter(i => i.id !== id))
 
+  function openSpecialPrice(item) {
+    setSpecialPriceEditing(item.id)
+    setSpecialPriceInput(String(Math.round(effectivePrice(item))))
+  }
+  function confirmSpecialPrice(id) {
+    const val = parseFloat(specialPriceInput)
+    if (!isNaN(val) && val > 0) {
+      setItems(prev => prev.map(i => i.id === id ? { ...i, specialPrice: val } : i))
+    }
+    setSpecialPriceEditing(null)
+  }
+  function removeSpecialPrice(id) {
+    setItems(prev => prev.map(i => i.id === id ? { ...i, specialPrice: null } : i))
+  }
+
   const total   = items.reduce((s, i) => s + effectivePrice(i) * i.qty, 0)
-  const savings = items.reduce((s, i) => i.discountPct > 0 ? s + (i.price - effectivePrice(i)) * i.qty : s, 0)
+  const savings = items.reduce((s, i) => {
+    if (i.specialPrice != null) return s
+    return i.discountPct > 0 ? s + (i.price - effectivePrice(i)) * i.qty : s
+  }, 0)
   const canSubmit = items.length > 0 && !submitting
 
   const handleSubmit = async () => {
@@ -536,13 +556,14 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
             paymentTerms,
             deliveryTime,
             items: items.map(i => ({
-              name:        i.name,
-              sku:         i.sku  ?? null,
-              unit:        i.unit ?? null,
-              qty:         i.qty,
-              price:       i.price,
-              discountPct: i.discountPct ?? 0,
-              unitPrice:   effectivePrice(i),
+              name:           i.name,
+              sku:            i.sku  ?? null,
+              unit:           i.unit ?? null,
+              qty:            i.qty,
+              price:          i.price,
+              discountPct:    i.specialPrice != null ? -1 : (i.discountPct ?? 0),
+              unitPrice:      effectivePrice(i),
+              isSpecialPrice: i.specialPrice != null,
             })),
           },
         },
@@ -568,7 +589,7 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
             prospectName={prospectName}
             contactName={contactName}
             sellerName={profile?.full_name}
-            items={items}
+            items={items.map(i => ({ ...i, isSpecialPrice: i.specialPrice != null }))}
             date={new Date()}
             paymentTerms={paymentTerms}
             deliveryTime={deliveryTime}
@@ -639,7 +660,7 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
           unit:           i.unit ?? null,
           quantity:       i.qty,
           unit_price:     effectivePrice(i),
-          discount_pct:   i.discountPct ?? 0,
+          discount_pct:   i.specialPrice != null ? -1 : (i.discountPct ?? 0),
         }))
       )
 
@@ -677,7 +698,7 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
           prospectName={prospectName}
           contactName={contactName}
           sellerName={profile?.full_name}
-          items={items}
+          items={items.map(i => ({ ...i, isSpecialPrice: i.specialPrice != null }))}
           date={new Date()}
           paymentTerms={paymentTerms}
           deliveryTime={deliveryTime}
@@ -904,69 +925,116 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {items.map(item => {
-                      const disc = item.discountPct || 0
+                      const disc = item.specialPrice != null ? 0 : (item.discountPct || 0)
                       const effP = effectivePrice(item)
                       const lineTotal = effP * item.qty
                       return (
                       <div key={item.id} style={{
-                        display: 'flex', alignItems: 'center', gap: 10,
                         padding: '10px 12px', background: 'var(--surface)',
-                        border: `0.5px solid ${disc > 0 ? 'var(--success)' : 'var(--border)'}`,
+                        border: `0.5px solid ${item.specialPrice != null ? '#7C3AED' : disc > 0 ? 'var(--success)' : 'var(--border)'}`,
                         borderRadius: 'var(--r-md)',
                       }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0 }}>
-                              {item.name}
+                        {/* Fila principal */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0 }}>
+                                {item.name}
+                              </div>
+                              {item.specialPrice != null ? (
+                                <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: '#EDE9FE', color: '#6D28D9', border: '0.5px solid #7C3AED' }}>
+                                  Precio esp.
+                                </span>
+                              ) : disc > 0 ? (
+                                <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: 'var(--success-bg)', color: 'var(--success-fg)', border: '0.5px solid var(--success)' }}>
+                                  −{disc}%
+                                </span>
+                              ) : null}
                             </div>
-                            {disc > 0 && (
-                              <span style={{
-                                flexShrink: 0, fontSize: 10, fontWeight: 700,
-                                padding: '1px 6px', borderRadius: 99,
-                                background: 'var(--success-bg)', color: 'var(--success-fg)',
-                                border: '0.5px solid var(--success)',
-                              }}>
-                                −{disc}%
-                              </span>
-                            )}
+                            <div style={{ fontSize: 11, color: 'var(--fg-secondary)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 5 }}>
+                              {item.specialPrice != null ? (
+                                <>
+                                  <span style={{ color: '#7C3AED', fontWeight: 500 }}>{fmt(item.specialPrice)}/{item.unit}</span>
+                                  <span>·</span>
+                                  <span style={{ color: 'var(--kiuvo-blue)', fontWeight: 500 }}>{fmt(lineTotal)}</span>
+                                </>
+                              ) : disc > 0 ? (
+                                <>
+                                  <span style={{ textDecoration: 'line-through', color: 'var(--fg-tertiary)' }}>{fmt(item.price)}</span>
+                                  <span style={{ color: 'var(--success-fg)', fontWeight: 500 }}>{fmt(effP)}</span>
+                                  <span>/{item.unit}</span>
+                                  <span>·</span>
+                                  <span style={{ color: 'var(--kiuvo-blue)', fontWeight: 500 }}>{fmt(lineTotal)}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <span>{fmt(item.price)}/{item.unit}</span>
+                                  <span>·</span>
+                                  <span style={{ color: 'var(--kiuvo-blue)', fontWeight: 500 }}>{fmt(lineTotal)}</span>
+                                </>
+                              )}
+                            </div>
                           </div>
-                          <div style={{ fontSize: 11, color: 'var(--fg-secondary)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 5 }}>
-                            {disc > 0 ? (
-                              <>
-                                <span style={{ textDecoration: 'line-through', color: 'var(--fg-tertiary)' }}>{fmt(item.price)}</span>
-                                <span style={{ color: 'var(--success-fg)', fontWeight: 500 }}>{fmt(effP)}</span>
-                                <span>/{item.unit}</span>
-                                <span>·</span>
-                                <span style={{ color: 'var(--kiuvo-blue)', fontWeight: 500 }}>{fmt(lineTotal)}</span>
-                              </>
-                            ) : (
-                              <>
-                                <span>{fmt(item.price)}/{item.unit}</span>
-                                <span>·</span>
-                                <span style={{ color: 'var(--kiuvo-blue)', fontWeight: 500 }}>{fmt(lineTotal)}</span>
-                              </>
-                            )}
+                          <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-secondary)', borderRadius: 'var(--r-md)', border: '0.5px solid var(--border)' }}>
+                            <button onClick={() => setQty(item.id, item.qty - 1)}
+                              style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-secondary)' }}>
+                              <IcoMinus size={14} />
+                            </button>
+                            <QtyInput
+                              qty={item.qty}
+                              onChange={n => setQty(item.id, n)}
+                              style={{ width: 36, textAlign: 'center', fontSize: 13, fontWeight: 500, color: 'var(--fg)', background: 'transparent', border: 'none', outline: 'none', fontFamily: 'inherit', padding: 0 }}
+                            />
+                            <button onClick={() => setQty(item.id, item.qty + 1)}
+                              style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-secondary)' }}>
+                              <IcoPlus size={14} />
+                            </button>
                           </div>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-secondary)', borderRadius: 'var(--r-md)', border: '0.5px solid var(--border)' }}>
-                          <button onClick={() => setQty(item.id, item.qty - 1)}
-                            style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-secondary)' }}>
-                            <IcoMinus size={14} />
-                          </button>
-                          <QtyInput
-                            qty={item.qty}
-                            onChange={n => setQty(item.id, n)}
-                            style={{ width: 36, textAlign: 'center', fontSize: 13, fontWeight: 500, color: 'var(--fg)', background: 'transparent', border: 'none', outline: 'none', fontFamily: 'inherit', padding: 0 }}
-                          />
-                          <button onClick={() => setQty(item.id, item.qty + 1)}
-                            style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-secondary)' }}>
-                            <IcoPlus size={14} />
+                          <button onClick={() => removeItem(item.id)}
+                            style={{ width: 28, height: 28, borderRadius: 'var(--r-sm)', background: 'var(--danger-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <IcoTrash size={13} color="var(--danger)" />
                           </button>
                         </div>
-                        <button onClick={() => removeItem(item.id)}
-                          style={{ width: 28, height: 28, borderRadius: 'var(--r-sm)', background: 'var(--danger-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <IcoTrash size={13} color="var(--danger)" />
-                        </button>
+
+                        {/* Control de precio especial */}
+                        {specialPriceEditing === item.id ? (
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 8 }}>
+                            <span style={{ fontSize: 13, color: '#7C3AED', fontWeight: 600, flexShrink: 0 }}>$</span>
+                            <input
+                              type="number" min="0" step="0.01"
+                              value={specialPriceInput}
+                              onChange={e => setSpecialPriceInput(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter') confirmSpecialPrice(item.id) }}
+                              autoFocus
+                              placeholder="Precio especial…"
+                              style={{ flex: 1, padding: '7px 10px', background: 'var(--bg-secondary)', border: '0.5px solid #7C3AED', borderRadius: 'var(--r-md)', fontSize: 13, color: 'var(--fg)', outline: 'none', fontFamily: 'inherit' }}
+                            />
+                            <button
+                              onClick={() => confirmSpecialPrice(item.id)}
+                              style={{ padding: '7px 12px', background: '#7C3AED', color: '#fff', borderRadius: 'var(--r-md)', fontSize: 12, fontWeight: 500, border: 'none', flexShrink: 0 }}
+                            >Listo</button>
+                            <button
+                              onClick={() => setSpecialPriceEditing(null)}
+                              style={{ width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-secondary)', color: 'var(--fg-secondary)', borderRadius: 'var(--r-md)', border: '0.5px solid var(--border)', flexShrink: 0 }}
+                            ><Icon name="x" size={13} /></button>
+                          </div>
+                        ) : item.specialPrice != null ? (
+                          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                            <button
+                              onClick={() => openSpecialPrice(item)}
+                              style={{ flex: 1, padding: '5px 8px', background: 'transparent', border: '0.5px dashed #7C3AED', borderRadius: 'var(--r-md)', fontSize: 11, color: '#7C3AED', textAlign: 'center' }}
+                            >Editar precio especial · {fmt(item.specialPrice)}</button>
+                            <button
+                              onClick={() => removeSpecialPrice(item.id)}
+                              style={{ padding: '5px 8px', background: '#EDE9FE', border: '0.5px solid #7C3AED', borderRadius: 'var(--r-md)', fontSize: 11, color: '#6D28D9' }}
+                            >Quitar</button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => openSpecialPrice(item)}
+                            style={{ marginTop: 8, width: '100%', padding: '5px 8px', background: 'transparent', border: '0.5px dashed var(--border)', borderRadius: 'var(--r-md)', fontSize: 11, color: 'var(--fg-tertiary)', textAlign: 'center' }}
+                          >$ Precio especial</button>
+                        )}
                       </div>
                       )
                     })}

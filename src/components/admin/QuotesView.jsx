@@ -499,15 +499,16 @@ export default function QuotesView() {
         .eq('quote_id', quote.id)
 
       const pdfItems = (items || []).map((item, idx) => {
-        const discountPct = item.discount_pct || 0
-        // unit_price in DB is the effective price; QuotePDFDoc expects the list price
+        const rawDisc = item.discount_pct ?? 0
+        const isSpecialPrice = rawDisc === -1
+        const discountPct = isSpecialPrice ? 0 : rawDisc
         const listPrice = discountPct > 0
           ? item.unit_price / (1 - discountPct / 100)
           : item.unit_price
         return {
           id: idx, name: item.product_name, sku: item.sku || '',
           unit: item.unit || 'u.', qty: item.quantity,
-          price: listPrice, discountPct,
+          price: listPrice, discountPct, isSpecialPrice,
         }
       })
 

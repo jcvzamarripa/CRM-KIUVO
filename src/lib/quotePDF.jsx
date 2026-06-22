@@ -160,7 +160,7 @@ export function QuotePDFDoc({
         {items.map((item, idx) => {
           const effP  = item.discountPct > 0 ? item.price * (1 - item.discountPct / 100) : item.price
           const lineT = effP * item.qty
-          const disc  = item.discountPct > 0 ? `${item.discountPct}%` : '—'
+          const disc  = item.isSpecialPrice ? 'Esp.' : item.discountPct > 0 ? `${item.discountPct}%` : '—'
           return (
             <View key={String(item.id)} style={[s.trow, idx % 2 === 1 && s.trowAlt]}>
               <View style={s.cProduct}>
