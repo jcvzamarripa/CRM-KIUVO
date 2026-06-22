@@ -990,7 +990,7 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
                                   {item.name}
                                 </div>
                                 <button onClick={() => openNameEdit(item)} title="Editar nombre" style={{ flexShrink: 0, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-tertiary)', background: 'transparent', border: 'none', padding: 0 }}>
-                                  <Icon name="edit" size={11} />
+                                  <Icon name="pencil" size={11} />
                                 </button>
                                 {item.specialPrice != null ? (
                                   <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: '#EDE9FE', color: '#6D28D9', border: '0.5px solid #7C3AED' }}>
