@@ -1131,7 +1131,7 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
           ? { ...p, stage_id: old.stage_id, stage: old.stage_id, stage_entered_at: old.stage_entered_at, days: old.days }
           : p
       ))
-      addToast({ message: 'No se pudo mover el prospecto. Cambio revertido.', kind: 'warning' })
+      addToast({ message: `Error: ${error.message || error.code || JSON.stringify(error)}`, kind: 'warning' })
     } else {
       supabase.from('activities').insert({
         prospect_id: prospectId, seller_id: user.id, kind: 'stage',
