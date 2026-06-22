@@ -212,8 +212,9 @@ function MetasTab({ sellers = [] }) {
     const sellerIds = sellers.map(s => s.id)
 
     const [{ data: salesData }, { data: prospectsData }, { data: visitsData }] = await Promise.all([
-      supabase.from('sales').select('seller_id, amount')
-        .in('seller_id', sellerIds).gte('closed_at', from).lte('closed_at', toEnd),
+      supabase.from('quotes').select('seller_id, total')
+        .eq('status', 'approved')
+        .in('seller_id', sellerIds).gte('created_at', from).lte('created_at', toEnd),
       supabase.from('prospects').select('owner_id')
         .in('owner_id', sellerIds).gte('created_at', from).lte('created_at', toEnd),
       supabase.from('visits').select('seller_id').eq('kind', 'visit')
@@ -221,7 +222,7 @@ function MetasTab({ sellers = [] }) {
     ])
 
     const ventasMap = {}; const prospectsMap = {}; const visitasMap = {}
-    ;(salesData    || []).forEach(r => { ventasMap[r.seller_id]    = (ventasMap[r.seller_id]    || 0) + Number(r.amount || 0) })
+    ;(salesData    || []).forEach(r => { ventasMap[r.seller_id]    = (ventasMap[r.seller_id]    || 0) + Number(r.total || 0) })
     ;(prospectsData|| []).forEach(r => { prospectsMap[r.owner_id]  = (prospectsMap[r.owner_id]  || 0) + 1 })
     ;(visitsData   || []).forEach(r => { visitasMap[r.seller_id]   = (visitasMap[r.seller_id]   || 0) + 1 })
 
