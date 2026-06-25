@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { VitePWA } from 'vite-plugin-pwa'
 
 /**
  * Vite configuration with per-mode settings.
@@ -14,7 +15,19 @@ export default defineConfig(({ mode }) => {
   const isStaging = mode === 'staging'
 
   return {
-    plugins: [react()],
+    plugins: [
+      react(),
+      VitePWA({
+        strategies: 'injectManifest',
+        srcDir: 'src',
+        filename: 'sw.js',
+        manifest: false,
+        injectManifest: {
+          globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
+        },
+        devOptions: { enabled: false },
+      }),
+    ],
 
     // ── Build options ────────────────────────────────────────────────────────
     build: {
