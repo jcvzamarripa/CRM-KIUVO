@@ -1389,7 +1389,14 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
             initialProspectName={quoteProspect.name}
             initialContactName={quoteProspect.contact || ''}
             onClose={() => { setShowProposalQuote(false); setQuoteProspect(null) }}
-            onGenerated={() => { setShowProposalQuote(false); setQuoteProspect(null); loadProspects() }}
+            onGenerated={async (_name, total) => {
+              if (quoteProspect?.id && total > 0) {
+                await supabase.from('prospects').update({ value: total }).eq('id', quoteProspect.id)
+              }
+              setShowProposalQuote(false)
+              setQuoteProspect(null)
+              loadProspects()
+            }}
           />
         </Suspense>
       )}
