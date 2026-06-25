@@ -877,11 +877,8 @@ function ProspectCard({ p, onAction, onAdvance, onODP }) {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          <div style={{
-            fontSize: 13, fontWeight: 500, fontVariantNumeric: 'tabular-nums',
-            color: p.value ? 'var(--fg)' : 'var(--fg-tertiary)',
-          }}>
-            {p.value ? fmt(p.value) : '—'}
+          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)', fontVariantNumeric: 'tabular-nums' }}>
+            {fmt(p.value)}
           </div>
           {!p._optimistic && (
             <button
@@ -997,7 +994,7 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
     setLoading(true)
     setLoadError(false)
 
-    const [{ data: rows, error: pErr }, { data: visits }] = await Promise.all([
+    const [{ data: rows, error: pErr }, { data: visits }, { data: quotes }] = await Promise.all([
       supabase
         .from('prospects')
         .select('id, name, company, phone, email, contact, stage_id, value, health, days_in_stage, stage_entered_at, last_contact_at, notes')
@@ -1007,6 +1004,11 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
         .from('visits')
         .select('prospect_id')
         .eq('seller_id', user.id),
+      supabase
+        .from('quotes')
+        .select('prospect_id, total')
+        .eq('seller_id', user.id)
+        .order('created_at', { ascending: false }),
     ])
 
     if (pErr) {
@@ -1019,7 +1021,18 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
     const counts = {}
     visits?.forEach(v => { counts[v.prospect_id] = (counts[v.prospect_id] ?? 0) + 1 })
 
-    setProspects((rows ?? []).map(r => normalize(r, counts)))
+    // Tomar el total de la cotización más reciente por prospecto
+    const quoteValue = {}
+    ;(quotes ?? []).forEach(q => {
+      if (!quoteValue[q.prospect_id]) quoteValue[q.prospect_id] = Number(q.total || 0)
+    })
+
+    setProspects((rows ?? []).map(r => {
+      const normalized = normalize(r, counts)
+      // Si hay cotización, usar ese total; si no, usar el valor estimado del prospecto
+      if (quoteValue[r.id]) normalized.value = quoteValue[r.id]
+      return normalized
+    }))
     setLoading(false)
   }, [user.id])
 
