@@ -30,8 +30,8 @@ function useSellerDashboard(sellerId) {
     const [profileRes, salesRes, activitiesTodayRes, atRiskRes, inactiveRes] = await Promise.all([
       // Meta del mes desde perfil
       supabase.from('profiles').select('goal_amount').eq('id', sellerId).single(),
-      // Ventas del mes
-      supabase.from('sales').select('amount').eq('seller_id', sellerId).gte('closed_at', monthStart),
+      // Ventas del mes — cotizaciones aprobadas (tabla sales no existe)
+      supabase.from('quotes').select('total').eq('seller_id', sellerId).eq('status', 'approved').gte('created_at', monthStart),
       // Actividades de hoy
       supabase.from('activities').select('kind')
         .eq('seller_id', sellerId)
@@ -51,7 +51,7 @@ function useSellerDashboard(sellerId) {
 
     const goal         = profileRes.data?.goal_amount || 100000
     const salesData    = salesRes.data || []
-    const monthlySales = salesData.reduce((s, r) => s + Number(r.amount || 0), 0)
+    const monthlySales = salesData.reduce((s, r) => s + Number(r.total || 0), 0)
     const acts         = activitiesTodayRes.data || []
     const atRisk       = atRiskRes.data || []
 
