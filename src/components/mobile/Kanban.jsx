@@ -134,16 +134,25 @@ function AddProspectModal({ stage, onClose, onSave }) {
             />
           </div>
           <div>
+            <label style={{ ...labelStyle, color: 'var(--kiuvo-blue)', fontWeight: 600 }}>
+              Valor del negocio ($) <span style={{ color: 'var(--danger)', fontSize: 13 }}>*</span>
+            </label>
+            <input
+              value={value}
+              onChange={e => setValue(e.target.value)}
+              placeholder="Ej. 15000"
+              type="text"
+              inputMode="numeric"
+              style={{ ...inputStyle, borderColor: 'var(--kiuvo-blue)', fontSize: 16, fontWeight: 500 }}
+            />
+          </div>
+          <div>
             <label style={labelStyle}>Persona de contacto</label>
             <input value={contact} onChange={e => setContact(e.target.value)} placeholder="Nombre del responsable" style={inputStyle} />
           </div>
           <div>
             <label style={labelStyle}>Teléfono</label>
             <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="10 dígitos" type="tel" inputMode="numeric" style={inputStyle} />
-          </div>
-          <div>
-            <label style={labelStyle}>Valor estimado ($)</label>
-            <input value={value} onChange={e => setValue(e.target.value)} placeholder="0" type="text" inputMode="numeric" style={inputStyle} />
           </div>
           <div>
             <label style={labelStyle}>Notas <span style={{ fontWeight: 400, opacity: 0.7 }}>(opcional)</span></label>
@@ -868,8 +877,11 @@ function ProspectCard({ p, onAction, onAdvance, onODP }) {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)', fontVariantNumeric: 'tabular-nums' }}>
-            {fmt(p.value)}
+          <div style={{
+            fontSize: 13, fontWeight: 500, fontVariantNumeric: 'tabular-nums',
+            color: p.value ? 'var(--fg)' : 'var(--fg-tertiary)',
+          }}>
+            {p.value ? fmt(p.value) : '—'}
           </div>
           {!p._optimistic && (
             <button
