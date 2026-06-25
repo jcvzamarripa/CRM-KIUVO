@@ -5,9 +5,7 @@ import { supabase, isSupabaseConfigured } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../../contexts/ToastContext'
 import { useStages } from '../../contexts/StagesContext'
-// useQuoteHistory ya no se usa directamente en Kanban (updates van inline)
-import { pdf } from '@react-pdf/renderer'
-import { QuotePDFDoc } from '../../lib/quotePDF'
+// PDF: importación dinámica para no bloquear la carga inicial del seller
 
 // Lazy: evita cargar react-pdf (~1.4 MB) hasta que el usuario abre cotizaciones
 const QuoteModal           = lazy(() => import('./QuoteModal'))
@@ -291,6 +289,10 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, on
           logoDataUrl = `data:image/png;base64,${btoa(bin)}`
         }
       } catch (_) {}
+      const [{ pdf }, { QuotePDFDoc }] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('../../lib/quotePDF'),
+      ])
       const blob = await pdf(
         <QuotePDFDoc
           quoteId={q.id}
