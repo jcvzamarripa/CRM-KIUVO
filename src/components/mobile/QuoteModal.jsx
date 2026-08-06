@@ -13,8 +13,20 @@ const fmt  = n => '$' + n.toLocaleString('es-MX', { minimumFractionDigits: 0 })
 const fmtPct = n => `${n}%`
 
 function effectivePrice(item) {
-  if (item.specialPrice != null) return item.specialPrice
-  return item.discountPct > 0 ? item.price * (1 - item.discountPct / 100) : item.price
+  let base
+  if (item.specialPrice != null) {
+    base = item.specialPrice
+  } else {
+    base = item.discountPct > 0 ? item.price * (1 - item.discountPct / 100) : item.price
+  }
+  if (item.extraDiscount?.value > 0) {
+    if (item.extraDiscount.type === 'pct') {
+      base = base * (1 - item.extraDiscount.value / 100)
+    } else {
+      base = Math.max(0, base - item.extraDiscount.value)
+    }
+  }
+  return base
 }
 
 /** Compute discount % for a product at a given qty. */
@@ -105,10 +117,7 @@ function Spinner({ size = 16 }) {
 // ── SuccessView ───────────────────────────────────────────────────
 function SuccessView({ items, prospectName, prospectEmail, prospectPhone, sellerName, pdfUrl, onClose }) {
   const total   = items.reduce((s, i) => s + effectivePrice(i) * i.qty, 0)
-  const savings = items.reduce((s, i) => {
-    if (i.specialPrice != null) return s
-    return i.discountPct > 0 ? s + (i.price - effectivePrice(i)) * i.qty : s
-  }, 0)
+  const savings = items.reduce((s, i) => s + (i.price - effectivePrice(i)) * i.qty, 0)
   const [sharing, setSharing]   = useState(false)
   const [shareMsg, setShareMsg] = useState('')
 
@@ -243,6 +252,16 @@ function SuccessView({ items, prospectName, prospectEmail, prospectPhone, seller
                     verticalAlign: 'middle',
                   }}>−{disc}%</span>
                 ) : null}
+                {i.extraDiscount?.value > 0 && (
+                  <span style={{
+                    marginLeft: 4, fontSize: 10, fontWeight: 700,
+                    padding: '1px 5px', borderRadius: 99,
+                    background: '#FFF7ED', color: '#C2410C',
+                    verticalAlign: 'middle',
+                  }}>
+                    {i.extraDiscount.type === 'pct' ? `−${i.extraDiscount.value}%` : `−${fmt(i.extraDiscount.value)}`} esp.
+                  </span>
+                )}
               </span>
               <span style={{ color: 'var(--fg-secondary)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
                 {fmt(effP * i.qty)}
@@ -252,7 +271,7 @@ function SuccessView({ items, prospectName, prospectEmail, prospectPhone, seller
         })}
         {savings > 0 && (
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--success-fg)', fontWeight: 500 }}>
-            <span>Ahorro por volumen</span>
+            <span>Descuentos aplicados</span>
             <span>−{fmt(savings)}</span>
           </div>
         )}
@@ -449,6 +468,9 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
   const [pdfUrl, setPdfUrl]               = useState(null)
   const [specialPriceEditing, setSpecialPriceEditing] = useState(null)
   const [specialPriceInput, setSpecialPriceInput]     = useState('')
+  const [extraDiscEditing, setExtraDiscEditing]       = useState(null)  // item.id
+  const [extraDiscType, setExtraDiscType]             = useState('pct') // 'pct' | 'mxn'
+  const [extraDiscInput, setExtraDiscInput]           = useState('')
   const [nameEditing, setNameEditing]   = useState(null)
   const [nameEditData, setNameEditData] = useState({ name: '', sku: '' })
   // Extra quote fields
@@ -506,7 +528,7 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
         return prev.map(i => i.id === product.id ? { ...i, qty: newQty, discountPct: disc } : i)
       }
       const disc = computeDiscount(product, 1)
-      return [...prev, { ...product, qty: 1, discountPct: disc, specialPrice: null }]
+      return [...prev, { ...product, qty: 1, discountPct: disc, specialPrice: null, extraDiscount: null }]
     })
   }
   const setQty = (id, qty) => {
@@ -548,12 +570,29 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
     setItems(prev => prev.map(i => i.id === id ? { ...i, specialPrice: null } : i))
   }
 
-  const total   = items.reduce((s, i) => s + effectivePrice(i) * i.qty, 0)
-  const savings = items.reduce((s, i) => {
-    if (i.specialPrice != null) return s
-    return i.discountPct > 0 ? s + (i.price - effectivePrice(i)) * i.qty : s
-  }, 0)
-  const canSubmit = items.length > 0 && !submitting
+  function openExtraDisc(item) {
+    setExtraDiscEditing(item.id)
+    setExtraDiscType(item.extraDiscount?.type ?? 'pct')
+    setExtraDiscInput(item.extraDiscount?.value != null ? String(item.extraDiscount.value) : '')
+  }
+  function confirmExtraDisc(id) {
+    const val = parseFloat(extraDiscInput)
+    if (!isNaN(val) && val > 0) {
+      setItems(prev => prev.map(i => i.id === id
+        ? { ...i, extraDiscount: { type: extraDiscType, value: val } }
+        : i
+      ))
+    }
+    setExtraDiscEditing(null)
+  }
+  function removeExtraDisc(id) {
+    setItems(prev => prev.map(i => i.id === id ? { ...i, extraDiscount: null } : i))
+  }
+
+  const total      = items.reduce((s, i) => s + effectivePrice(i) * i.qty, 0)
+  const savings    = items.reduce((s, i) => s + (i.price - effectivePrice(i)) * i.qty, 0)
+  const hasExtraDisc = items.some(i => i.extraDiscount?.value > 0)
+  const canSubmit  = items.length > 0 && !submitting
 
   const handleSubmit = async () => {
     if (!canSubmit) return
@@ -1011,6 +1050,11 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
                                     −{disc}%
                                   </span>
                                 ) : null}
+                                {item.extraDiscount?.value > 0 && (
+                                  <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: '#FFF7ED', color: '#C2410C', border: '0.5px solid #F97316' }}>
+                                    {item.extraDiscount.type === 'pct' ? `−${item.extraDiscount.value}%` : `−${fmt(item.extraDiscount.value)}`} esp.
+                                  </span>
+                                )}
                               </div>
                               <div style={{ fontSize: 11, color: 'var(--fg-secondary)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 5 }}>
                                 {item.specialPrice != null ? (
@@ -1096,6 +1140,51 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
                             onClick={() => openSpecialPrice(item)}
                             style={{ marginTop: 8, width: '100%', padding: '5px 8px', background: 'transparent', border: '0.5px dashed var(--border)', borderRadius: 'var(--r-md)', fontSize: 11, color: 'var(--fg-tertiary)', textAlign: 'center' }}
                           >$ Precio especial</button>
+                        )}
+
+                        {/* ── Descuento adicional (% o $) ── */}
+                        {extraDiscEditing === item.id ? (
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 6 }}>
+                            {/* Toggle % / $ */}
+                            <div style={{ display: 'flex', border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)', overflow: 'hidden', flexShrink: 0 }}>
+                              {[['pct','%'],['mxn','$']].map(([t,label]) => (
+                                <button key={t} onClick={() => setExtraDiscType(t)} style={{
+                                  padding: '7px 11px', fontSize: 12, fontWeight: 600,
+                                  background: extraDiscType === t ? '#F97316' : 'var(--bg-secondary)',
+                                  color: extraDiscType === t ? '#fff' : 'var(--fg-secondary)',
+                                  border: 'none', cursor: 'pointer',
+                                }}>{label}</button>
+                              ))}
+                            </div>
+                            <input
+                              type="number" min="0" step="0.01"
+                              value={extraDiscInput}
+                              onChange={e => setExtraDiscInput(e.target.value)}
+                              onKeyDown={e => { if (e.key === 'Enter') confirmExtraDisc(item.id) }}
+                              autoFocus
+                              placeholder={extraDiscType === 'pct' ? 'Ej. 10' : 'Ej. 500'}
+                              style={{ flex: 1, padding: '7px 10px', background: 'var(--bg-secondary)', border: '0.5px solid #F97316', borderRadius: 'var(--r-md)', fontSize: 13, color: 'var(--fg)', outline: 'none', fontFamily: 'inherit' }}
+                            />
+                            <button onClick={() => confirmExtraDisc(item.id)} style={{ padding: '7px 12px', background: '#F97316', color: '#fff', borderRadius: 'var(--r-md)', fontSize: 12, fontWeight: 500, border: 'none', flexShrink: 0 }}>
+                              Listo
+                            </button>
+                            <button onClick={() => setExtraDiscEditing(null)} style={{ width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-secondary)', color: 'var(--fg-secondary)', borderRadius: 'var(--r-md)', border: '0.5px solid var(--border)', flexShrink: 0 }}>
+                              <Icon name="x" size={13} />
+                            </button>
+                          </div>
+                        ) : item.extraDiscount?.value > 0 ? (
+                          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                            <button onClick={() => openExtraDisc(item)} style={{ flex: 1, padding: '5px 8px', background: 'transparent', border: '0.5px dashed #F97316', borderRadius: 'var(--r-md)', fontSize: 11, color: '#C2410C', textAlign: 'center' }}>
+                              Dto. adicional: {item.extraDiscount.type === 'pct' ? `−${item.extraDiscount.value}%` : `−${fmt(item.extraDiscount.value)}`} · Final: {fmt(effectivePrice(item))}
+                            </button>
+                            <button onClick={() => removeExtraDisc(item.id)} style={{ padding: '5px 8px', background: '#FFF7ED', border: '0.5px solid #F97316', borderRadius: 'var(--r-md)', fontSize: 11, color: '#C2410C' }}>
+                              Quitar
+                            </button>
+                          </div>
+                        ) : (
+                          <button onClick={() => openExtraDisc(item)} style={{ marginTop: 6, width: '100%', padding: '5px 8px', background: 'transparent', border: '0.5px dashed var(--border)', borderRadius: 'var(--r-md)', fontSize: 11, color: 'var(--fg-tertiary)', textAlign: 'center' }}>
+                            % / $ Descuento adicional
+                          </button>
                         )}
                       </div>
                       )
@@ -1191,7 +1280,7 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
                       fontSize: 12, color: 'var(--success-fg)', fontWeight: 500,
                     }}>
                       <Icon name="discount" size={13} color="var(--success)" />
-                      Ahorro por volumen: {fmt(savings)}
+                      {hasExtraDisc ? 'Descuentos aplicados' : 'Ahorro por volumen'}: {fmt(savings)}
                     </div>
                   )}
                 </div>
