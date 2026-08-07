@@ -81,6 +81,18 @@ const fmtDate = d => {
   return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`
 }
 
+// Precio efectivo final (precio base con volumen + descuento adicional si existe)
+function pdfEffectivePrice(item) {
+  const base = item.discountPct > 0
+    ? item.price * (1 - item.discountPct / 100)
+    : item.price
+  if (item.extraDiscount?.value > 0) {
+    if (item.extraDiscount.type === 'pct') return base * (1 - item.extraDiscount.value / 100)
+    return Math.max(0, base - item.extraDiscount.value)
+  }
+  return base
+}
+
 export function QuotePDFDoc({
   quoteId,
   prospectName,
@@ -95,11 +107,8 @@ export function QuotePDFDoc({
   address = CO_ADDRESS,
 }) {
   const subtotalBruto = items.reduce((sum, i) => sum + i.price * i.qty, 0)
-  const subtotal = items.reduce((sum, i) => {
-    const effP = i.discountPct > 0 ? i.price * (1 - i.discountPct / 100) : i.price
-    return sum + effP * i.qty
-  }, 0)
-  const savings = subtotalBruto - subtotal
+  const subtotal      = items.reduce((sum, i) => sum + pdfEffectivePrice(i) * i.qty, 0)
+  const savings       = subtotalBruto - subtotal
   const ivaAmt = subtotal * IVA
   const total  = subtotal + ivaAmt
 
@@ -158,9 +167,18 @@ export function QuotePDFDoc({
 
         {/* ── Table rows ── */}
         {items.map((item, idx) => {
-          const effP  = item.discountPct > 0 ? item.price * (1 - item.discountPct / 100) : item.price
+          const effP  = pdfEffectivePrice(item)
           const lineT = effP * item.qty
-          const disc  = item.isSpecialPrice ? 'Esp.' : item.discountPct > 0 ? `${item.discountPct}%` : '—'
+          // Construir etiqueta de descuento compuesta
+          const discParts = []
+          if (item.isSpecialPrice) discParts.push('Esp.')
+          else if (item.discountPct > 0) discParts.push(`${item.discountPct}%`)
+          if (item.extraDiscount?.value > 0) {
+            discParts.push(item.extraDiscount.type === 'pct'
+              ? `+${item.extraDiscount.value}%`
+              : `+$${item.extraDiscount.value}`)
+          }
+          const disc = discParts.length > 0 ? discParts.join(' ') : '—'
           return (
             <View key={String(item.id)} style={[s.trow, idx % 2 === 1 && s.trowAlt]}>
               <View style={s.cProduct}>
@@ -188,7 +206,7 @@ export function QuotePDFDoc({
             )}
             {savings > 0 && (
               <View style={[s.totalsRow, { borderBottomColor: '#1D9E75' }]}>
-                <Text style={[s.totalsLabel, { color: '#1D9E75', fontFamily: 'Helvetica-Bold' }]}>Descuento por volumen</Text>
+                <Text style={[s.totalsLabel, { color: '#1D9E75', fontFamily: 'Helvetica-Bold' }]}>Descuentos aplicados</Text>
                 <Text style={[s.totalsValue, { color: '#1D9E75', fontFamily: 'Helvetica-Bold' }]}>−{fmt(savings)}</Text>
               </View>
             )}
@@ -230,7 +248,7 @@ export function QuotePDFDoc({
           <Text style={s.condTitle}>Condiciones Comerciales</Text>
           <Text style={s.condItem}>• Los precios están expresados en pesos mexicanos (MXN) e incluyen IVA al 16%.</Text>
           <Text style={s.condItem}>• Esta cotización tiene una vigencia de 15 días naturales a partir de la fecha de emisión.</Text>
-          <Text style={s.condItem}>• Los descuentos por volumen aplican únicamente para las cantidades indicadas en este documento.</Text>
+          <Text style={s.condItem}>• Los descuentos aplican únicamente para las cantidades y condiciones indicadas en este documento.</Text>
           <Text style={s.condItem}>• El pedido se confirma con el 50% de anticipo; el saldo restante se cubre contra entrega.</Text>
           <Text style={s.condItem}>• Precios sujetos a cambio sin previo aviso por variaciones en tipo de cambio o costos de insumos.</Text>
         </View>
