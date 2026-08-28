@@ -5,6 +5,7 @@ import { supabase, isSupabaseConfigured } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../../contexts/ToastContext'
 import { useStages } from '../../contexts/StagesContext'
+import { downloadStoredPDF } from '../../hooks/useQuoteHistory'
 // PDF: importación dinámica para no bloquear la carga inicial del seller
 
 // Lazy: evita cargar react-pdf (~1.4 MB) hasta que el usuario abre cotizaciones
@@ -845,6 +846,93 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, on
 }
 
 // ─── ProspectCard ─────────────────────────────────────────────────────────────
+// ─── Tarjeta de cotización (resultados de búsqueda) ───────────────────────────
+function QuoteResultCard({ q, onOpenProspect }) {
+  const [downloading, setDownloading] = useState(false)
+
+  async function handleDownload() {
+    if (!q.pdfPath) return
+    setDownloading(true)
+    await downloadStoredPDF(q.pdfPath, `${q.clientName} - ${q.quoteNumber ?? q.shortId}`)
+    setDownloading(false)
+  }
+
+  return (
+    <div style={{
+      background: 'var(--surface)', border: '0.5px solid var(--border)',
+      borderRadius: 'var(--r-md)', padding: '11px 12px',
+      display: 'flex', flexDirection: 'column', gap: 8,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
+          <Icon name="receipt" size={14} color="#854F0B" />
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {q.clientName}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginTop: 1 }}>
+              #{q.quoteNumber ?? q.shortId} · {q.dateStr}
+            </div>
+          </div>
+        </div>
+        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+          {fmt(q.total)}
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+        <span style={{
+          fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 99,
+          background: QUOTE_STATUS_BG[q.status], color: QUOTE_STATUS_COLOR[q.status],
+        }}>
+          {QUOTE_STATUS_LABEL[q.status] ?? q.status}
+        </span>
+        {q.orphan && (
+          <span style={{
+            fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 99,
+            background: 'var(--warning-bg)', color: 'var(--warning-fg)',
+            display: 'inline-flex', alignItems: 'center', gap: 3,
+          }}>
+            <Icon name="alert-triangle" size={9} color="var(--warning-fg)" />
+            Sin prospecto en el embudo
+          </span>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', gap: 6 }}>
+        {q.pdfPath && (
+          <button
+            onClick={handleDownload}
+            disabled={downloading}
+            style={{
+              flex: 1, padding: '7px', borderRadius: 'var(--r-md)',
+              background: 'var(--bg-secondary)', border: '0.5px solid var(--border)',
+              color: 'var(--fg-secondary)', fontSize: 12,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+              opacity: downloading ? 0.6 : 1,
+            }}>
+            <Icon name="download" size={12} />
+            {downloading ? 'Abriendo…' : 'Descargar PDF'}
+          </button>
+        )}
+        {q.prospectId && (
+          <button
+            onClick={() => onOpenProspect(q.prospectId)}
+            style={{
+              flex: 1, padding: '7px', borderRadius: 'var(--r-md)',
+              background: 'var(--kiuvo-blue-soft)', border: '0.5px solid var(--kiuvo-blue)',
+              color: 'var(--kiuvo-blue-deep)', fontSize: 12, fontWeight: 500,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+            }}>
+            <Icon name="arrow-up-right" size={12} />
+            Ver prospecto
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function ProspectCard({ p, onAction, onAdvance, onODP, showStage = false }) {
   const { stages: ctxStages, stageById: ctxStageById } = useStages()
   const stageIdx  = ctxStages.findIndex(s => s.id === p.stage)
@@ -1000,6 +1088,7 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
   const [sortMode,         setSortMode]         = useState('value')
   const [showSearch,       setShowSearch]       = useState(false)
   const [searchQuery,      setSearchQuery]      = useState('')
+  const [quotes,           setQuotes]           = useState([])
 
   // ── Load ──────────────────────────────────────────────────────────
   const loadProspects = useCallback(async () => {
@@ -1018,7 +1107,7 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
         .eq('seller_id', user.id),
       supabase
         .from('quotes')
-        .select('prospect_id, total')
+        .select('id, prospect_id, total, status, notes, created_at, pdf_path, quote_number, prospect:prospects(name)')
         .eq('seller_id', user.id)
         .order('created_at', { ascending: false }),
     ])
@@ -1036,8 +1125,23 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
     // Tomar el total de la cotización más reciente por prospecto
     const quoteValue = {}
     ;(quotes ?? []).forEach(q => {
-      if (!quoteValue[q.prospect_id]) quoteValue[q.prospect_id] = Number(q.total || 0)
+      if (q.prospect_id && !quoteValue[q.prospect_id]) quoteValue[q.prospect_id] = Number(q.total || 0)
     })
+
+    // Guardar cotizaciones normalizadas para el buscador
+    setQuotes((quotes ?? []).map(q => ({
+      id:           q.id,
+      shortId:      q.id.slice(0, 8).toUpperCase(),
+      quoteNumber:  q.quote_number || null,
+      prospectId:   q.prospect_id || null,
+      clientName:   q.prospect?.name || q.notes || 'Sin cliente',
+      orphan:       !q.prospect_id,
+      total:        Number(q.total || 0),
+      status:       q.status || 'draft',
+      pdfPath:      q.pdf_path || null,
+      createdAt:    q.created_at,
+      dateStr:      new Date(q.created_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }),
+    })))
 
     setProspects((rows ?? []).map(r => {
       const normalized = normalize(r, counts)
@@ -1110,6 +1214,15 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
     : prospects.filter(p => p.stage === activeStage)
   const list       = [...rawList].sort((a, b) => sortMode === 'value' ? (b.value ?? 0) - (a.value ?? 0) : (b.days ?? 0) - (a.days ?? 0))
   const totalValue = rawList.reduce((s, p) => s + (p.value ?? 0), 0)
+
+  // Cotizaciones que coinciden con la búsqueda (incluye las huérfanas sin prospecto)
+  const quoteHits = searching
+    ? quotes.filter(qt =>
+        qt.clientName.toLowerCase().includes(q) ||
+        qt.shortId.toLowerCase().includes(q) ||
+        String(qt.quoteNumber ?? '').includes(q)
+      )
+    : []
 
   // ── Create ────────────────────────────────────────────────────────
   async function handleAddProspect({ name, contact, phone, value, notes }) {
@@ -1296,7 +1409,7 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
           <input
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Buscar por nombre, contacto, teléfono…"
+            placeholder="Buscar prospecto o cotización…"
             autoFocus
             style={{
               width: '100%', boxSizing: 'border-box', padding: '10px 34px 10px 36px',
@@ -1361,7 +1474,10 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
           </div>
           <div style={{ fontSize: 11, color: 'var(--fg-secondary)', marginTop: 2 }}>
             {searching
-              ? `${list.length} prospecto${list.length !== 1 ? 's' : ''} en todas las etapas · ${fmt(totalValue)}`
+              ? [
+                  `${list.length} prospecto${list.length !== 1 ? 's' : ''}`,
+                  quoteHits.length > 0 ? `${quoteHits.length} cotización${quoteHits.length !== 1 ? 'es' : ''}` : null,
+                ].filter(Boolean).join(' · ')
               : stage.isRepository
                 ? 'Prospectos archivados — reactivables'
                 : `Mínimo ${stage.min} visita${stage.min > 1 ? 's' : ''} · ${fmt(totalValue)} potencial`
@@ -1395,7 +1511,7 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
               background: 'var(--kiuvo-blue)', color: '#fff', fontSize: 13,
             }}>Reintentar</button>
           </div>
-        ) : list.length === 0 ? (
+        ) : (list.length === 0 && quoteHits.length === 0) ? (
           <div style={{
             padding: '40px 0', textAlign: 'center', color: 'var(--fg-tertiary)',
             border: '0.5px dashed var(--border-strong)', borderRadius: 'var(--r-lg)',
@@ -1429,13 +1545,39 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
             )}
           </div>
         ) : (
-          list.map(p => (
-            <ProspectCard
-              key={p.id} p={p}
-              onAction={setActionTarget} onAdvance={handleMoveStage} onODP={setOdpProspect}
-              showStage={searching}
-            />
-          ))
+          <>
+            {/* Prospectos */}
+            {searching && list.length > 0 && (
+              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--fg-tertiary)', letterSpacing: 0.5, marginTop: 2 }}>
+                PROSPECTOS ({list.length})
+              </div>
+            )}
+            {list.map(p => (
+              <ProspectCard
+                key={p.id} p={p}
+                onAction={setActionTarget} onAdvance={handleMoveStage} onODP={setOdpProspect}
+                showStage={searching}
+              />
+            ))}
+
+            {/* Cotizaciones */}
+            {quoteHits.length > 0 && (
+              <>
+                <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--fg-tertiary)', letterSpacing: 0.5, marginTop: 8 }}>
+                  COTIZACIONES ({quoteHits.length})
+                </div>
+                {quoteHits.map(qt => (
+                  <QuoteResultCard
+                    key={qt.id} q={qt}
+                    onOpenProspect={pid => {
+                      const target = prospects.find(p => p.id === pid)
+                      if (target) { setSearchQuery(''); setShowSearch(false); setActiveStage(target.stage) }
+                    }}
+                  />
+                ))}
+              </>
+            )}
+          </>
         )}
       </div>
 
