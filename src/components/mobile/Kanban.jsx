@@ -846,8 +846,191 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, on
 }
 
 // ─── ProspectCard ─────────────────────────────────────────────────────────────
+// ─── Modal: vincular cotización huérfana a un prospecto ───────────────────────
+function LinkQuoteModal({ quote, prospects, onClose, onCreate, onLink }) {
+  const { stages: allStages, stageById } = useStages()
+  const selectable = allStages.filter(s => !s.isRepository)
+
+  const [mode,    setMode]    = useState('new')      // 'new' | 'existing'
+  const [saving,  setSaving]  = useState(false)
+  // Crear nuevo
+  const [name,    setName]    = useState(quote.clientName === 'Sin cliente' ? '' : quote.clientName)
+  const [contact, setContact] = useState('')
+  const [phone,   setPhone]   = useState('')
+  const [stageId, setStageId] = useState(
+    selectable.some(s => s.id === 'cotizacion') ? 'cotizacion' : (selectable[0]?.id ?? 'prospeccion')
+  )
+  // Vincular existente
+  const [search,  setSearch]  = useState('')
+
+  const matches = search.trim()
+    ? prospects.filter(p => (p.name ?? '').toLowerCase().includes(search.trim().toLowerCase()))
+    : prospects.slice(0, 20)
+
+  async function handleCreate() {
+    if (!name.trim() || saving) return
+    setSaving(true)
+    const ok = await onCreate({ name: name.trim(), contact: contact.trim(), phone: phone.trim(), stageId })
+    setSaving(false)
+    if (ok) onClose()
+  }
+
+  async function handleLink(prospectId) {
+    if (saving) return
+    setSaving(true)
+    const ok = await onLink(prospectId)
+    setSaving(false)
+    if (ok) onClose()
+  }
+
+  const inputStyle = {
+    width: '100%', boxSizing: 'border-box', padding: '10px 12px',
+    background: 'var(--bg-secondary)', border: '0.5px solid var(--border)',
+    borderRadius: 'var(--r-md)', fontSize: 14, color: 'var(--fg)',
+    outline: 'none', fontFamily: 'inherit',
+  }
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100 }} />
+      <div style={{
+        position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 101,
+        background: 'var(--bg)', borderRadius: '20px 20px 0 0',
+        maxHeight: '90%', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+      }}>
+        {/* Handle */}
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 2px' }}>
+          <div style={{ width: 40, height: 4, borderRadius: 2, background: 'var(--border-strong)' }} />
+        </div>
+
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px 12px' }}>
+          <div>
+            <div style={{ fontSize: 17, fontWeight: 500, color: 'var(--fg)' }}>Vincular cotización</div>
+            <div style={{ fontSize: 12, color: 'var(--fg-secondary)', marginTop: 2 }}>
+              #{quote.quoteNumber ?? quote.shortId} · {fmt(quote.total)}
+            </div>
+          </div>
+          <button onClick={onClose} style={{
+            width: 32, height: 32, borderRadius: '50%', background: 'var(--bg-secondary)',
+            border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-secondary)',
+          }}>
+            <Icon name="x" size={16} />
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: 6, padding: '0 16px 12px' }}>
+          {[['new', 'Crear prospecto'], ['existing', 'Vincular a existente']].map(([m, label]) => (
+            <button key={m} onClick={() => setMode(m)} style={{
+              flex: 1, padding: '8px', borderRadius: 'var(--r-md)', fontSize: 13, fontWeight: 500,
+              border: `0.5px solid ${mode === m ? 'var(--kiuvo-blue)' : 'var(--border)'}`,
+              background: mode === m ? 'var(--kiuvo-blue-soft)' : 'var(--surface)',
+              color: mode === m ? 'var(--kiuvo-blue-deep)' : 'var(--fg-secondary)',
+            }}>{label}</button>
+          ))}
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px 20px' }}>
+          {mode === 'new' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <label style={{ fontSize: 11, color: 'var(--fg-secondary)', fontWeight: 500 }}>Nombre del cliente *</label>
+                <input value={name} onChange={e => setName(e.target.value)} autoFocus
+                  placeholder="Nombre o empresa"
+                  style={{ ...inputStyle, borderColor: 'var(--kiuvo-blue)' }} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <label style={{ fontSize: 11, color: 'var(--fg-secondary)', fontWeight: 500 }}>Contacto</label>
+                <input value={contact} onChange={e => setContact(e.target.value)}
+                  placeholder="Ej. Juan Pérez" style={inputStyle} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <label style={{ fontSize: 11, color: 'var(--fg-secondary)', fontWeight: 500 }}>Teléfono</label>
+                <input value={phone} onChange={e => setPhone(e.target.value)} inputMode="tel"
+                  placeholder="449-000-00-00" style={inputStyle} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label style={{ fontSize: 11, color: 'var(--fg-secondary)', fontWeight: 500 }}>Etapa inicial</label>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {selectable.map(s => {
+                    const on = s.id === stageId
+                    return (
+                      <button key={s.id} onClick={() => setStageId(s.id)} style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 5,
+                        padding: '6px 11px', borderRadius: 'var(--r-full)', fontSize: 12, fontWeight: 500,
+                        border: `0.5px solid ${on ? s.color : 'var(--border)'}`,
+                        background: on ? s.color : 'var(--surface)',
+                        color: on ? '#fff' : 'var(--fg)',
+                      }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: on ? '#fff' : s.color }} />
+                        {s.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+              <div style={{
+                padding: '9px 12px', background: 'var(--kiuvo-blue-soft)',
+                borderRadius: 'var(--r-md)', fontSize: 12, color: 'var(--kiuvo-blue-deep)',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}>
+                <Icon name="info-circle" size={13} color="var(--kiuvo-blue)" />
+                El valor del prospecto será {fmt(quote.total)} (total de la cotización).
+              </div>
+              <button
+                onClick={handleCreate}
+                disabled={!name.trim() || saving}
+                style={{
+                  width: '100%', padding: '13px', borderRadius: 'var(--r-md)',
+                  background: name.trim() ? 'var(--kiuvo-blue)' : 'var(--bg-tertiary)',
+                  color: name.trim() ? '#fff' : 'var(--fg-tertiary)',
+                  fontSize: 15, fontWeight: 500, opacity: saving ? 0.7 : 1,
+                }}>
+                {saving ? 'Creando…' : 'Crear y vincular'}
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <input
+                value={search} onChange={e => setSearch(e.target.value)} autoFocus
+                placeholder="Buscar prospecto…" style={inputStyle} />
+              {matches.length === 0 ? (
+                <div style={{ padding: '28px 0', textAlign: 'center', fontSize: 13, color: 'var(--fg-tertiary)' }}>
+                  Sin prospectos que coincidan
+                </div>
+              ) : matches.map(p => {
+                const st = stageById[p.stage] ?? STAGE_BY_ID[p.stage]
+                return (
+                  <button key={p.id} onClick={() => handleLink(p.id)} disabled={saving}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                      padding: '11px 12px', background: 'var(--surface)',
+                      border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)',
+                      textAlign: 'left', opacity: saving ? 0.6 : 1,
+                    }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {p.name}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginTop: 1 }}>
+                        {st?.label ?? p.stage} · {fmt(p.value)}
+                      </div>
+                    </div>
+                    <Icon name="arrow-up-right" size={14} color="var(--fg-tertiary)" />
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  )
+}
+
 // ─── Tarjeta de cotización (resultados de búsqueda) ───────────────────────────
-function QuoteResultCard({ q, onOpenProspect }) {
+function QuoteResultCard({ q, onOpenProspect, onLinkQuote }) {
   const [downloading, setDownloading] = useState(false)
 
   async function handleDownload() {
@@ -915,7 +1098,7 @@ function QuoteResultCard({ q, onOpenProspect }) {
             {downloading ? 'Abriendo…' : 'Descargar PDF'}
           </button>
         )}
-        {q.prospectId && (
+        {q.prospectId ? (
           <button
             onClick={() => onOpenProspect(q.prospectId)}
             style={{
@@ -926,6 +1109,18 @@ function QuoteResultCard({ q, onOpenProspect }) {
             }}>
             <Icon name="arrow-up-right" size={12} />
             Ver prospecto
+          </button>
+        ) : (
+          <button
+            onClick={() => onLinkQuote(q)}
+            style={{
+              flex: 1, padding: '7px', borderRadius: 'var(--r-md)',
+              background: 'var(--kiuvo-blue)', border: '0.5px solid var(--kiuvo-blue)',
+              color: '#fff', fontSize: 12, fontWeight: 500,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+            }}>
+            <Icon name="plus" size={12} />
+            Añadir al embudo
           </button>
         )}
       </div>
@@ -1089,6 +1284,7 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
   const [showSearch,       setShowSearch]       = useState(false)
   const [searchQuery,      setSearchQuery]      = useState('')
   const [quotes,           setQuotes]           = useState([])
+  const [linkQuote,        setLinkQuote]        = useState(null)
 
   // ── Load ──────────────────────────────────────────────────────────
   const loadProspects = useCallback(async () => {
@@ -1270,6 +1466,93 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
     supabase.from('activities').insert({
       prospect_id: data.id, seller_id: user.id, kind: 'new',
     }).then(() => {})
+  }
+
+  // ── Vincular cotización huérfana ──────────────────────────────────
+  /** Crea un prospecto nuevo y le asigna la cotización. */
+  async function handleCreateProspectForQuote({ name, contact, phone, stageId }) {
+    if (!linkQuote) return false
+
+    const { data, error } = await supabase
+      .from('prospects')
+      .insert({
+        name,
+        company:  name,
+        phone:    phone   || null,
+        contact:  contact || null,
+        owner_id: user.id,
+        stage_id: stageId,
+        value:    linkQuote.total,
+        notes:    contact ? 'Contacto: ' + contact : null,
+        health:   'green',
+      })
+      .select('id, name, company, phone, email, contact, stage_id, value, health, days_in_stage, stage_entered_at, last_contact_at, notes')
+      .single()
+
+    if (error) {
+      addToast({ message: 'No se pudo crear el prospecto. Intenta de nuevo.', kind: 'error' })
+      return false
+    }
+
+    const { error: qErr } = await supabase
+      .from('quotes')
+      .update({ prospect_id: data.id })
+      .eq('id', linkQuote.id)
+
+    if (qErr) {
+      addToast({ message: 'Prospecto creado, pero no se pudo vincular la cotización.', kind: 'warning' })
+      setProspects(prev => [normalize(data), ...prev])
+      return false
+    }
+
+    setProspects(prev => [normalize(data), ...prev])
+    setQuotes(prev => prev.map(q =>
+      q.id === linkQuote.id ? { ...q, prospectId: data.id, orphan: false, clientName: data.name } : q
+    ))
+    supabase.from('activities').insert({
+      prospect_id: data.id, seller_id: user.id, kind: 'new',
+    }).then(() => {})
+
+    setActiveStage(stageId)
+    setSearchQuery('')
+    setShowSearch(false)
+    addToast({ message: `${data.name} añadido al embudo con su cotización.`, kind: 'success' })
+    return true
+  }
+
+  /** Vincula la cotización a un prospecto que ya existe. */
+  async function handleLinkQuoteToProspect(prospectId) {
+    if (!linkQuote) return false
+
+    const { error } = await supabase
+      .from('quotes')
+      .update({ prospect_id: prospectId })
+      .eq('id', linkQuote.id)
+
+    if (error) {
+      addToast({ message: 'No se pudo vincular la cotización. Intenta de nuevo.', kind: 'error' })
+      return false
+    }
+
+    const target = prospects.find(p => p.id === prospectId)
+
+    // Si la cotización es más reciente que el valor actual, actualizar el prospecto
+    if (target && linkQuote.total > 0) {
+      await supabase.from('prospects').update({ value: linkQuote.total }).eq('id', prospectId)
+      setProspects(prev => prev.map(p => p.id === prospectId ? { ...p, value: linkQuote.total } : p))
+    }
+
+    setQuotes(prev => prev.map(q =>
+      q.id === linkQuote.id
+        ? { ...q, prospectId, orphan: false, clientName: target?.name ?? q.clientName }
+        : q
+    ))
+
+    if (target) setActiveStage(target.stage)
+    setSearchQuery('')
+    setShowSearch(false)
+    addToast({ message: `Cotización vinculada a ${target?.name ?? 'el prospecto'}.`, kind: 'success' })
+    return true
   }
 
   // ── Update stage ──────────────────────────────────────────────────
@@ -1573,6 +1856,7 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
                       const target = prospects.find(p => p.id === pid)
                       if (target) { setSearchQuery(''); setShowSearch(false); setActiveStage(target.stage) }
                     }}
+                    onLinkQuote={setLinkQuote}
                   />
                 ))}
               </>
@@ -1586,6 +1870,16 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
           <Icon name="arrows-horizontal" size={12} />
           <span style={{ fontSize: 11 }}>Desliza pills para cambiar etapa</span>
         </div>
+      )}
+
+      {linkQuote && (
+        <LinkQuoteModal
+          quote={linkQuote}
+          prospects={prospects}
+          onClose={() => setLinkQuote(null)}
+          onCreate={handleCreateProspectForQuote}
+          onLink={handleLinkQuoteToProspect}
+        />
       )}
 
       {showAdd && (
