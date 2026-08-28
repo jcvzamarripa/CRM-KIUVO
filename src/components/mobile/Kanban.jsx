@@ -845,7 +845,7 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, on
 }
 
 // ─── ProspectCard ─────────────────────────────────────────────────────────────
-function ProspectCard({ p, onAction, onAdvance, onODP }) {
+function ProspectCard({ p, onAction, onAdvance, onODP, showStage = false }) {
   const { stages: ctxStages, stageById: ctxStageById } = useStages()
   const stageIdx  = ctxStages.findIndex(s => s.id === p.stage)
   const stage     = ctxStageById[p.stage] ?? STAGES[0]
@@ -875,6 +875,16 @@ function ProspectCard({ p, onAction, onAdvance, onODP }) {
           <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {p.name}
           </div>
+          {showStage && (
+            <span style={{
+              flexShrink: 0, fontSize: 10, fontWeight: 600, padding: '1px 6px',
+              borderRadius: 99, background: stage.color + '1F', color: stage.color,
+              display: 'inline-flex', alignItems: 'center', gap: 3,
+            }}>
+              {stage.isRepository && <Icon name="archive" size={9} color={stage.color} />}
+              {stage.label}
+            </span>
+          )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)', fontVariantNumeric: 'tabular-nums' }}>
@@ -988,6 +998,8 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
   const [odpProspect,      setOdpProspect]      = useState(null)
   const [actionTarget,     setActionTarget]     = useState(null)
   const [sortMode,         setSortMode]         = useState('value')
+  const [showSearch,       setShowSearch]       = useState(false)
+  const [searchQuery,      setSearchQuery]      = useState('')
 
   // ── Load ──────────────────────────────────────────────────────────
   const loadProspects = useCallback(async () => {
@@ -1083,7 +1095,19 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
   const counts     = Object.fromEntries(contextStages.map(s => [s.id, prospects.filter(p => p.stage === s.id).length]))
   const totalAll   = prospects.length
   const totalPot   = prospects.filter(p => p.stage !== 'cierre' && p.stage !== 'repositorio').reduce((s, p) => s + (p.value ?? 0), 0)
-  const rawList    = prospects.filter(p => p.stage === activeStage)
+  // Búsqueda: cuando hay query se busca en TODAS las etapas, no solo la activa
+  const q          = searchQuery.trim().toLowerCase()
+  const searching  = q.length > 0
+  const rawList    = searching
+    ? prospects.filter(p =>
+        (p.name    ?? '').toLowerCase().includes(q) ||
+        (p.company ?? '').toLowerCase().includes(q) ||
+        (p.contact ?? '').toLowerCase().includes(q) ||
+        (p.phone   ?? '').replace(/\D/g, '').includes(q.replace(/\D/g, '')) && q.replace(/\D/g, '').length > 0 ||
+        (p.email   ?? '').toLowerCase().includes(q) ||
+        (p.notes   ?? '').toLowerCase().includes(q)
+      )
+    : prospects.filter(p => p.stage === activeStage)
   const list       = [...rawList].sort((a, b) => sortMode === 'value' ? (b.value ?? 0) - (a.value ?? 0) : (b.days ?? 0) - (a.days ?? 0))
   const totalValue = rawList.reduce((s, p) => s + (p.value ?? 0), 0)
 
@@ -1238,6 +1262,16 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           <button
+            onClick={() => {
+              setShowSearch(s => {
+                if (s) setSearchQuery('')   // al cerrar, limpiar
+                return !s
+              })
+            }}
+            style={{ width: 36, height: 36, borderRadius: 'var(--r-md)', border: `0.5px solid ${showSearch ? 'var(--kiuvo-blue)' : 'var(--border)'}`, background: showSearch ? 'var(--kiuvo-blue-soft)' : 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name={showSearch ? 'x' : 'search'} size={17} color={showSearch ? 'var(--kiuvo-blue)' : 'var(--fg-secondary)'} />
+          </button>
+          <button
             onClick={onOpenNotifications}
             style={{ width: 36, height: 36, borderRadius: 'var(--r-md)', border: '0.5px solid var(--border)', background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
             <Icon name="bell" size={17} color="var(--fg-secondary)" />
@@ -1253,18 +1287,51 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
         </div>
       </div>
 
+      {/* Search bar */}
+      {showSearch && (
+        <div style={{ padding: '0 16px 12px', position: 'relative' }}>
+          <span style={{ position: 'absolute', left: 27, top: '50%', transform: 'translateY(-50%)', marginTop: -6, pointerEvents: 'none', display: 'flex' }}>
+            <Icon name="search" size={15} color="var(--fg-tertiary)" />
+          </span>
+          <input
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Buscar por nombre, contacto, teléfono…"
+            autoFocus
+            style={{
+              width: '100%', boxSizing: 'border-box', padding: '10px 34px 10px 36px',
+              background: 'var(--surface)', border: '0.5px solid var(--kiuvo-blue)',
+              borderRadius: 'var(--r-md)', fontSize: 14, color: 'var(--fg)',
+              outline: 'none', fontFamily: 'inherit',
+            }}
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              style={{
+                position: 'absolute', right: 26, top: '50%', transform: 'translateY(-50%)', marginTop: -6,
+                width: 20, height: 20, borderRadius: '50%', background: 'var(--bg-tertiary)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', padding: 0,
+              }}>
+              <Icon name="x" size={11} color="var(--fg-secondary)" />
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Stage pills */}
       <div style={{ display: 'flex', gap: 6, padding: '0 16px 12px', overflowX: 'auto', scrollSnapType: 'x mandatory' }}>
         {contextStages.map(s => {
-          const on = s.id === activeStage
+          const on = s.id === activeStage && !searching
           return (
-            <button key={s.id} onClick={() => setActiveStage(s.id)} style={{
+            <button key={s.id} onClick={() => { setActiveStage(s.id); setSearchQuery('') }} style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
               padding: '6px 12px', borderRadius: 'var(--r-full)',
               border: '0.5px solid', borderColor: on ? s.color : 'var(--border)',
               background: on ? s.color : 'var(--surface)',
               color: on ? '#fff' : 'var(--fg)',
               fontSize: 12, fontWeight: 500, flexShrink: 0, scrollSnapAlign: 'start',
+              opacity: searching ? 0.55 : 1, transition: 'opacity 0.15s',
             }}>
               {s.isRepository
                 ? <Icon name="archive" size={11} color={on ? '#fff' : s.color} />
@@ -1284,20 +1351,24 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
       </div>
 
       {/* Column summary */}
-      <div style={{ margin: '0 16px 10px', padding: '10px 12px', background: stage.color + '14', borderRadius: 'var(--r-md)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ margin: '0 16px 10px', padding: '10px 12px', background: searching ? 'var(--kiuvo-blue-soft)' : stage.color + '14', borderRadius: 'var(--r-md)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <div style={{ fontSize: 12, fontWeight: 500, color: stage.color, display: 'flex', alignItems: 'center', gap: 5 }}>
-            {stage.isRepository && <Icon name="archive" size={12} color={stage.color} />}
-            {stage.label}
+          <div style={{ fontSize: 12, fontWeight: 500, color: searching ? 'var(--kiuvo-blue-deep)' : stage.color, display: 'flex', alignItems: 'center', gap: 5 }}>
+            {searching
+              ? <><Icon name="search" size={12} color="var(--kiuvo-blue-deep)" />Resultados de búsqueda</>
+              : <>{stage.isRepository && <Icon name="archive" size={12} color={stage.color} />}{stage.label}</>
+            }
           </div>
           <div style={{ fontSize: 11, color: 'var(--fg-secondary)', marginTop: 2 }}>
-            {stage.isRepository
-              ? 'Prospectos archivados — reactivables'
-              : `Mínimo ${stage.min} visita${stage.min > 1 ? 's' : ''} · ${fmt(totalValue)} potencial`
+            {searching
+              ? `${list.length} prospecto${list.length !== 1 ? 's' : ''} en todas las etapas · ${fmt(totalValue)}`
+              : stage.isRepository
+                ? 'Prospectos archivados — reactivables'
+                : `Mínimo ${stage.min} visita${stage.min > 1 ? 's' : ''} · ${fmt(totalValue)} potencial`
             }
           </div>
         </div>
-        {!stage.isRepository && (
+        {!stage.isRepository && !searching && (
           <button
             onClick={() => activeStage === 'cotizacion' ? setShowQuote(true) : setShowAdd(true)}
             style={{
@@ -1330,25 +1401,45 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
             border: '0.5px dashed var(--border-strong)', borderRadius: 'var(--r-lg)',
             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
           }}>
-            <Icon name="layout-kanban" size={28} />
-            <div style={{ fontSize: 13 }}>Sin prospectos en esta etapa</div>
-            <button
-              onClick={() => activeStage === 'cotizacion' ? setShowQuote(true) : setShowAdd(true)}
-              style={{
-                padding: '8px 16px', borderRadius: 'var(--r-md)',
-                background: stage.color, color: '#fff', fontSize: 12, fontWeight: 500,
-                display: 'flex', alignItems: 'center', gap: 6, marginTop: 4,
-              }}>
-              <Icon name={activeStage === 'cotizacion' ? 'receipt' : 'plus'} size={13} />
-              {activeStage === 'cotizacion' ? 'Nueva cotización' : 'Añadir el primero'}
-            </button>
+            <Icon name={searching ? 'search' : 'layout-kanban'} size={28} />
+            <div style={{ fontSize: 13 }}>
+              {searching ? `Sin resultados para "${searchQuery}"` : 'Sin prospectos en esta etapa'}
+            </div>
+            {searching ? (
+              <button
+                onClick={() => setSearchQuery('')}
+                style={{
+                  padding: '8px 16px', borderRadius: 'var(--r-md)',
+                  background: 'var(--bg-secondary)', border: '0.5px solid var(--border)',
+                  color: 'var(--fg-secondary)', fontSize: 12, marginTop: 4,
+                }}>
+                Limpiar búsqueda
+              </button>
+            ) : (
+              <button
+                onClick={() => activeStage === 'cotizacion' ? setShowQuote(true) : setShowAdd(true)}
+                style={{
+                  padding: '8px 16px', borderRadius: 'var(--r-md)',
+                  background: stage.color, color: '#fff', fontSize: 12, fontWeight: 500,
+                  display: 'flex', alignItems: 'center', gap: 6, marginTop: 4,
+                }}>
+                <Icon name={activeStage === 'cotizacion' ? 'receipt' : 'plus'} size={13} />
+                {activeStage === 'cotizacion' ? 'Nueva cotización' : 'Añadir el primero'}
+              </button>
+            )}
           </div>
         ) : (
-          list.map(p => <ProspectCard key={p.id} p={p} onAction={setActionTarget} onAdvance={handleMoveStage} onODP={setOdpProspect} />)
+          list.map(p => (
+            <ProspectCard
+              key={p.id} p={p}
+              onAction={setActionTarget} onAdvance={handleMoveStage} onODP={setOdpProspect}
+              showStage={searching}
+            />
+          ))
         )}
       </div>
 
-      {!loading && !loadError && (
+      {!loading && !loadError && !searching && (
         <div style={{ marginTop: 16, textAlign: 'center', display: 'flex', justifyContent: 'center', gap: 4, alignItems: 'center', color: 'var(--fg-tertiary)' }}>
           <Icon name="arrows-horizontal" size={12} />
           <span style={{ fontSize: 11 }}>Desliza pills para cambiar etapa</span>
