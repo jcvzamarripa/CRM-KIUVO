@@ -12,7 +12,8 @@ import {
   // Actions & UI
   IconSearch, IconPlus, IconX, IconCheck, IconPencil, IconCopy,
   IconDownload, IconSettings, IconLogout, IconSelector, IconLoader2,
-  IconFilter, IconChevronDown, IconMinus, IconTrash, IconDots,
+  IconFilter, IconChevronDown, IconChevronUp, IconMinus, IconTrash, IconDots,
+  IconDiscount2, IconSchool,
 
   // Communication extras
   IconMail, IconLink, IconSend,
@@ -101,6 +102,9 @@ const ICON_MAP = {
   'loader-2':           IconLoader2,
   'filter':             IconFilter,
   'chevron-down':       IconChevronDown,
+  'chevron-up':         IconChevronUp,
+  'discount':           IconDiscount2,
+  'school':             IconSchool,
   'trash':              IconTrash,
   'dots':               IconDots,
 

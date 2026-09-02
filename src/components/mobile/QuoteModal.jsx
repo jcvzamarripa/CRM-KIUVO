@@ -8,6 +8,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { QuotePDFDoc } from '../../lib/quotePDF'
 import useOnlineStatus from '../../hooks/useOnlineStatus'
 import { enqueue } from '../../lib/offlineQueue'
+import SchoolPackageModal from './SchoolPackageModal'
 
 const fmt  = n => '$' + n.toLocaleString('es-MX', { minimumFractionDigits: 0 })
 const fmtPct = n => `${n}%`
@@ -468,6 +469,7 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
   const [pdfUrl, setPdfUrl]               = useState(null)
   const [specialPriceEditing, setSpecialPriceEditing] = useState(null)
   const [specialPriceInput, setSpecialPriceInput]     = useState('')
+  const [showSchoolPkg, setShowSchoolPkg]             = useState(false)
   const [extraDiscEditing, setExtraDiscEditing]       = useState(null)  // item.id
   const [extraDiscType, setExtraDiscType]             = useState('pct') // 'pct' | 'mxn'
   const [extraDiscInput, setExtraDiscInput]           = useState('')
@@ -1193,6 +1195,34 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
                 </div>
               )}
 
+              {/* Paquete escolar */}
+              <div style={{ padding: '0 16px 12px' }}>
+                <button
+                  onClick={() => setShowSchoolPkg(true)}
+                  style={{
+                    width: '100%', padding: '12px 14px',
+                    background: 'var(--kiuvo-blue-soft)', border: '0.5px solid var(--kiuvo-blue)',
+                    borderRadius: 'var(--r-md)', textAlign: 'left',
+                    display: 'flex', alignItems: 'center', gap: 11,
+                  }}>
+                  <div style={{
+                    width: 34, height: 34, borderRadius: 'var(--r-md)', flexShrink: 0,
+                    background: 'var(--kiuvo-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <Icon name="school" size={18} color="#fff" />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--kiuvo-blue-deep)' }}>
+                      Paquete escolar de credenciales
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--fg-secondary)', marginTop: 1 }}>
+                      Captura los alumnos y calcula todo automático
+                    </div>
+                  </div>
+                  <Icon name="chevron-right" size={16} color="var(--kiuvo-blue)" />
+                </button>
+              </div>
+
               {/* Catalog */}
               <div style={{ padding: '0 16px', flex: 1 }}>
                 <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', letterSpacing: 0.5, marginBottom: 8 }}>CATÁLOGO DE PRODUCTOS</div>
@@ -1313,6 +1343,13 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
           </>
         )}
       </div>
+
+      {showSchoolPkg && (
+        <SchoolPackageModal
+          onClose={() => setShowSchoolPkg(false)}
+          onAdd={newItems => setItems(prev => [...prev, ...newItems])}
+        />
+      )}
     </>
   )
 }
