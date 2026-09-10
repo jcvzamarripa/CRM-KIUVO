@@ -1,10 +1,11 @@
 import React from 'react'
 import { Document, Page, View, Text, StyleSheet, Image } from '@react-pdf/renderer'
 
-const BLUE  = '#185FA5'
-const GRAY  = '#888780'
-const LIGHT = '#EEEDE9'
-const DARK  = '#1C1B19'
+const BLUE   = '#185FA5'
+const GRAY   = '#6E6D69'   // labels y notas — legible impreso
+const SUBTLE = '#55544F'   // subtexto de producto: casi cuerpo de texto
+const LIGHT  = '#EEEDE9'
+const DARK   = '#1C1B19'
 const IVA   = 0.16
 
 // ── Defaults (edit here if you don't pass props) ───────────────────
@@ -38,7 +39,7 @@ const s = StyleSheet.create({
   trow:       { flexDirection: 'row', paddingVertical: 6, paddingHorizontal: 10, borderBottomWidth: 0.5, borderBottomColor: LIGHT },
   trowAlt:    { backgroundColor: '#FAFAF8' },
   tcell:      { fontSize: 9, color: DARK },
-  tcellSub:   { fontSize: 7, color: GRAY, marginTop: 1 },
+  tcellSub:   { fontSize: 8, color: SUBTLE, marginTop: 2, lineHeight: 1.35 },
 
   // Column widths
   cProduct: { flex: 1 },
@@ -68,7 +69,7 @@ const s = StyleSheet.create({
   // ── Conditions ───────────────────────────────────────────────────
   condWrap:  { backgroundColor: '#F4F3F0', borderRadius: 3, padding: '7 10', marginBottom: 10 },
   condTitle: { fontSize: 7, fontFamily: 'Helvetica-Bold', color: GRAY, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 5 },
-  condItem:  { fontSize: 8, color: GRAY, marginBottom: 2, lineHeight: 1.4 },
+  condItem:  { fontSize: 8, color: SUBTLE, marginBottom: 2.5, lineHeight: 1.45 },
 
   // ── Footer ───────────────────────────────────────────────────────
   footer:     { position: 'absolute', bottom: 24, left: 40, right: 40, flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 0.5, borderTopColor: LIGHT, paddingTop: 7 },

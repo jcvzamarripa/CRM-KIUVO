@@ -89,7 +89,7 @@ export function buildSchoolItems(calc, mode = 'itemized') {
         ? `Credencialización escolar — incluye ${kits} kit${plural ? 's' : ''} (tablet + lector)`
         : 'Credencialización escolar',
       sku:           kits > 0
-        ? `Credencial por alumno · Licencia de software anual · ${kits} kit${plural ? 's' : ''} tablet + lector sin costo adicional`
+        ? `Credencial por alumno · Licencia de software anual · ${kits} kit${plural ? 's' : ''} tablet + lector incluido${plural ? 's' : ''} en el precio`
         : 'Credencial por alumno · Licencia de software anual',
       unit:          'alumno',
       category:      'Credenciales escolares',
