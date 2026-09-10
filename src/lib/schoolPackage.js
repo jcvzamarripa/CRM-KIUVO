@@ -73,19 +73,24 @@ export function calcSchoolPackage({ students, includeEquipment = true, params = 
  * @param {object} calc  Resultado de calcSchoolPackage.
  * @param {'itemized'|'blended'} mode
  *        itemized — credenciales, software y equipo como conceptos separados.
- *        blended  — un solo concepto por alumno; el equipo no se menciona.
+ *        blended  — un solo precio por alumno. El equipo NO se desglosa en
+ *                   importe, pero sí se declara cuántos kits se entregan.
  */
 export function buildSchoolItems(calc, mode = 'itemized') {
   const stamp = Date.now()
   if (calc.students <= 0) return []
 
   if (mode === 'blended') {
+    const kits   = calc.kitsNeeded
+    const plural = kits > 1
     return [{
       id:            `school-all-${stamp}`,
-      name:          calc.kitsNeeded > 0
-        ? 'Credencialización escolar — equipo incluido'
+      name:          kits > 0
+        ? `Credencialización escolar — incluye ${kits} kit${plural ? 's' : ''} (tablet + lector)`
         : 'Credencialización escolar',
-      sku:           'Credenciales + licencia de software anual',
+      sku:           kits > 0
+        ? `Credencial por alumno · Licencia de software anual · ${kits} kit${plural ? 's' : ''} tablet + lector sin costo adicional`
+        : 'Credencial por alumno · Licencia de software anual',
       unit:          'alumno',
       category:      'Credenciales escolares',
       qty:           calc.students,
@@ -94,6 +99,7 @@ export function buildSchoolItems(calc, mode = 'itemized') {
       discountPct:   0,
       extraDiscount: null,
       _school:       true,
+      _kits:         kits,
     }]
   }
 

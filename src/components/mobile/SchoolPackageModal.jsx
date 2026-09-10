@@ -18,6 +18,12 @@ export default function SchoolPackageModal({ onClose, onAdd }) {
     [n, withEquip, params]
   )
 
+  // Líneas tal como quedarán en la cotización y en el PDF
+  const previewItems = useMemo(
+    () => (n > 0 ? buildSchoolItems(calc, mode) : []),
+    [calc, mode, n]
+  )
+
   // ── Sugerencias de negociación ───────────────────────────────────
   const tips = useMemo(() => {
     const out = []
@@ -172,6 +178,42 @@ export default function SchoolPackageModal({ onClose, onAdd }) {
             </div>
           </div>
 
+          {/* Así lo verá la escuela — solo en modo por alumno, donde no es obvio */}
+          {previewItems.length > 0 && mode === 'blended' && (
+            <div style={{
+              background: 'var(--bg-secondary)', borderRadius: 'var(--r-md)',
+              padding: '11px 13px', display: 'flex', flexDirection: 'column', gap: 9,
+            }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--fg-tertiary)', letterSpacing: 0.5 }}>
+                ASÍ APARECE EN LA COTIZACIÓN
+              </div>
+              {previewItems.map(it => {
+                const unitP = it.specialPrice != null
+                  ? it.specialPrice
+                  : it.price * (1 - (it.discountPct || 0) / 100)
+                return (
+                  <div key={it.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, color: 'var(--fg)', lineHeight: 1.35 }}>{it.name}</div>
+                      <div style={{ fontSize: 10, color: 'var(--fg-tertiary)', marginTop: 1, lineHeight: 1.35 }}>
+                        {it.sku}
+                      </div>
+                      <div style={{ fontSize: 10, color: 'var(--fg-secondary)', marginTop: 2 }}>
+                        {it.qty.toLocaleString('es-MX')} {it.unit}{it.qty !== 1 ? 's' : ''} × {fmt2(unitP)}
+                        {it.discountPct > 0 && (
+                          <span style={{ color: 'var(--success-fg)', fontWeight: 600 }}> · −{it.discountPct}%</span>
+                        )}
+                      </div>
+                    </div>
+                    <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--fg)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                      {fmt(unitP * it.qty)}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
           {/* Vista previa */}
           {n > 0 && (
             <div style={{
@@ -180,7 +222,7 @@ export default function SchoolPackageModal({ onClose, onAdd }) {
               display: 'flex', flexDirection: 'column', gap: 7,
             }}>
               <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--fg-tertiary)', letterSpacing: 0.5 }}>
-                DESGLOSE
+                {mode === 'blended' ? 'DESGLOSE INTERNO — NO SE IMPRIME' : 'DESGLOSE'}
               </div>
 
               <Row
