@@ -83,14 +83,15 @@ export function buildSchoolItems(calc, mode = 'itemized') {
   if (mode === 'blended') {
     const kits   = calc.kitsNeeded
     const plural = kits > 1
+    // El nombre se mantiene corto: en el PDF la columna de producto es
+    // angosta y un nombre largo se parte y queda pegado a la cantidad.
+    // El detalle del equipo abre el subtexto, que es donde sí hay espacio.
     return [{
       id:            `school-all-${stamp}`,
-      name:          kits > 0
-        ? `Credencialización escolar — incluye ${kits} kit${plural ? 's' : ''} (tablet + lector)`
-        : 'Credencialización escolar',
+      name:          'Credencialización escolar',
       sku:           kits > 0
-        ? `Credencial por alumno · Licencia de software anual · ${kits} kit${plural ? 's' : ''} tablet + lector incluido${plural ? 's' : ''} en el precio`
-        : 'Credencial por alumno · Licencia de software anual',
+        ? `Incluye ${kits} kit${plural ? 's' : ''} (tablet + lector) · Credencial y licencia de software anual por alumno`
+        : 'Credencial y licencia de software anual por alumno',
       unit:          'alumno',
       category:      'Credenciales escolares',
       qty:           calc.students,

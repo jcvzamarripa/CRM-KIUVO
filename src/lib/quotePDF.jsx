@@ -42,7 +42,9 @@ const s = StyleSheet.create({
   tcellSub:   { fontSize: 8, color: SUBTLE, marginTop: 2, lineHeight: 1.35 },
 
   // Column widths
-  cProduct: { flex: 1 },
+  // paddingRight evita que un nombre largo que se parte en dos líneas
+  // quede pegado a la columna CANT. y se lea como parte del número.
+  cProduct: { flex: 1, paddingRight: 12 },
   cQty:     { width: 34, textAlign: 'center' },
   cUnit:    { width: 30, textAlign: 'center' },
   cPUnit:   { width: 64, textAlign: 'right' },
