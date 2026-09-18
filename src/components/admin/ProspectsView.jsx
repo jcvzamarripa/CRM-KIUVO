@@ -5,6 +5,7 @@ import { useAdminProspects } from '../../hooks/useAdminProspects'
 import { useSellers } from '../../hooks/useSellers'
 import { rules, collectErrors } from '../../lib/validation'
 import { supabase } from '../../lib/supabase'
+import { saveFile } from '../../lib/saveFile'
 
 const HEALTH_COLOR = { green: 'var(--success)', amber: 'var(--warning)', red: 'var(--danger)', black: 'var(--fg-tertiary)' }
 const fmt = n => '$' + n.toLocaleString('es-MX')
@@ -764,11 +765,10 @@ export default function ProspectsView() {
       p.health || '',
     ].join(','))
     const csv = '﻿' + [headers.join(','), ...rows].join('\n')
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
-    const a = document.createElement('a')
-    a.href = url; a.download = `prospectos_kiuvo_${new Date().toISOString().slice(0, 10)}.csv`
-    document.body.appendChild(a); a.click()
-    document.body.removeChild(a); URL.revokeObjectURL(url)
+    saveFile(
+      new Blob([csv], { type: 'text/csv;charset=utf-8;' }),
+      `prospectos_kiuvo_${new Date().toISOString().slice(0, 10)}.csv`
+    )
     setExportFlash(true); setTimeout(() => setExportFlash(false), 2200)
   }
 

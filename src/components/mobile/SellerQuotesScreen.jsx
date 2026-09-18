@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useQuoteHistory } from '../../hooks/useQuoteHistory'
 import { QuotePDFDoc } from '../../lib/quotePDF'
 import { supabase } from '../../lib/supabase'
+import { saveFile } from '../../lib/saveFile'
 
 const fmt = n => '$' + Number(n).toLocaleString('es-MX', { minimumFractionDigits: 0 })
 
@@ -75,17 +76,10 @@ export default function SellerQuotesScreen({ onBack }) {
           logoUrl={logoDataUrl}
         />
       ).toBlob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
       const safeName = (q.prospectName || 'cotizacion').replace(/[/\\:*?"<>|]/g, '').trim()
-      a.download = q.quoteNumber
+      await saveFile(blob, q.quoteNumber
         ? `${safeName} - ${q.quoteNumber}.pdf`
-        : `${safeName} - ${q.shortId}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+        : `${safeName} - ${q.shortId}.pdf`)
     } catch (err) {
       console.error('[handleDownload]', err)
     } finally {

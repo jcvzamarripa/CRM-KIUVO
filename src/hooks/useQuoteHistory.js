@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase, isSupabaseConfigured } from '../lib/supabase'
+import { saveFile } from '../lib/saveFile'
 
 /**
  * Fetches quote history from Supabase.
@@ -86,15 +87,15 @@ export async function updateQuoteStatus(quoteId, status) {
  */
 export async function downloadStoredPDF(pdfPath, filename) {
   if (!pdfPath) return
-  const { data, error } = await supabase.storage
+  // Se descarga el archivo en vez de enlazar la URL firmada: un <a download>
+  // a otro dominio se ignora y saca la pestaña del CRM hacia Supabase.
+  const { data: blob, error } = await supabase.storage
     .from('cotizaciones')
-    .createSignedUrl(pdfPath, 3600)
-  if (error || !data?.signedUrl) {
+    .download(pdfPath)
+  if (error || !blob) {
     console.warn('[downloadStoredPDF]', error?.message)
     return
   }
-  const a = document.createElement('a')
-  a.href = data.signedUrl
-  a.download = `${filename || 'cotizacion'}.pdf`
-  a.click()
+  const pdfBlob = blob.type ? blob : new Blob([blob], { type: 'application/pdf' })
+  await saveFile(pdfBlob, `${filename || 'cotizacion'}.pdf`)
 }

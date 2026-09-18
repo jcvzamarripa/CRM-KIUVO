@@ -9,6 +9,7 @@ import { QuotePDFDoc } from '../../lib/quotePDF'
 import useOnlineStatus from '../../hooks/useOnlineStatus'
 import { enqueue } from '../../lib/offlineQueue'
 import SchoolPackageModal from './SchoolPackageModal'
+import { saveFile, isIOS } from '../../lib/saveFile'
 
 const fmt  = n => '$' + n.toLocaleString('es-MX', { minimumFractionDigits: 0 })
 const fmtPct = n => `${n}%`
@@ -116,7 +117,7 @@ function Spinner({ size = 16 }) {
 }
 
 // ── SuccessView ───────────────────────────────────────────────────
-function SuccessView({ items, prospectName, prospectEmail, prospectPhone, sellerName, pdfUrl, onClose }) {
+function SuccessView({ items, prospectName, prospectEmail, prospectPhone, sellerName, pdfFile, onClose }) {
   const total   = items.reduce((s, i) => s + effectivePrice(i) * i.qty, 0)
   const savings = items.reduce((s, i) => s + (i.price - effectivePrice(i)) * i.qty, 0)
   const [sharing, setSharing]   = useState(false)
@@ -127,7 +128,7 @@ function SuccessView({ items, prospectName, prospectEmail, prospectPhone, seller
   const [emailTo, setEmailTo]       = useState(prospectEmail ?? '')
   const [emailError, setEmailError] = useState('')
 
-  const pdfFilename = `cotizacion-kiuvo.pdf`
+  const pdfFilename = pdfFile?.name ?? 'cotizacion-kiuvo.pdf'
   const waMessage   = [
     `Hola${prospectName ? ` *${prospectName}*` : ''},`,
     `te comparto la cotización generada con KIUVO CRM.`,
@@ -136,23 +137,19 @@ function SuccessView({ items, prospectName, prospectEmail, prospectPhone, seller
   ].join('\n')
 
   const handleDownload = () => {
-    if (!pdfUrl) return
-    const a = document.createElement('a')
-    a.href = pdfUrl
-    a.download = pdfFilename
-    a.click()
+    if (!pdfFile) return
+    saveFile(pdfFile.blob, pdfFilename)
   }
 
   const handleWhatsApp = async () => {
-    if (!pdfUrl) return
+    if (!pdfFile) return
     setSharing(true)
     setShareMsg('')
 
     try {
       if (navigator.share) {
-        const response = await fetch(pdfUrl)
-        const blob     = await response.blob()
-        const file     = new File([blob], pdfFilename, { type: 'application/pdf' })
+        // Sin await previo: iOS exige que share() ocurra pegado al toque
+        const file = new File([pdfFile.blob], pdfFilename, { type: 'application/pdf' })
 
         if (navigator.canShare?.({ files: [file] })) {
           await navigator.share({ files: [file], title: 'Cotización KIUVO CRM', text: waMessage })
@@ -183,12 +180,10 @@ function SuccessView({ items, prospectName, prospectEmail, prospectPhone, seller
     setEmailError('')
 
     try {
-      // Convert blob URL → base64
+      // PDF → base64
       let pdfBase64 = null
-      if (pdfUrl) {
-        const response = await fetch(pdfUrl)
-        const blob     = await response.blob()
-        const buffer   = await blob.arrayBuffer()
+      if (pdfFile) {
+        const buffer   = await pdfFile.blob.arrayBuffer()
         const bytes    = new Uint8Array(buffer)
         let binary = ''
         bytes.forEach(b => { binary += String.fromCharCode(b) })
@@ -301,7 +296,7 @@ function SuccessView({ items, prospectName, prospectEmail, prospectPhone, seller
         {/* WhatsApp */}
         <button
           onClick={handleWhatsApp}
-          disabled={sharing || !pdfUrl}
+          disabled={sharing || !pdfFile}
           style={{
             width: '100%', padding: '13px',
             background: '#25D366', color: '#fff',
@@ -377,7 +372,7 @@ function SuccessView({ items, prospectName, prospectEmail, prospectPhone, seller
         )}
 
         {/* Download */}
-        {pdfUrl && (
+        {pdfFile && (
           <button
             onClick={handleDownload}
             style={{
@@ -466,7 +461,7 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
   const [prospects, setProspects]         = useState([])
   const [submitting, setSubmitting]       = useState(false)
   const [serverError, setServerError]     = useState('')
-  const [pdfUrl, setPdfUrl]               = useState(null)
+  const [pdfFile, setPdfFile]             = useState(null)   // { blob, name }
   const [specialPriceEditing, setSpecialPriceEditing] = useState(null)
   const [specialPriceInput, setSpecialPriceInput]     = useState('')
   const [showSchoolPkg, setShowSchoolPkg]             = useState(false)
@@ -668,11 +663,11 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
           />
         ).toBlob()
 
-        const url = URL.createObjectURL(blob)
-        setPdfUrl(url)
         const safeName = (prospectName || 'cotizacion').replace(/[/\\:*?"<>|]/g, '').trim()
-        const a = document.createElement('a')
-        a.href = url; a.download = `${safeName} - ${offlineQuoteNum}.pdf`; a.click()
+        const name = `${safeName} - ${offlineQuoteNum}.pdf`
+        setPdfFile({ blob, name })
+        // En iPhone no se descarga solo: la pantalla de éxito ofrece el botón
+        if (!isIOS()) saveFile(blob, name)
       } catch (pdfErr) {
         console.warn('[QuoteModal offline] PDF error:', pdfErr)
       }
@@ -747,7 +742,6 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
     }
 
     // 4 — Generate PDF blob
-    let url = null
     try {
       // Pre-fetch logo as base64 so the PDF worker doesn't need to do a separate request
       let logoDataUrl = null
@@ -795,15 +789,11 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
         console.warn('[QuoteModal] storage upload:', uploadErr.message)
       }
 
-      url = URL.createObjectURL(blob)
-      setPdfUrl(url)
-
-      // Auto-trigger download with readable filename
       const safeName = (prospectName || 'cotizacion').replace(/[/\\:*?"<>|]/g, '').trim()
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${safeName} - ${quoteNumber}.pdf`
-      a.click()
+      const name = `${safeName} - ${quoteNumber}.pdf`
+      setPdfFile({ blob, name })
+      // En iPhone no se descarga solo: la pantalla de éxito ofrece el botón
+      if (!isIOS()) saveFile(blob, name)
     } catch (pdfErr) {
       console.error('PDF error:', pdfErr)
       setServerError(`Error PDF: ${pdfErr?.message || String(pdfErr)}`)
@@ -841,7 +831,7 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
             prospectEmail={prospectEmail}
             prospectPhone={prospects.find(p => p.id === prospectId)?.phone ?? ''}
             sellerName={profile?.full_name}
-            pdfUrl={pdfUrl}
+            pdfFile={pdfFile}
             onClose={onClose}
           />
         ) : (

@@ -6,6 +6,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../../contexts/ToastContext'
 import { useStages } from '../../contexts/StagesContext'
 import { downloadStoredPDF } from '../../hooks/useQuoteHistory'
+import { saveFile } from '../../lib/saveFile'
 // PDF: importación dinámica para no bloquear la carga inicial del seller
 
 // Lazy: evita cargar react-pdf (~1.4 MB) hasta que el usuario abre cotizaciones
@@ -312,13 +313,8 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, on
           logoUrl={logoDataUrl}
         />
       ).toBlob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
       const safe = (prospect.name || 'cotizacion').replace(/[/\\:*?"<>|]/g, '').trim()
-      a.download = q.quoteNumber ? `${safe} - ${q.quoteNumber}.pdf` : `${safe} - ${q.shortId}.pdf`
-      document.body.appendChild(a); a.click(); document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      await saveFile(blob, q.quoteNumber ? `${safe} - ${q.quoteNumber}.pdf` : `${safe} - ${q.shortId}.pdf`)
     } catch (err) {
       console.error('[handleDownloadQuote]', err)
       addToast({ message: 'No se pudo generar el PDF.', kind: 'error' })

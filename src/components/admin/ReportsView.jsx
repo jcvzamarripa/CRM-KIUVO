@@ -5,6 +5,7 @@ import { useActivities } from '../../hooks/useActivities'
 import { useQuoteHistory } from '../../hooks/useQuoteHistory'
 import { useAdminProspects } from '../../hooks/useAdminProspects'
 import { supabase, isSupabaseConfigured } from '../../lib/supabase'
+import { saveFile } from '../../lib/saveFile'
 import { STAGES } from '../../constants/stages'
 
 // ─── Períodos disponibles (calculados dinámicamente) ─────────────────────────
@@ -150,11 +151,7 @@ function computeSellerStats(sellers, activities, from, to, allQuotes = [], allPr
 
 // ─── Exports ─────────────────────────────────────────────────────────────────
 function triggerDownload(blob, filename) {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url; a.download = filename
-  document.body.appendChild(a); a.click()
-  document.body.removeChild(a); URL.revokeObjectURL(url)
+  saveFile(blob, filename)
 }
 
 function exportSellerCSV(stats, periodLabel) {
