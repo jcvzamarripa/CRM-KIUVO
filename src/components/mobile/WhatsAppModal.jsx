@@ -1,27 +1,8 @@
 import React, { useState } from 'react'
 import Icon from '../shared/Icon'
+import { Sheet, Button, Chip, Card, Label, SearchInput, Empty } from '../ui'
 import { useAdminProspects } from '../../hooks/useAdminProspects'
 import { STAGE_BY_ID } from '../../constants/stages'
-
-// ── Inline SVGs ───────────────────────────────────────────────────
-function IcoWhatsApp({ size = 28, color = 'currentColor' }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 21l1.65-3.8a9 9 0 1 1 3.4 2.9L3 21" />
-      <path d="M9 10a.5.5 0 0 0 1 0V9a.5.5 0 0 0-1 0v1a5 5 0 0 0 5 5h1a.5.5 0 0 0 0-1h-1a.5.5 0 0 0 0 1" />
-    </svg>
-  )
-}
-
-function IcoSearch({ size = 14, color = 'currentColor' }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-    </svg>
-  )
-}
 
 // ── Templates ─────────────────────────────────────────────────────
 const TEMPLATES = [
@@ -62,6 +43,12 @@ const TEMPLATES = [
   },
 ]
 
+const ELLIPSIS = { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }
+
+function StageDot({ color }) {
+  return <span style={{ width: 10, height: 10, borderRadius: '50%', background: color || 'var(--fg-tertiary)', flexShrink: 0 }} />
+}
+
 // ── Main ──────────────────────────────────────────────────────────
 export default function WhatsAppModal({ onClose }) {
   const { prospects } = useAdminProspects()
@@ -73,7 +60,6 @@ export default function WhatsAppModal({ onClose }) {
 
   const prospect  = prospects.find(p => p.id === selected)
   const stage     = prospect ? STAGE_BY_ID[prospect.stage] : null
-  const template  = TEMPLATES.find(t => t.id === templateId)
 
   const filtered = prospects.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -106,191 +92,105 @@ export default function WhatsAppModal({ onClose }) {
 
   const canSend = !!prospect && message.trim().length > 0
 
+  if (sent) {
+    return (
+      <Sheet title="Listo" onClose={onClose}>
+        <SentView prospect={prospect} />
+      </Sheet>
+    )
+  }
+
   return (
-    <>
-      {/* Backdrop */}
-      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100 }} />
-
-      {/* Sheet */}
-      <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 101,
-        background: 'var(--bg)', borderRadius: '20px 20px 0 0',
-        maxHeight: '94%', display: 'flex', flexDirection: 'column', overflow: 'hidden',
-      }}>
-        {sent ? (
-          <SentView prospect={prospect} />
-        ) : (
-          <>
-            {/* Handle */}
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 2px' }}>
-              <div style={{ width: 40, height: 4, borderRadius: 2, background: 'var(--border-strong)' }} />
+    <Sheet
+      full
+      title="WhatsApp"
+      onClose={onClose}
+      footer={
+        <>
+          {prospect && (
+            <div style={{ fontSize: 13, color: 'var(--fg-secondary)', marginBottom: 10, textAlign: 'center' }}>
+              Se abrirá WhatsApp con {prospect.contact} ({formatPhone(prospect.phone)})
             </div>
-
-            {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px 10px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ width: 30, height: 30, borderRadius: 'var(--r-sm)', background: '#E1F5EE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <IcoWhatsApp size={18} color="#0F6E56" />
-                </div>
-                <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--fg)' }}>WhatsApp</div>
-              </div>
-              <button onClick={onClose} style={{
-                width: 32, height: 32, borderRadius: '50%', background: 'var(--bg-secondary)',
-                border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-secondary)',
+          )}
+          <Button variant="accent" block size="lg" icon="brand-whatsapp" disabled={!canSend} onClick={handleSend}>
+            Abrir en WhatsApp
+          </Button>
+        </>
+      }
+    >
+      {/* Destinatario */}
+      <Label>Destinatario</Label>
+      {prospect ? (
+        <Card style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 22 }}>
+          <StageDot color={stage?.color} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, ...ELLIPSIS }}>{prospect.name}</div>
+            <div style={{ fontSize: 13, color: 'var(--fg-secondary)', marginTop: 2, ...ELLIPSIS }}>
+              {prospect.contact} · {formatPhone(prospect.phone)}
+            </div>
+          </div>
+          <Button variant="soft" size="sm" onClick={() => setSelected(null)}>Cambiar</Button>
+        </Card>
+      ) : (
+        <div style={{ marginBottom: 22 }}>
+          <SearchInput value={search} onChange={setSearch} placeholder="Buscar prospecto o contacto…" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10, maxHeight: 260, overflowY: 'auto' }}>
+            {filtered.length === 0 ? (
+              <Empty icon="search">Sin resultados</Empty>
+            ) : filtered.map(p => (
+              <button key={p.id} type="button" onClick={() => selectProspect(p)} style={{
+                display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left',
+                minHeight: 56, padding: '10px 14px', borderRadius: 'var(--r-md)', background: 'var(--surface)',
               }}>
-                <Icon name="x" size={16} />
+                <StageDot color={STAGE_BY_ID[p.stage]?.color} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 15, fontWeight: 500, ...ELLIPSIS }}>{p.name}</div>
+                  <div style={{ fontSize: 13, color: 'var(--fg-secondary)', ...ELLIPSIS }}>{p.contact} · {formatPhone(p.phone)}</div>
+                </div>
               </button>
-            </div>
+            ))}
+          </div>
+        </div>
+      )}
 
-            {/* Body */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '4px 16px 0' }}>
-
-              {/* Prospect picker */}
-              <Section label="DESTINATARIO">
-                {prospect ? (
-                  /* Selected prospect chip */
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: '#E1F5EE', border: '0.5px solid #A7D9C8', borderRadius: 'var(--r-md)' }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: stage?.color, flexShrink: 0 }} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: '#0F3D2E' }}>{prospect.name}</div>
-                      <div style={{ fontSize: 11, color: '#1D6B4F' }}>{prospect.contact} · {formatPhone(prospect.phone)}</div>
-                    </div>
-                    <button
-                      onClick={() => setSelected(null)}
-                      style={{ fontSize: 11, fontWeight: 500, color: '#0F6E56', padding: '4px 8px', borderRadius: 'var(--r-full)', background: 'rgba(15,110,86,0.12)' }}
-                    >
-                      Cambiar
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <div style={{ position: 'relative', marginBottom: 8 }}>
-                      <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-                        <IcoSearch size={14} color="var(--fg-tertiary)" />
-                      </span>
-                      <input
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
-                        placeholder="Buscar prospecto o contacto…"
-                        style={{
-                          width: '100%', boxSizing: 'border-box', padding: '9px 10px 9px 30px',
-                          background: 'var(--bg-secondary)', border: '0.5px solid var(--border)',
-                          borderRadius: 'var(--r-md)', fontSize: 13, color: 'var(--fg)', outline: 'none', fontFamily: 'inherit',
-                        }}
-                      />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 200, overflowY: 'auto' }}>
-                      {filtered.map(p => {
-                        const s = STAGE_BY_ID[p.stage]
-                        return (
-                          <button key={p.id} onClick={() => selectProspect(p)} style={{
-                            display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
-                            border: '0.5px solid var(--border)', background: 'var(--surface)',
-                            borderRadius: 'var(--r-md)', textAlign: 'left',
-                          }}>
-                            <span style={{ width: 8, height: 8, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
-                              <div style={{ fontSize: 11, color: 'var(--fg-secondary)' }}>{p.contact} · {formatPhone(p.phone)}</div>
-                            </div>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </>
-                )}
-              </Section>
-
-              {/* Template pills */}
-              <Section label="PLANTILLA">
-                <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
-                  {TEMPLATES.map(t => {
-                    const on = templateId === t.id
-                    return (
-                      <button key={t.id} onClick={() => selectTemplate(t)} style={{
-                        flexShrink: 0, padding: '6px 13px', borderRadius: 'var(--r-full)', fontSize: 12, fontWeight: on ? 500 : 400,
-                        border: `0.5px solid ${on ? '#0F6E56' : 'var(--border)'}`,
-                        background: on ? '#E1F5EE' : 'var(--surface)',
-                        color: on ? '#0F3D2E' : 'var(--fg)',
-                      }}>
-                        {t.label}
-                      </button>
-                    )
-                  })}
-                </div>
-              </Section>
-
-              {/* Message */}
-              <Section label="MENSAJE">
-                <textarea
-                  value={message}
-                  onChange={e => setMessage(e.target.value)}
-                  placeholder={prospect ? 'Selecciona una plantilla o escribe tu mensaje…' : 'Primero elige un prospecto…'}
-                  rows={7}
-                  style={{
-                    width: '100%', boxSizing: 'border-box', padding: '11px 12px',
-                    background: 'var(--bg-secondary)', border: '0.5px solid var(--border)',
-                    borderRadius: 'var(--r-md)', fontSize: 13, color: 'var(--fg)',
-                    outline: 'none', resize: 'none', fontFamily: 'inherit', lineHeight: 1.55,
-                  }}
-                />
-                <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginTop: 4, textAlign: 'right' }}>
-                  {message.length} caracteres
-                </div>
-              </Section>
-
-              <div style={{ height: 8 }} />
-            </div>
-
-            {/* Footer */}
-            <div style={{ padding: '10px 16px 20px', borderTop: '0.5px solid var(--border)' }}>
-              {prospect && (
-                <div style={{ fontSize: 12, color: 'var(--fg-tertiary)', marginBottom: 8, textAlign: 'center' }}>
-                  Se abrirá WhatsApp con {prospect.contact} ({formatPhone(prospect.phone)})
-                </div>
-              )}
-              <button
-                onClick={handleSend}
-                disabled={!canSend}
-                style={{
-                  width: '100%', padding: '14px',
-                  background: canSend ? '#1FAF38' : 'var(--bg-tertiary)',
-                  color: canSend ? '#fff' : 'var(--fg-tertiary)',
-                  borderRadius: 'var(--r-md)', fontSize: 15, fontWeight: 500,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  opacity: canSend ? 1 : 0.6,
-                }}
-              >
-                <IcoWhatsApp size={18} color={canSend ? '#fff' : 'var(--fg-tertiary)'} />
-                Abrir en WhatsApp
-              </button>
-            </div>
-          </>
-        )}
+      {/* Plantilla */}
+      <Label>Plantilla</Label>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 22 }}>
+        {TEMPLATES.map(t => (
+          <Chip key={t.id} selected={templateId === t.id} onClick={() => selectTemplate(t)}>{t.label}</Chip>
+        ))}
       </div>
-    </>
+
+      {/* Mensaje */}
+      <Label>Mensaje</Label>
+      <textarea
+        className="k-input"
+        value={message}
+        onChange={e => setMessage(e.target.value)}
+        placeholder={prospect ? 'Selecciona una plantilla o escribe tu mensaje…' : 'Primero elige un prospecto…'}
+        rows={7}
+        style={{ lineHeight: 1.5 }}
+      />
+      <div style={{ fontSize: 13, color: 'var(--fg-tertiary)', marginTop: 6, textAlign: 'right' }}>
+        {message.length} caracteres
+      </div>
+    </Sheet>
   )
 }
 
 function SentView({ prospect }) {
   return (
-    <div style={{ padding: '40px 24px 56px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
-      <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#E1F5EE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <IcoWhatsApp size={30} color="#0F6E56" />
+    <div style={{ padding: '12px 0 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, textAlign: 'center' }}>
+      <div style={{
+        width: 84, height: 84, borderRadius: '50%', background: 'var(--accent)', color: 'var(--accent-fg)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Icon name="brand-whatsapp" size={40} />
       </div>
-      <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--fg)', textAlign: 'center' }}>¡WhatsApp abierto!</div>
-      <div style={{ fontSize: 13, color: 'var(--fg-secondary)', textAlign: 'center', lineHeight: 1.5 }}>
+      <div className="k-display" style={{ fontSize: 24, fontWeight: 700 }}>¡WhatsApp abierto!</div>
+      <div style={{ fontSize: 15, color: 'var(--fg-secondary)', lineHeight: 1.5 }}>
         El mensaje para <b style={{ color: 'var(--fg)' }}>{prospect?.contact}</b> de <b style={{ color: 'var(--fg)' }}>{prospect?.name}</b> está listo para enviar.
       </div>
-    </div>
-  )
-}
-
-function Section({ label, children }) {
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', letterSpacing: 0.5, marginBottom: 8 }}>{label}</div>
-      {children}
     </div>
   )
 }

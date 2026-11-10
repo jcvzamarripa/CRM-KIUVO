@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import Icon from '../shared/Icon'
+import { Button, IconButton, Card, Pill, Chip, Sheet, Label, Segmented, Empty, Bone } from '../ui'
 import { STAGE_BY_ID } from '../../constants/stages'
 import { supabase, isSupabaseConfigured } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -10,10 +11,10 @@ const DAYS_SHORT  = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
 const MONTHS_FULL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
 const EVENT_TYPES = [
-  { id: 'visit',   label: 'Visita',   color: '#185FA5', bg: '#E6F1FB', icon: 'map-pin'        },
-  { id: 'call',    label: 'Llamada',  color: '#1D9E75', bg: '#E1F5EE', icon: 'phone'          },
-  { id: 'meeting', label: 'Reunión',  color: '#EF9F27', bg: '#FAEEDA', icon: 'users'          },
-  { id: 'other',   label: 'Otro',     color: '#8D8B83', bg: '#F4F2EE', icon: 'calendar-event' },
+  { id: 'visit',   label: 'Visita',   tone: 'sky',     icon: 'map-pin'        },
+  { id: 'call',    label: 'Llamada',  tone: 'success', icon: 'phone'          },
+  { id: 'meeting', label: 'Reunión',  tone: 'warning', icon: 'users'          },
+  { id: 'other',   label: 'Otro',     tone: undefined, icon: 'calendar-event' },
 ]
 const TYPE_BY_ID = Object.fromEntries(EVENT_TYPES.map(t => [t.id, t]))
 
@@ -77,20 +78,16 @@ function normalize(row) {
 
 function SkeletonEvent() {
   return (
-    <div style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)', padding: '10px 12px 10px 13px', display: 'flex', gap: 12 }}>
-      <div style={{ minWidth: 46, display: 'flex', flexDirection: 'column', gap: 7 }}>
-        <div style={{ width: 36, height: 16, borderRadius: 4, background: 'var(--bg-secondary)' }} />
-        <div style={{ width: 22, height: 11, borderRadius: 4, background: 'var(--bg-secondary)' }} />
+    <Card style={{ display: 'flex', alignItems: 'center', gap: 14, minHeight: 76 }}>
+      <div style={{ minWidth: 58, display: 'flex', flexDirection: 'column', gap: 7 }}>
+        <Bone w={46} h={20} />
+        <Bone w={24} h={12} />
       </div>
-      <div style={{ width: '0.5px', background: 'var(--border)', flexShrink: 0 }} />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-          <div style={{ width: '55%', height: 13, borderRadius: 4, background: 'var(--bg-secondary)' }} />
-          <div style={{ width: 52, height: 20, borderRadius: 10, background: 'var(--bg-secondary)' }} />
-        </div>
-        <div style={{ width: '40%', height: 11, borderRadius: 4, background: 'var(--bg-secondary)' }} />
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 9 }}>
+        <Bone w="60%" h={16} />
+        <Bone w={70} h={20} r={99} />
       </div>
-    </div>
+    </Card>
   )
 }
 
@@ -103,45 +100,39 @@ function MonthYearPicker({ year, month, onSelect, onClose }) {
   const today = new Date()
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 250,
-      display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 60,
-    }} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{
-        background: 'var(--bg)', borderRadius: 'var(--r-lg)', padding: '16px',
-        width: 280, boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+    <>
+      <div className="k-sheet__backdrop" onClick={onClose} />
+      <div role="dialog" aria-modal="true" aria-label="Elegir mes" style={{
+        position: 'fixed', zIndex: 301, left: '50%', top: 72, transform: 'translateX(-50%)',
+        width: 'min(340px, calc(100vw - 28px))',
+        background: 'var(--bg)', color: 'var(--fg)',
+        borderRadius: 'var(--r-xl)', padding: 16, boxShadow: 'var(--shadow-float)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-          <button onClick={() => setPickerYear(y => y - 1)} style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--r-md)', color: 'var(--fg-secondary)' }}>
-            <Icon name="chevron-left" size={18} />
-          </button>
-          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--fg)' }}>{pickerYear}</div>
-          <button onClick={() => setPickerYear(y => y + 1)} style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--r-md)', color: 'var(--fg-secondary)' }}>
-            <Icon name="chevron-right" size={18} />
-          </button>
+          <IconButton icon="chevron-left" label="Año anterior" onClick={() => setPickerYear(y => y - 1)} />
+          <div className="k-h2">{pickerYear}</div>
+          <IconButton icon="chevron-right" label="Año siguiente" onClick={() => setPickerYear(y => y + 1)} />
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
           {MONTHS_SHORT.map((m, i) => {
             const isSelected = i === month && pickerYear === year
             const isToday    = i === today.getMonth() && pickerYear === today.getFullYear()
             return (
-              <button key={m} onClick={() => { onSelect(pickerYear, i); onClose() }} style={{
-                padding: '10px 0', borderRadius: 'var(--r-md)',
-                background: isSelected ? 'var(--kiuvo-blue)' : isToday ? 'var(--kiuvo-blue-soft)' : 'var(--surface)',
-                border: `0.5px solid ${isSelected ? 'var(--kiuvo-blue)' : isToday ? 'var(--kiuvo-blue-mid)' : 'var(--border)'}`,
-                fontSize: 13, fontWeight: isSelected || isToday ? 600 : 400,
-                color: isSelected ? '#fff' : isToday ? 'var(--kiuvo-blue)' : 'var(--fg)',
+              <button key={m} onClick={() => { onSelect(pickerYear, i); onClose() }} aria-pressed={isSelected} style={{
+                minHeight: 48, borderRadius: 'var(--r-full)',
+                background: isSelected ? 'var(--primary-bg)' : 'var(--surface)',
+                color: isSelected ? 'var(--primary-fg)' : 'var(--fg)',
+                boxShadow: isToday && !isSelected ? 'inset 0 0 0 2px var(--fg)' : 'none',
+                fontSize: 15, fontWeight: isSelected || isToday ? 600 : 500,
               }}>
                 {m}
               </button>
             )
           })}
         </div>
-        <button onClick={onClose} style={{ marginTop: 12, width: '100%', padding: '10px', borderRadius: 'var(--r-md)', background: 'var(--surface)', border: '0.5px solid var(--border)', fontSize: 13, color: 'var(--fg-secondary)' }}>
-          Cancelar
-        </button>
+        <Button variant="soft" block onClick={onClose} style={{ marginTop: 14 }}>Cancelar</Button>
       </div>
-    </div>
+    </>
   )
 }
 
@@ -185,7 +176,7 @@ function WeekStrip({ selected, onChange, events, viewYear, viewMonth: viewMonthI
   }, [selKey, viewMonthIdx, viewYear])
 
   return (
-    <div ref={containerRef} style={{ overflowX: 'auto', display: 'flex', gap: 2, padding: '4px 12px 6px', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+    <div ref={containerRef} style={{ overflowX: 'auto', display: 'flex', gap: 6, padding: '6px 14px 10px', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
       {days.map(d => {
         const key   = dateKey(d)
         const isTod = key === todayKey
@@ -197,33 +188,25 @@ function WeekStrip({ selected, onChange, events, viewYear, viewMonth: viewMonthI
             key={key}
             ref={isSel ? selRef : null}
             onClick={() => onChange(new Date(d))}
+            aria-pressed={isSel}
             style={{
-              flexShrink: 0, width: 44,
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-              padding: '6px 0', borderRadius: 'var(--r-md)',
-              background: isSel ? 'var(--kiuvo-blue)' : 'transparent',
+              flexShrink: 0, width: 52, minHeight: 78,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
+              borderRadius: 'var(--r-lg)',
+              background: isSel ? 'var(--primary-bg)' : 'var(--surface)',
+              color: isSel ? 'var(--primary-fg)' : past ? 'var(--fg-tertiary)' : 'var(--fg)',
+              boxShadow: isTod && !isSel ? 'inset 0 0 0 2px var(--fg)' : 'none',
             }}
           >
-            <span style={{
-              fontSize: 10, fontWeight: 500, textTransform: 'uppercase', letterSpacing: 0.3,
-              color: isSel ? 'rgba(255,255,255,0.75)' : isTod ? 'var(--kiuvo-blue)' : 'var(--fg-tertiary)',
-            }}>
+            <span style={{ fontSize: 13, fontWeight: 500, opacity: isSel ? 0.8 : 1, color: isSel ? 'inherit' : 'var(--fg-tertiary)' }}>
               {DAYS_SHORT[d.getDay()]}
             </span>
-            <span style={{
-              width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              borderRadius: '50%',
-              border: isTod && !isSel ? '1.5px solid var(--kiuvo-blue)' : 'none',
-              fontSize: 14, fontWeight: isSel || isTod ? 600 : 400,
-              color: isSel ? '#fff' : past ? 'var(--fg-tertiary)' : 'var(--fg)',
-            }}>
+            <span className="k-display" style={{ fontSize: 20, fontWeight: 700, lineHeight: 1 }}>
               {d.getDate()}
             </span>
             <span style={{
-              width: 4, height: 4, borderRadius: '50%',
-              background: eventDays.has(key)
-                ? (isSel ? 'rgba(255,255,255,0.65)' : 'var(--kiuvo-blue)')
-                : 'transparent',
+              width: 6, height: 6, borderRadius: '50%',
+              background: eventDays.has(key) ? 'currentColor' : 'transparent',
             }} />
           </button>
         )
@@ -241,56 +224,45 @@ function EventCard({ event, onPress }) {
   const { hh, ampm } = fmtTime(event.date)
 
   return (
-    <button onClick={() => onPress(event)} style={{
+    <button onClick={() => onPress(event)} className="k-card" style={{
       width: '100%', textAlign: 'left',
-      background: 'var(--surface)', border: '0.5px solid var(--border)',
-      borderRadius: 'var(--r-md)', padding: '10px 12px 10px 13px',
-      display: 'flex', gap: 12, position: 'relative', overflow: 'hidden',
-      opacity: past ? 0.55 : 1,
+      display: 'flex', alignItems: 'center', gap: 14, minHeight: 76,
+      opacity: past ? 0.6 : 1,
     }}>
-      <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: 3, background: stage ? stage.color : type.color }} />
-
-      <div style={{ minWidth: 46, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', paddingTop: 1 }}>
-        <span style={{ fontSize: 16, fontWeight: 500, color: 'var(--fg)', letterSpacing: -0.4, lineHeight: 1 }}>{hh}</span>
-        <span style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginTop: 2 }}>{ampm}</span>
+      <div style={{ minWidth: 58 }}>
+        <div className="k-display" style={{ fontSize: 22, fontWeight: 700, lineHeight: 1 }}>{hh}</div>
+        <div style={{ fontSize: 13, color: 'var(--fg-tertiary)', marginTop: 3 }}>{ampm}</div>
       </div>
 
-      <div style={{ width: '0.5px', background: 'var(--border)', flexShrink: 0 }} />
-
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 6 }}>
-          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {event.title}
-          </div>
-          <span style={{
-            flexShrink: 0, fontSize: 11, fontWeight: 500,
-            color: type.color, background: type.bg,
-            padding: '2px 7px', borderRadius: 'var(--r-full)',
-          }}>
-            {type.label}
-          </span>
+        <div style={{ fontSize: 16, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {event.title}
         </div>
 
         {event.activity && (
-          <div style={{ fontSize: 12, color: 'var(--fg-secondary)', marginTop: 2 }}>{event.activity}</div>
+          <div style={{ fontSize: 14, color: 'var(--fg-secondary)', marginTop: 2 }}>{event.activity}</div>
         )}
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+          <Pill tone={type.tone} icon={type.icon}>{type.label}</Pill>
+          {stage && (
+            <Pill>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: stage.color }} />
+              {stage.label}
+            </Pill>
+          )}
+          {event.source === 'google' && <Pill><GoogleColorIcon size={12} /> Google</Pill>}
+        </div>
 
         {event.address ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4, color: 'var(--fg-tertiary)' }}>
-            <Icon name="map-pin" size={11} />
-            <span style={{ fontSize: 11, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{event.address}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 6, color: 'var(--fg-secondary)' }}>
+            <Icon name="map-pin" size={14} />
+            <span style={{ fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{event.address}</span>
           </div>
         ) : null}
-
-        {event.source === 'google' && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
-            <GoogleColorIcon size={11} />
-            <span style={{ fontSize: 11, color: 'var(--fg-tertiary)' }}>Google Calendar</span>
-          </div>
-        )}
       </div>
 
-      <Icon name="chevron-right" size={16} color="var(--fg-tertiary)" style={{ flexShrink: 0, alignSelf: 'center' }} />
+      <Icon name="chevron-right" size={20} color="var(--fg-tertiary)" />
     </button>
   )
 }
@@ -370,234 +342,171 @@ function AddEventModal({ initialDate, prefill, onSave, onClose }) {
     ? title.trim()
     : (title.trim() || prospectQuery.trim())
 
-  const inputStyle = {
-    width: '100%', padding: '10px 12px', boxSizing: 'border-box',
-    background: 'var(--surface)', border: '0.5px solid var(--border)',
-    borderRadius: 'var(--r-md)', fontSize: 14, color: 'var(--fg)',
-    outline: 'none', fontFamily: 'inherit',
-  }
-  const labelStyle = { fontSize: 12, fontWeight: 500, color: 'var(--fg-secondary)', display: 'block', marginBottom: 6 }
+  const hint = { fontSize: 13, color: 'var(--fg-secondary)', marginTop: 6 }
+  const block = { marginBottom: 20 }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
-      onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: 'var(--bg)', borderRadius: '16px 16px 0 0', maxHeight: '92vh', overflowY: 'auto', paddingBottom: 28 }}>
-        <div style={{ padding: '12px 16px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 17, fontWeight: 500, color: 'var(--fg)' }}>Nuevo evento</span>
-          <button onClick={onClose} style={{ color: 'var(--fg-tertiary)', padding: 4 }}><Icon name="x" size={20} /></button>
+    <Sheet
+      title="Nuevo evento"
+      onClose={onClose}
+      footer={
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8 }}>
+          <Button variant="soft" size="lg" onClick={onClose}>Cancelar</Button>
+          <Button size="lg" icon="check" onClick={handleSave} disabled={!canSave}>Guardar evento</Button>
         </div>
-        <div style={{ height: '0.5px', background: 'var(--border)', margin: '12px 0 0' }} />
+      }
+    >
+      {/* ── Prospect picker ── */}
+      <div style={block}>
+        <Label>Prospecto</Label>
 
-        <div style={{ padding: '16px 16px 0', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <Segmented
+          size="lg"
+          surface
+          value={prospectMode}
+          onChange={id => { setProspectMode(id); clearProspect() }}
+          options={[
+            { id: 'search', label: 'Existente',     icon: 'search' },
+            { id: 'new',    label: 'Nuevo / libre', icon: 'plus' },
+          ]}
+          style={{ marginBottom: 10 }}
+        />
 
-          {/* ── Prospect picker ── */}
-          <div>
-            <label style={labelStyle}>Prospecto</label>
-
-            {/* Mode toggle */}
-            <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-              {[
-                { id: 'search', label: 'Existente', icon: 'search' },
-                { id: 'new',    label: 'Nuevo / libre', icon: 'plus' },
-              ].map(m => (
-                <button key={m.id} onClick={() => { setProspectMode(m.id); clearProspect() }} style={{
-                  flex: 1, padding: '7px 0', borderRadius: 'var(--r-md)', fontSize: 12, fontWeight: 500,
-                  background: prospectMode === m.id ? 'var(--kiuvo-blue-soft)' : 'var(--surface)',
-                  border: `0.5px solid ${prospectMode === m.id ? 'var(--kiuvo-blue)' : 'var(--border)'}`,
-                  color: prospectMode === m.id ? 'var(--kiuvo-blue-deep)' : 'var(--fg-secondary)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                }}>
-                  <Icon name={m.icon} size={13} color={prospectMode === m.id ? 'var(--kiuvo-blue)' : 'var(--fg-tertiary)'} />
-                  {m.label}
-                </button>
-              ))}
-            </div>
-
-            {prospectMode === 'search' ? (
-              <div style={{ position: 'relative' }}>
-                {selectedProspect ? (
-                  /* Selected chip */
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    padding: '10px 12px', borderRadius: 'var(--r-md)',
-                    background: 'var(--kiuvo-blue-soft)',
-                    border: '0.5px solid var(--kiuvo-blue)',
-                  }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: STAGE_BY_ID[selectedProspect.stage_id]?.color ?? '#888', flexShrink: 0 }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--kiuvo-blue-deep)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {selectedProspect.name}
-                      </div>
-                      {selectedProspect.phone && (
-                        <div style={{ fontSize: 11, color: 'var(--kiuvo-blue)', marginTop: 1 }}>{selectedProspect.phone}</div>
-                      )}
-                    </div>
-                    <button onClick={clearProspect} style={{ color: 'var(--kiuvo-blue)', flexShrink: 0 }}>
-                      <Icon name="x" size={16} />
-                    </button>
+        {prospectMode === 'search' ? (
+          <div style={{ position: 'relative' }}>
+            {selectedProspect ? (
+              <Card style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 10px 10px 16px' }}>
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: STAGE_BY_ID[selectedProspect.stage_id]?.color ?? 'var(--fg-tertiary)', flexShrink: 0 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 16, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {selectedProspect.name}
                   </div>
-                ) : (
-                  /* Search input */
-                  <>
-                    <div style={{ position: 'relative' }}>
-                      <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-                        <Icon name="search" size={15} color="var(--fg-tertiary)" />
-                      </span>
-                      <input
-                        value={prospectQuery}
-                        onChange={e => { setProspectQuery(e.target.value); setShowDropdown(true) }}
-                        onFocus={() => setShowDropdown(true)}
-                        onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
-                        placeholder="Buscar prospecto existente…"
-                        style={{ ...inputStyle, paddingLeft: 36 }}
-                      />
-                    </div>
-                    {showDropdown && matches.length > 0 && (
-                      <div style={{
-                        position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
-                        background: 'var(--surface)', border: '0.5px solid var(--border)',
-                        borderRadius: 'var(--r-md)', marginTop: 4,
-                        maxHeight: 200, overflowY: 'auto',
-                        boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-                      }}>
-                        {matches.map(p => {
-                          const s = STAGE_BY_ID[p.stage_id]
-                          return (
-                            <button
-                              key={p.id}
-                              onMouseDown={() => selectProspect(p)}
-                              style={{
-                                width: '100%', textAlign: 'left',
-                                padding: '11px 14px',
-                                borderBottom: '0.5px solid var(--border)',
-                                display: 'flex', alignItems: 'center', gap: 10,
-                              }}
-                            >
-                              <span style={{ width: 8, height: 8, borderRadius: '50%', background: s?.color ?? '#888', flexShrink: 0 }} />
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
-                                {s && <div style={{ fontSize: 11, color: s.color, marginTop: 1 }}>{s.label}</div>}
-                              </div>
-                              {p.phone && <span style={{ fontSize: 11, color: 'var(--fg-tertiary)', flexShrink: 0 }}>{p.phone}</span>}
-                            </button>
-                          )
-                        })}
-                        {prospectQuery && matches.length === 0 && (
-                          <div style={{ padding: '12px 14px', fontSize: 13, color: 'var(--fg-tertiary)' }}>
-                            Sin resultados — cambia a "Nuevo / libre"
+                  {selectedProspect.phone && (
+                    <div style={{ fontSize: 13, color: 'var(--fg-secondary)', marginTop: 1 }}>{selectedProspect.phone}</div>
+                  )}
+                </div>
+                <IconButton icon="x" label="Quitar prospecto" variant="soft" onClick={clearProspect} />
+              </Card>
+            ) : (
+              <>
+                <label className="k-search">
+                  <Icon name="search" size={18} />
+                  <input
+                    className="k-input"
+                    value={prospectQuery}
+                    onChange={e => { setProspectQuery(e.target.value); setShowDropdown(true) }}
+                    onFocus={() => setShowDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+                    placeholder="Buscar prospecto existente…"
+                  />
+                </label>
+                {showDropdown && matches.length > 0 && (
+                  <div style={{
+                    position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
+                    background: 'var(--surface)', borderRadius: 'var(--r-lg)', marginTop: 6,
+                    maxHeight: 240, overflowY: 'auto', boxShadow: 'var(--shadow-float)',
+                  }}>
+                    {matches.map(p => {
+                      const s = STAGE_BY_ID[p.stage_id]
+                      return (
+                        <button key={p.id} onMouseDown={() => selectProspect(p)} className="k-row">
+                          <span style={{ width: 10, height: 10, borderRadius: '50%', background: s?.color ?? 'var(--fg-tertiary)', flexShrink: 0 }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 15, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                            {s && <div style={{ fontSize: 13, color: 'var(--fg-secondary)', marginTop: 1 }}>{s.label}</div>}
                           </div>
-                        )}
+                          {p.phone && <span style={{ fontSize: 13, color: 'var(--fg-tertiary)', flexShrink: 0 }}>{p.phone}</span>}
+                        </button>
+                      )
+                    })}
+                    {prospectQuery && matches.length === 0 && (
+                      <div style={{ padding: '14px 16px', fontSize: 14, color: 'var(--fg-tertiary)' }}>
+                        Sin resultados — cambia a "Nuevo / libre"
                       </div>
                     )}
-                  </>
+                  </div>
                 )}
-              </div>
-            ) : (
-              /* Free text for new prospect */
-              <input
-                value={prospectQuery}
-                onChange={e => setProspectQuery(e.target.value)}
-                placeholder="Nombre del nuevo cliente…"
-                style={inputStyle}
-              />
+              </>
             )}
           </div>
+        ) : (
+          <input
+            className="k-input"
+            value={prospectQuery}
+            onChange={e => setProspectQuery(e.target.value)}
+            placeholder="Nombre del nuevo cliente…"
+          />
+        )}
+      </div>
 
-          {/* ── Título del evento ── */}
-          <div>
-            <label style={labelStyle}>Título del evento *</label>
-            <input
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              placeholder={selectedProspect ? selectedProspect.name : 'Ej. Presentación de producto'}
-              style={inputStyle}
-            />
-            {selectedProspect && !title && (
-              <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginTop: 4 }}>
-                Se usará el nombre del prospecto si lo dejas vacío
-              </div>
-            )}
-          </div>
+      {/* ── Título del evento ── */}
+      <div style={block}>
+        <Label>Título del evento *</Label>
+        <input
+          className="k-input"
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          placeholder={selectedProspect ? selectedProspect.name : 'Ej. Presentación de producto'}
+        />
+        {selectedProspect && !title && (
+          <div style={hint}>Se usará el nombre del prospecto si lo dejas vacío</div>
+        )}
+      </div>
 
-          {/* ── Tipo ── */}
-          <div>
-            <label style={labelStyle}>Tipo</label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
-              {EVENT_TYPES.map(t => (
-                <button key={t.id} onClick={() => setType(t.id)} style={{
-                  padding: '8px 4px', borderRadius: 'var(--r-md)', fontSize: 12, fontWeight: 500,
-                  background: type === t.id ? t.bg : 'var(--surface)',
-                  border: `0.5px solid ${type === t.id ? t.color : 'var(--border)'}`,
-                  color: type === t.id ? t.color : 'var(--fg-secondary)',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                }}>
-                  <Icon name={t.icon} size={16} />
-                  {t.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* ── Fecha y hora ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <div>
-              <label style={labelStyle}>Fecha</label>
-              <input type="date" value={dateVal} onChange={e => setDateVal(e.target.value)} style={inputStyle} />
-            </div>
-            <div>
-              <label style={labelStyle}>Hora</label>
-              <input type="time" value={timeVal} onChange={e => setTimeVal(e.target.value)} style={inputStyle} />
-            </div>
-          </div>
-
-          {/* ── Duración ── */}
-          <div>
-            <label style={labelStyle}>Duración</label>
-            <select value={duration} onChange={e => setDuration(Number(e.target.value))} style={{ ...inputStyle, appearance: 'none' }}>
-              {[15,30,45,60,90,120].map(v => (
-                <option key={v} value={v}>{v < 60 ? `${v} minutos` : v === 60 ? '1 hora' : `${v/60} horas`}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* ── Dirección ── */}
-          <div>
-            <label style={labelStyle}>Dirección (opcional)</label>
-            <input value={address} onChange={e => setAddress(e.target.value)} placeholder="Calle, colonia..." style={inputStyle} />
-            {selectedProspect?.address && !address && (
-              <button
-                onClick={() => setAddress(selectedProspect.address)}
-                style={{ marginTop: 5, fontSize: 11, color: 'var(--kiuvo-blue)', display: 'flex', alignItems: 'center', gap: 4 }}
-              >
-                <Icon name="map-pin" size={11} color="var(--kiuvo-blue)" />
-                Usar dirección del prospecto
-              </button>
-            )}
-          </div>
-
-          {/* ── Notas ── */}
-          <div>
-            <label style={labelStyle}>Notas (opcional)</label>
-            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
-              placeholder="Objetivo, qué llevar..." style={{ ...inputStyle, resize: 'none' }} />
-          </div>
-
-          {/* ── Botones ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8, paddingTop: 4 }}>
-            <button onClick={onClose} style={{ padding: 12, borderRadius: 'var(--r-md)', border: '0.5px solid var(--border)', background: 'var(--surface)', color: 'var(--fg-secondary)', fontSize: 14, fontWeight: 500 }}>
-              Cancelar
-            </button>
-            <button onClick={handleSave} disabled={!canSave} style={{
-              padding: 12, borderRadius: 'var(--r-md)', fontSize: 14, fontWeight: 500,
-              background: canSave ? 'var(--kiuvo-blue)' : 'var(--bg-tertiary)',
-              color: canSave ? '#fff' : 'var(--fg-tertiary)',
-            }}>
-              Guardar evento
-            </button>
-          </div>
+      {/* ── Tipo ── */}
+      <div style={block}>
+        <Label>Tipo</Label>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+          {EVENT_TYPES.map(t => (
+            <Chip key={t.id} selected={type === t.id} onClick={() => setType(t.id)}
+              style={{ flexDirection: 'column', gap: 4, minHeight: 64, padding: '8px 4px', borderRadius: 'var(--r-md)', fontSize: 13 }}>
+              <Icon name={t.icon} size={22} />
+              {t.label}
+            </Chip>
+          ))}
         </div>
       </div>
-    </div>
+
+      {/* ── Fecha y hora ── */}
+      <div style={{ ...block, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div>
+          <Label>Fecha</Label>
+          <input type="date" className="k-input" value={dateVal} onChange={e => setDateVal(e.target.value)} />
+        </div>
+        <div>
+          <Label>Hora</Label>
+          <input type="time" className="k-input" value={timeVal} onChange={e => setTimeVal(e.target.value)} />
+        </div>
+      </div>
+
+      {/* ── Duración ── */}
+      <div style={block}>
+        <Label>Duración</Label>
+        <select className="k-input" value={duration} onChange={e => setDuration(Number(e.target.value))}>
+          {[15,30,45,60,90,120].map(v => (
+            <option key={v} value={v}>{v < 60 ? `${v} minutos` : v === 60 ? '1 hora' : `${v/60} horas`}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* ── Dirección ── */}
+      <div style={block}>
+        <Label>Dirección (opcional)</Label>
+        <input className="k-input" value={address} onChange={e => setAddress(e.target.value)} placeholder="Calle, colonia..." />
+        {selectedProspect?.address && !address && (
+          <Button variant="soft" size="sm" icon="map-pin" onClick={() => setAddress(selectedProspect.address)} style={{ marginTop: 8 }}>
+            Usar dirección del prospecto
+          </Button>
+        )}
+      </div>
+
+      {/* ── Notas ── */}
+      <div>
+        <Label>Notas (opcional)</Label>
+        <textarea className="k-input" value={notes} onChange={e => setNotes(e.target.value)} rows={2}
+          placeholder="Objetivo, qué llevar..." />
+      </div>
+    </Sheet>
   )
 }
 
@@ -609,74 +518,58 @@ function EventDetailSheet({ event, onClose, onDelete }) {
   const { hh, ampm } = fmtTime(event.date)
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
-      onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: 'var(--bg)', borderRadius: '16px 16px 0 0', paddingBottom: 32 }}>
-        <div style={{ padding: '12px 16px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{
-            fontSize: 11, fontWeight: 500, color: type.color,
-            background: type.bg, padding: '3px 9px', borderRadius: 'var(--r-full)',
-          }}>{type.label}</span>
-          <button onClick={onClose} style={{ color: 'var(--fg-tertiary)', padding: 4 }}><Icon name="x" size={20} /></button>
-        </div>
-        <div style={{ height: '0.5px', background: 'var(--border)' }} />
-
-        <div style={{ padding: '16px 16px 0', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div>
-            <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--fg)' }}>{event.title}</div>
-            {event.activity && <div style={{ fontSize: 14, color: 'var(--fg-secondary)', marginTop: 4 }}>{event.activity}</div>}
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)' }}>
-              <Icon name="clock" size={16} color="var(--fg-tertiary)" />
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>{hh} {ampm}</div>
-                <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginTop: 1 }}>{event.duration} min de duración</div>
-              </div>
-            </div>
-
-            {event.address ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)' }}>
-                <Icon name="map-pin" size={16} color="var(--fg-tertiary)" />
-                <span style={{ fontSize: 13, color: 'var(--fg)', flex: 1 }}>{event.address}</span>
-              </div>
-            ) : null}
-
-            {event.notes ? (
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px', background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)' }}>
-                <Icon name="notes" size={16} color="var(--fg-tertiary)" style={{ marginTop: 1 }} />
-                <span style={{ fontSize: 13, color: 'var(--fg)', flex: 1, lineHeight: 1.5 }}>{event.notes}</span>
-              </div>
-            ) : null}
-
-            {event.source === 'google' && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)' }}>
-                <GoogleColorIcon size={16} />
-                <span style={{ fontSize: 12, color: 'var(--fg-secondary)' }}>Importado de Google Calendar</span>
-              </div>
-            )}
-
-            {stage && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)' }}>
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: stage.color, flexShrink: 0 }} />
-                <span style={{ fontSize: 13, color: 'var(--fg)' }}>{stage.label}</span>
-              </div>
-            )}
-          </div>
-
-          {event.source === 'local' && (
-            <button onClick={() => { onDelete(event.id); onClose() }} style={{
-              width: '100%', padding: 12, borderRadius: 'var(--r-md)',
-              border: '0.5px solid var(--danger-border)', background: 'var(--danger-bg)',
-              color: 'var(--danger)', fontSize: 14, fontWeight: 500,
-            }}>
-              Eliminar evento
-            </button>
-          )}
-        </div>
+    <Sheet
+      title={event.title}
+      onClose={onClose}
+      footer={event.source === 'local' && (
+        <Button variant="danger" block size="lg" icon="trash" onClick={() => { onDelete(event.id); onClose() }}>
+          Eliminar evento
+        </Button>
+      )}
+    >
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+        <Pill tone={type.tone} icon={type.icon}>{type.label}</Pill>
+        {stage && (
+          <Pill>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: stage.color }} />
+            {stage.label}
+          </Pill>
+        )}
       </div>
-    </div>
+
+      {event.activity && <div style={{ fontSize: 16, color: 'var(--fg-secondary)', marginBottom: 14 }}>{event.activity}</div>}
+
+      <Card flush>
+        <div className="k-row">
+          <Icon name="clock" size={22} color="var(--fg-tertiary)" />
+          <div>
+            <div className="k-display" style={{ fontSize: 20, fontWeight: 700 }}>{hh} {ampm}</div>
+            <div style={{ fontSize: 13, color: 'var(--fg-secondary)', marginTop: 1 }}>{event.duration} min de duración</div>
+          </div>
+        </div>
+
+        {event.address ? (
+          <div className="k-row">
+            <Icon name="map-pin" size={22} color="var(--fg-tertiary)" />
+            <span style={{ fontSize: 15, flex: 1 }}>{event.address}</span>
+          </div>
+        ) : null}
+
+        {event.notes ? (
+          <div className="k-row" style={{ alignItems: 'flex-start' }}>
+            <Icon name="notes" size={22} color="var(--fg-tertiary)" />
+            <span style={{ fontSize: 15, flex: 1, lineHeight: 1.5 }}>{event.notes}</span>
+          </div>
+        ) : null}
+
+        {event.source === 'google' && (
+          <div className="k-row">
+            <GoogleColorIcon size={22} />
+            <span style={{ fontSize: 15, color: 'var(--fg-secondary)' }}>Importado de Google Calendar</span>
+          </div>
+        )}
+      </Card>
+    </Sheet>
   )
 }
 
@@ -686,88 +579,70 @@ function GoogleConnectSheet({ connected, onConnect, onDisconnect, onClose, loadi
   const hasClientId = !!import.meta.env.VITE_GOOGLE_CLIENT_ID
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
-      onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: 'var(--bg)', borderRadius: '16px 16px 0 0', paddingBottom: 32 }}>
-        <div style={{ padding: '12px 16px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 17, fontWeight: 500, color: 'var(--fg)' }}>Google Calendar</span>
-          <button onClick={onClose} style={{ color: 'var(--fg-tertiary)', padding: 4 }}><Icon name="x" size={20} /></button>
-        </div>
-        <div style={{ height: '0.5px', background: 'var(--border)' }} />
-
-        <div style={{ padding: '20px 16px 0', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {!hasClientId && (
-            <div style={{ padding: 14, background: 'var(--warning-bg)', border: '0.5px solid var(--warning-border)', borderRadius: 'var(--r-lg)' }}>
-              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--warning-fg)', marginBottom: 6 }}>Configuración requerida</div>
-              <div style={{ fontSize: 12, color: 'var(--warning-fg)', lineHeight: 1.6 }}>
-                Agrega tu Client ID en el archivo <code style={{ fontFamily: 'monospace', background: 'rgba(0,0,0,0.1)', padding: '1px 4px', borderRadius: 3 }}>.env</code>:
-              </div>
-              <div style={{ marginTop: 8, padding: '8px 10px', background: '#0F0E0C', borderRadius: 'var(--r-md)', fontFamily: 'monospace', fontSize: 12, color: '#A8E6CF', wordBreak: 'break-all' }}>
-                VITE_GOOGLE_CLIENT_ID=tu_client_id
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--warning-fg)', marginTop: 10, opacity: 0.9, lineHeight: 1.5 }}>
-                1. Ve a <strong>console.cloud.google.com</strong>{'\n'}
-                2. APIs y Servicios → Credenciales{'\n'}
-                3. Crear → ID de cliente OAuth 2.0{'\n'}
-                4. Tipo: Aplicación web{'\n'}
-                5. Activa la <strong>Google Calendar API</strong>
-              </div>
+    <Sheet title="Google Calendar" onClose={onClose}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {!hasClientId && (
+          <div style={{ padding: 16, background: 'var(--warning-bg)', color: 'var(--warning-fg)', borderRadius: 'var(--r-lg)' }}>
+            <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>Configuración requerida</div>
+            <div style={{ fontSize: 14, lineHeight: 1.6 }}>
+              Agrega tu Client ID en el archivo <code style={{ fontFamily: 'monospace', background: 'rgba(0,0,0,0.1)', padding: '1px 5px', borderRadius: 4 }}>.env</code>:
             </div>
-          )}
-
-          {connected ? (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 14, background: 'var(--success-bg)', border: '0.5px solid #B8E3D2', borderRadius: 'var(--r-lg)' }}>
-                <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <GoogleColorIcon size={22} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--success-fg)' }}>Conectado</div>
-                  <div style={{ fontSize: 12, color: 'var(--success-fg)', opacity: 0.85, marginTop: 1 }}>Sincronizando tu Google Calendar</div>
-                </div>
-                <Icon name="check" size={18} color="var(--success)" />
-              </div>
-              <button onClick={onDisconnect} style={{
-                width: '100%', padding: 12, borderRadius: 'var(--r-md)',
-                border: '0.5px solid var(--danger-border)', background: 'var(--danger-bg)',
-                color: 'var(--danger)', fontSize: 14, fontWeight: 500,
-              }}>
-                Desconectar Google Calendar
-              </button>
-            </>
-          ) : (
-            <button onClick={onConnect} disabled={loading} style={{
-              width: '100%', padding: 14, borderRadius: 'var(--r-lg)',
-              border: '0.5px solid var(--border)', background: 'var(--surface)',
-              display: 'flex', alignItems: 'center', gap: 12,
-              opacity: loading ? 0.7 : 1,
-            }}>
-              <div style={{ width: 42, height: 42, borderRadius: '50%', background: '#F1F3F4', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                {loading
-                  ? <Icon name="loader-2" size={22} color="#5C5A53" />
-                  : <GoogleColorIcon size={24} />
-                }
-              </div>
-              <div style={{ textAlign: 'left', flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg)' }}>
-                  {loading ? 'Conectando...' : 'Conectar Google Calendar'}
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--fg-secondary)', marginTop: 1 }}>
-                  Importa eventos y recibe avisos en tu celular
-                </div>
-              </div>
-              {!loading && <Icon name="chevron-right" size={18} color="var(--fg-tertiary)" />}
-            </button>
-          )}
-
-          <div style={{ padding: 12, background: 'var(--bg-secondary)', borderRadius: 'var(--r-md)' }}>
-            <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', lineHeight: 1.6 }}>
-              Al conectar, KIUVO CRM puede leer y crear eventos en tu Google Calendar. Los eventos se sincronizan solo en este dispositivo.
+            <div style={{ marginTop: 8, padding: '10px 12px', background: 'var(--ink)', color: 'var(--accent)', borderRadius: 'var(--r-md)', fontFamily: 'monospace', fontSize: 13, wordBreak: 'break-all' }}>
+              VITE_GOOGLE_CLIENT_ID=tu_client_id
+            </div>
+            <div style={{ fontSize: 13, marginTop: 10, lineHeight: 1.6, whiteSpace: 'pre-line' }}>
+              1. Ve a <strong>console.cloud.google.com</strong>{'\n'}
+              2. APIs y Servicios → Credenciales{'\n'}
+              3. Crear → ID de cliente OAuth 2.0{'\n'}
+              4. Tipo: Aplicación web{'\n'}
+              5. Activa la <strong>Google Calendar API</strong>
             </div>
           </div>
+        )}
+
+        {connected ? (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 16, background: 'var(--success-bg)', color: 'var(--success-fg)', borderRadius: 'var(--r-lg)' }}>
+              <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <GoogleColorIcon size={24} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 16, fontWeight: 600 }}>Conectado</div>
+                <div style={{ fontSize: 14, marginTop: 1 }}>Sincronizando tu Google Calendar</div>
+              </div>
+              <Icon name="check" size={22} />
+            </div>
+            <Button variant="danger" block size="lg" onClick={onDisconnect}>Desconectar Google Calendar</Button>
+          </>
+        ) : (
+          <button onClick={onConnect} disabled={loading} className="k-card" style={{
+            width: '100%', textAlign: 'left', minHeight: 76,
+            display: 'flex', alignItems: 'center', gap: 12,
+            opacity: loading ? 0.7 : 1,
+          }}>
+            <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              {loading
+                ? <span className="k-spin" style={{ display: 'inline-flex' }}><Icon name="loader-2" size={24} color="var(--fg-secondary)" /></span>
+                : <GoogleColorIcon size={24} />
+              }
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 16, fontWeight: 600 }}>
+                {loading ? 'Conectando...' : 'Conectar Google Calendar'}
+              </div>
+              <div style={{ fontSize: 14, color: 'var(--fg-secondary)', marginTop: 1 }}>
+                Importa eventos y recibe avisos en tu celular
+              </div>
+            </div>
+            {!loading && <Icon name="chevron-right" size={20} color="var(--fg-tertiary)" />}
+          </button>
+        )}
+
+        <div style={{ padding: 14, background: 'var(--bg-secondary)', borderRadius: 'var(--r-md)', fontSize: 13, color: 'var(--fg-secondary)', lineHeight: 1.6 }}>
+          Al conectar, KIUVO CRM puede leer y crear eventos en tu Google Calendar. Los eventos se sincronizan solo en este dispositivo.
         </div>
       </div>
-    </div>
+    </Sheet>
   )
 }
 
@@ -845,7 +720,7 @@ export default function AgendaScreen({ pendingEvent, onClearPending, prefillEven
   // ── Load from Supabase (tabla agenda_events) ─────────────────────
   const load = useCallback(async () => {
     if (!isSupabaseConfigured || !supabase) {
-      setSaveError('⚠️ Modo demo activo: los eventos no se guardan en la nube. Configura las variables de entorno de Supabase.')
+      setSaveError('Modo demo activo: los eventos no se guardan en la nube. Configura las variables de entorno de Supabase.')
       setLoading(false)
       return
     }
@@ -1001,7 +876,7 @@ export default function AgendaScreen({ pendingEvent, onClearPending, prefillEven
 
   async function handleAddEvent(ev) {
     if (!isSupabaseConfigured || !supabase) {
-      setSaveError('⚠️ Modo demo: no se puede guardar. Ingresa con tu cuenta real de Supabase.')
+      setSaveError('Modo demo: no se puede guardar. Ingresa con tu cuenta real de Supabase.')
       return
     }
 
@@ -1110,68 +985,56 @@ export default function AgendaScreen({ pendingEvent, onClearPending, prefillEven
   ]
 
   return (
-    <div style={{ paddingBottom: 92, minHeight: '100%', background: 'var(--bg)' }}>
+    <div style={{ paddingBottom: 170, minHeight: '100%', background: 'var(--bg)' }}>
 
       {/* ── Header ── */}
-      <div style={{ padding: '8px 16px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <button onClick={goToPrevMonth} style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--r-md)', color: 'var(--fg-secondary)' }}>
-            <Icon name="chevron-left" size={18} />
-          </button>
-          <button
-            onClick={() => setShowMonthPick(true)}
-            title="Seleccionar mes y año"
-            style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 6px', borderRadius: 'var(--r-md)', background: 'transparent' }}
-          >
-            <span style={{ fontSize: 18, fontWeight: 500, color: 'var(--fg)' }}>
-              {MONTHS_FULL[viewMonth]} {viewYear}
-            </span>
-            <Icon name="selector" size={14} color="var(--fg-tertiary)" />
-          </button>
-          <button onClick={goToNextMonth} style={{ width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 'var(--r-md)', color: 'var(--fg-secondary)' }}>
-            <Icon name="chevron-right" size={18} />
-          </button>
-        </div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={() => setShowGoogle(true)} title="Google Calendar" style={{
-            width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
-            border: gcConnected ? 'none' : '0.5px solid var(--border)',
-            background: gcConnected ? 'var(--success-bg)' : 'var(--surface)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            {gcConnected
-              ? <Icon name="calendar-check" size={18} color="var(--success)" />
-              : <GoogleColorIcon size={18} />
-            }
-          </button>
-          <button onClick={goToToday} title="Ir a hoy" style={{
-            height: 36, padding: '0 10px', borderRadius: 'var(--r-full)', flexShrink: 0,
-            border: '0.5px solid var(--kiuvo-blue)',
-            background: 'var(--kiuvo-blue-soft)',
-            display: 'flex', alignItems: 'center', gap: 5,
-          }}>
-            <Icon name="calendar-event" size={15} color="var(--kiuvo-blue)" />
-            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--kiuvo-blue)' }}>Hoy</span>
-          </button>
-        </div>
+      <div className="k-screenhead" style={{ gap: 8 }}>
+        <button
+          onClick={() => setShowMonthPick(true)}
+          title="Seleccionar mes y año"
+          className="k-screenhead__title"
+          style={{ display: 'flex', alignItems: 'center', gap: 6, minHeight: 48, textAlign: 'left' }}
+        >
+          <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {MONTHS_FULL[viewMonth]} {viewYear}
+          </span>
+          <Icon name="selector" size={18} color="var(--fg-tertiary)" />
+        </button>
+        <IconButton icon="chevron-left" label="Mes anterior" onClick={goToPrevMonth} />
+        <IconButton icon="chevron-right" label="Mes siguiente" onClick={goToNextMonth} />
+      </div>
+
+      <div style={{ padding: '0 14px 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Button variant="soft" size="sm" icon="calendar-event" onClick={goToToday} title="Ir a hoy"
+          style={{ minHeight: 44, background: 'var(--surface)' }}>
+          Hoy
+        </Button>
+        <button onClick={() => setShowGoogle(true)} title="Google Calendar" className="k-btn k-btn--sm" style={{
+          minHeight: 44,
+          background: gcConnected ? 'var(--success-bg)' : 'var(--surface)',
+          color: gcConnected ? 'var(--success-fg)' : 'var(--fg)',
+        }}>
+          {gcConnected ? <Icon name="calendar-check" size={18} /> : <GoogleColorIcon size={18} />}
+          {gcConnected ? 'Google conectado' : 'Google Calendar'}
+        </button>
       </div>
 
       {/* ── Save error ── */}
       {saveError && (
-        <div style={{ margin: '0 16px 8px', padding: '10px 12px', background: 'var(--danger-bg)', border: '0.5px solid var(--danger-border)', borderRadius: 'var(--r-md)', fontSize: 12, color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ margin: '0 14px 8px', padding: '12px 8px 12px 16px', background: 'var(--coral-soft)', color: 'var(--coral-fg)', borderRadius: 'var(--r-md)', fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 600, marginBottom: 2 }}>Error al guardar el evento</div>
-            <div style={{ opacity: 0.85 }}>{saveError}</div>
+            <div>{saveError}</div>
           </div>
-          <button onClick={() => setSaveError(null)} style={{ color: 'var(--danger)', flexShrink: 0 }}><Icon name="x" size={14} /></button>
+          <button onClick={() => setSaveError(null)} aria-label="Cerrar aviso" style={{ width: 44, height: 44, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="x" size={18} /></button>
         </div>
       )}
 
       {/* ── Sync error ── */}
       {syncError && (
-        <div style={{ margin: '0 16px 8px', padding: '8px 12px', background: 'var(--warning-bg)', border: '0.5px solid var(--warning-border)', borderRadius: 'var(--r-md)', fontSize: 12, color: 'var(--warning-fg)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ margin: '0 14px 8px', padding: '6px 8px 6px 16px', background: 'var(--warning-bg)', color: 'var(--warning-fg)', borderRadius: 'var(--r-md)', fontSize: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ flex: 1 }}>{syncError}</span>
-          <button onClick={() => setSyncError(null)} style={{ color: 'var(--warning-fg)', flexShrink: 0 }}><Icon name="x" size={14} /></button>
+          <button onClick={() => setSyncError(null)} aria-label="Cerrar aviso" style={{ width: 44, height: 44, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="x" size={18} /></button>
         </div>
       )}
 
@@ -1179,43 +1042,34 @@ export default function AgendaScreen({ pendingEvent, onClearPending, prefillEven
       <WeekStrip selected={selected} onChange={handleSelectDay} events={events} viewYear={viewYear} viewMonth={viewMonth} />
 
       {/* ── Day label ── */}
-      <div style={{ padding: '2px 16px 10px', display: 'flex', alignItems: 'baseline', gap: 8 }}>
-        <span style={{ fontSize: 16, fontWeight: 500, color: 'var(--fg)' }}>{selLabel}</span>
+      <div style={{ padding: '6px 18px 10px', display: 'flex', alignItems: 'baseline', gap: 10 }}>
+        <span className="k-h2">{selLabel}</span>
         {!loading && dayEvents.length > 0 && (
-          <span style={{ fontSize: 12, color: 'var(--fg-tertiary)' }}>{dayEvents.length} evento{dayEvents.length !== 1 ? 's' : ''}</span>
+          <span style={{ fontSize: 14, color: 'var(--fg-secondary)' }}>{dayEvents.length} evento{dayEvents.length !== 1 ? 's' : ''}</span>
         )}
       </div>
 
       {/* ── Filter chips ── */}
-      <div style={{ padding: '0 16px 12px', display: 'flex', gap: 6, overflowX: 'auto', scrollbarWidth: 'none' }}>
-        {FILTERS.map(f => (
-          <button key={f.id} onClick={() => setFilter(f.id)} style={{
-            flexShrink: 0, padding: '5px 12px', borderRadius: 'var(--r-full)',
-            fontSize: 12, fontWeight: 500,
-            background: filter === f.id ? 'var(--kiuvo-blue)' : 'var(--surface)',
-            border: `0.5px solid ${filter === f.id ? 'var(--kiuvo-blue)' : 'var(--border)'}`,
-            color: filter === f.id ? '#fff' : 'var(--fg-secondary)',
-          }}>
-            {f.label}
-          </button>
-        ))}
+      <div style={{ padding: '0 14px 12px' }}>
+        <Segmented size="lg" surface options={FILTERS} value={filter} onChange={setFilter} />
       </div>
 
       {/* ── Events list ── */}
-      <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ padding: '0 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {loading ? (
           [1, 2, 3].map(i => <SkeletonEvent key={i} />)
         ) : dayEvents.length === 0 ? (
-          <div style={{ padding: '40px 20px', textAlign: 'center', border: '0.5px dashed var(--border-strong)', borderRadius: 'var(--r-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-            <Icon name="calendar-off" size={28} color="var(--fg-tertiary)" />
-            <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg-secondary)' }}>Sin eventos</div>
-            <div style={{ fontSize: 12, color: 'var(--fg-tertiary)' }}>
-              {filter !== 'all' ? 'No hay eventos de este tipo para este día' : 'No hay eventos para este día'}
-            </div>
-            <button onClick={() => setShowAdd(true)} style={{ marginTop: 8, padding: '8px 16px', borderRadius: 'var(--r-full)', background: 'var(--kiuvo-blue-soft)', color: 'var(--kiuvo-blue)', fontSize: 13, fontWeight: 500 }}>
-              + Agregar evento
-            </button>
-          </div>
+          <Card>
+            <Empty icon="calendar-off">
+              <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--fg)' }}>Sin eventos</div>
+              <div style={{ fontSize: 14, marginTop: 2 }}>
+                {filter !== 'all' ? 'No hay eventos de este tipo para este día' : 'No hay eventos para este día'}
+              </div>
+              <Button variant="soft" icon="plus" onClick={() => setShowAdd(true)} style={{ marginTop: 14 }}>
+                Agregar evento
+              </Button>
+            </Empty>
+          </Card>
         ) : (
           dayEvents.map(ev => <EventCard key={ev.id} event={ev} onPress={setShowDetail} />)
         )}
@@ -1223,46 +1077,34 @@ export default function AgendaScreen({ pendingEvent, onClearPending, prefillEven
 
       {/* ── Banners ── */}
       {!notifOk && (
-        <div style={{ margin: '14px 16px 0', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, background: 'var(--kiuvo-blue-soft)', border: '0.5px solid var(--kiuvo-blue-mid)', borderRadius: 'var(--r-lg)' }}>
-          <Icon name="bell" size={18} color="var(--kiuvo-blue)" />
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--kiuvo-blue-deep)' }}>Activa las notificaciones</div>
-            <div style={{ fontSize: 11, color: 'var(--kiuvo-blue)', marginTop: 1 }}>Recibe un aviso 15 min antes de cada evento</div>
+        <Card style={{ margin: '14px 14px 0', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span className="k-iconbtn k-iconbtn--soft"><Icon name="bell" size={22} /></span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 16, fontWeight: 600 }}>Activa las notificaciones</div>
+            <div style={{ fontSize: 13, color: 'var(--fg-secondary)', marginTop: 1 }}>Recibe un aviso 15 min antes de cada evento</div>
           </div>
-          <button onClick={handleRequestNotif} style={{ flexShrink: 0, padding: '6px 10px', borderRadius: 'var(--r-full)', background: 'var(--kiuvo-blue)', color: '#fff', fontSize: 12, fontWeight: 500 }}>
-            Activar
-          </button>
-        </div>
+          <Button size="sm" onClick={handleRequestNotif} style={{ minHeight: 44 }}>Activar</Button>
+        </Card>
       )}
 
       {!gcConnected && (
-        <button onClick={() => setShowGoogle(true)} style={{
-          width: 'calc(100% - 32px)', margin: '10px 16px 0',
-          padding: '11px 14px', display: 'flex', alignItems: 'center', gap: 10,
-          background: 'var(--surface)', border: '0.5px solid var(--border)',
-          borderRadius: 'var(--r-lg)', textAlign: 'left',
+        <button onClick={() => setShowGoogle(true)} className="k-card" style={{
+          width: 'calc(100% - 28px)', margin: '10px 14px 0', minHeight: 72,
+          display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left',
         }}>
-          <GoogleColorIcon size={22} />
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>Conectar Google Calendar</div>
-            <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginTop: 1 }}>Sincroniza y recibe notificaciones en tu celular</div>
+          <span className="k-iconbtn k-iconbtn--soft"><GoogleColorIcon size={22} /></span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 16, fontWeight: 600 }}>Conectar Google Calendar</div>
+            <div style={{ fontSize: 13, color: 'var(--fg-secondary)', marginTop: 1 }}>Sincroniza y recibe notificaciones en tu celular</div>
           </div>
-          <Icon name="chevron-right" size={16} color="var(--fg-tertiary)" />
+          <Icon name="chevron-right" size={20} color="var(--fg-tertiary)" />
         </button>
       )}
 
-      <div style={{ height: 16 }} />
-
       {/* ── FAB ── */}
-      <button onClick={() => setShowAdd(true)} style={{
-        position: 'fixed', bottom: 88, right: 16,
-        width: 52, height: 52, borderRadius: '50%',
-        background: 'var(--kiuvo-blue)', color: '#fff',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        boxShadow: '0 4px 16px rgba(24, 95, 165, 0.4)',
-        zIndex: 50,
-      }}>
+      <button onClick={() => setShowAdd(true)} className="k-fab" style={{ position: 'fixed' }}>
         <Icon name="plus" size={24} />
+        Nuevo evento
       </button>
 
       {/* ── Modals ── */}

@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { pdf } from '@react-pdf/renderer'
 import Icon from '../shared/Icon'
+import { Sheet, Button, Card, Pill, Label, Segmented, SearchInput, Field, Empty } from '../ui'
 import { getDiscount, getEffectivePrice } from '../../lib/productsStore'
 import { useProducts } from '../../hooks/useProducts'
 import { supabase } from '../../lib/supabase'
@@ -34,86 +35,6 @@ function effectivePrice(item) {
 /** Compute discount % for a product at a given qty. */
 function computeDiscount(product, qty) {
   return getDiscount(product, qty)
-}
-
-// ── Inline SVGs ───────────────────────────────────────────────────
-function IcoSearch({ size = 14, color = 'currentColor' }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-    </svg>
-  )
-}
-function IcoPlus({ size = 16, color = 'currentColor' }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke={color} strokeWidth="2.5" strokeLinecap="round">
-      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-    </svg>
-  )
-}
-function IcoMinus({ size = 16, color = 'currentColor' }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke={color} strokeWidth="2.5" strokeLinecap="round">
-      <line x1="5" y1="12" x2="19" y2="12" />
-    </svg>
-  )
-}
-function IcoTrash({ size = 14, color = 'currentColor' }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="3 6 5 6 21 6" />
-      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-      <path d="M10 11v6" /><path d="M14 11v6" />
-      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-    </svg>
-  )
-}
-function IcoCheck({ size = 28, color = 'currentColor' }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="20 6 9 17 4 12" />
-    </svg>
-  )
-}
-function IcoDownload({ size = 18, color = 'currentColor' }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <polyline points="7 10 12 15 17 10" />
-      <line x1="12" y1="15" x2="12" y2="3" />
-    </svg>
-  )
-}
-function IcoWhatsApp({ size = 18 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
-      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/>
-    </svg>
-  )
-}
-function IcoMail({ size = 18, color = 'currentColor' }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-      <polyline points="22,6 12,13 2,6" />
-    </svg>
-  )
-}
-function Spinner({ size = 16 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="2.5" strokeLinecap="round"
-      style={{ animation: 'spin 0.7s linear infinite', flexShrink: 0 }}>
-      <path d="M12 2a10 10 0 0 1 10 10" />
-    </svg>
-  )
 }
 
 // ── SuccessView ───────────────────────────────────────────────────
@@ -212,191 +133,123 @@ function SuccessView({ items, prospectName, prospectEmail, prospectPhone, seller
     }
   }
 
+  const shareOk = shareMsg.startsWith('✓')
+
   return (
-    <div style={{ padding: '28px 24px 36px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
-      {/* Icon */}
-      <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#FAEEDA', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Icon name="file-invoice" size={30} color="#854F0B" />
+    <div style={{ padding: '4px 0 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+      <div style={{
+        width: 84, height: 84, borderRadius: '50%', background: 'var(--accent)', color: 'var(--accent-fg)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Icon name="file-invoice" size={40} />
       </div>
-      <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--fg)', textAlign: 'center' }}>¡Cotización generada!</div>
-      <div style={{ fontSize: 13, color: 'var(--fg-secondary)', textAlign: 'center', lineHeight: 1.6 }}>
+      <div className="k-display" style={{ fontSize: 24, fontWeight: 700, textAlign: 'center' }}>¡Cotización generada!</div>
+      <div style={{ fontSize: 15, color: 'var(--fg-secondary)', textAlign: 'center', lineHeight: 1.5 }}>
         {prospectName && <><b style={{ color: 'var(--fg)' }}>{prospectName}</b> · </>}
-        <b style={{ color: 'var(--fg)' }}>{items.length} producto{items.length !== 1 ? 's' : ''}</b> · {fmt(total)}
+        {items.length} producto{items.length !== 1 ? 's' : ''}
       </div>
 
       {/* Items summary */}
-      <div style={{ width: '100%', background: 'var(--bg-secondary)', borderRadius: 'var(--r-md)', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <Card style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
         {items.map(i => {
           const disc = i.specialPrice != null ? 0 : (i.discountPct || 0)
           const effP = effectivePrice(i)
           return (
-            <div key={i.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, alignItems: 'flex-start', gap: 8 }}>
-              <span style={{ color: 'var(--fg)', flex: 1 }}>
-                {i.qty}× {i.name}
-                {i.specialPrice != null ? (
-                  <span style={{
-                    marginLeft: 6, fontSize: 10, fontWeight: 700,
-                    padding: '1px 5px', borderRadius: 99,
-                    background: '#EDE9FE', color: '#6D28D9',
-                    verticalAlign: 'middle',
-                  }}>Precio esp.</span>
-                ) : disc > 0 ? (
-                  <span style={{
-                    marginLeft: 6, fontSize: 10, fontWeight: 700,
-                    padding: '1px 5px', borderRadius: 99,
-                    background: 'var(--success-bg)', color: 'var(--success-fg)',
-                    verticalAlign: 'middle',
-                  }}>−{disc}%</span>
-                ) : null}
-                {i.extraDiscount?.value > 0 && (
-                  <span style={{
-                    marginLeft: 4, fontSize: 10, fontWeight: 700,
-                    padding: '1px 5px', borderRadius: 99,
-                    background: '#FFF7ED', color: '#C2410C',
-                    verticalAlign: 'middle',
-                  }}>
-                    {i.extraDiscount.type === 'pct' ? `−${i.extraDiscount.value}%` : `−${fmt(i.extraDiscount.value)}`} esp.
-                  </span>
+            <div key={i.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, alignItems: 'flex-start', gap: 10 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ lineHeight: 1.35 }}>{i.qty}× {i.name}</div>
+                {(i.specialPrice != null || disc > 0 || i.extraDiscount?.value > 0) && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 5 }}>
+                    {i.specialPrice != null
+                      ? <Pill tone="lilac">Precio esp.</Pill>
+                      : disc > 0 ? <Pill tone="success">−{disc}%</Pill> : null}
+                    {i.extraDiscount?.value > 0 && (
+                      <Pill tone="warning">
+                        {i.extraDiscount.type === 'pct' ? `−${i.extraDiscount.value}%` : `−${fmt(i.extraDiscount.value)}`} esp.
+                      </Pill>
+                    )}
+                  </div>
                 )}
-              </span>
-              <span style={{ color: 'var(--fg-secondary)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+              </div>
+              <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
                 {fmt(effP * i.qty)}
               </span>
             </div>
           )
         })}
         {savings > 0 && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--success-fg)', fontWeight: 500 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, color: 'var(--success-fg)', fontWeight: 600 }}>
             <span>Descuentos aplicados</span>
             <span>−{fmt(savings)}</span>
           </div>
         )}
-        <div style={{ borderTop: '0.5px solid var(--border)', paddingTop: 8, display: 'flex', justifyContent: 'space-between', fontWeight: 500, fontSize: 14 }}>
-          <span style={{ color: 'var(--fg)' }}>Total</span>
-          <span style={{ color: 'var(--kiuvo-blue)' }}>{fmt(total)}</span>
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+          <span style={{ fontSize: 15, fontWeight: 600 }}>Total</span>
+          <span className="k-num" style={{ fontSize: 28 }}>{fmt(total)}</span>
         </div>
-      </div>
+      </Card>
 
       {/* Share feedback */}
       {shareMsg && (
         <div style={{
-          width: '100%', padding: '9px 14px',
-          background: shareMsg.startsWith('✓') ? 'var(--success-bg)' : 'var(--warning-bg)',
-          border: `0.5px solid ${shareMsg.startsWith('✓') ? 'var(--success)' : 'var(--warning-border)'}`,
-          borderRadius: 'var(--r-md)', fontSize: 12,
-          color: shareMsg.startsWith('✓') ? 'var(--success-fg)' : 'var(--warning-fg)',
+          width: '100%', padding: '12px 14px', borderRadius: 'var(--r-md)', fontSize: 14,
+          background: shareOk ? 'var(--success-bg)' : 'var(--warning-bg)',
+          color: shareOk ? 'var(--success-fg)' : 'var(--warning-fg)',
         }}>
           {shareMsg}
         </div>
       )}
 
       {/* Actions */}
-      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-        {/* WhatsApp */}
-        <button
-          onClick={handleWhatsApp}
-          disabled={sharing || !pdfFile}
-          style={{
-            width: '100%', padding: '13px',
-            background: '#25D366', color: '#fff',
-            borderRadius: 'var(--r-md)', fontSize: 14, fontWeight: 500,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            opacity: sharing ? 0.7 : 1,
-          }}
-        >
-          {sharing ? <Spinner size={16} /> : <IcoWhatsApp size={17} />}
+        <Button variant="accent" size="lg" block icon="brand-whatsapp" loading={sharing} disabled={!pdfFile} onClick={handleWhatsApp}>
           {sharing ? 'Compartiendo…' : 'Enviar por WhatsApp'}
-        </button>
+        </Button>
 
         {/* Email */}
         {emailStep === 'sent' ? (
           <div style={{
-            width: '100%', padding: '12px 14px',
-            background: 'var(--success-bg)', border: '0.5px solid var(--success)',
-            borderRadius: 'var(--r-md)', fontSize: 13, color: 'var(--success-fg)',
+            width: '100%', padding: '12px 14px', borderRadius: 'var(--r-md)', fontSize: 15,
+            background: 'var(--success-bg)', color: 'var(--success-fg)',
             display: 'flex', alignItems: 'center', gap: 8,
           }}>
-            <IcoCheck size={16} color="var(--success-fg)" />
-            Correo enviado a <b>{emailTo}</b>
+            <Icon name="check" size={18} />
+            <span>Correo enviado a <b>{emailTo}</b></span>
           </div>
         ) : emailStep === 'input' || emailStep === 'sending' || emailStep === 'error' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <div style={{ display: 'flex', gap: 6 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
               <input
                 type="email"
+                className="k-input"
                 value={emailTo}
                 onChange={e => { setEmailTo(e.target.value); setEmailError('') }}
                 placeholder="correo@cliente.com"
                 autoFocus
-                style={{
-                  flex: 1, padding: '12px 12px',
-                  background: 'var(--bg-secondary)',
-                  border: `0.5px solid ${emailError ? 'var(--danger)' : 'var(--kiuvo-blue)'}`,
-                  borderRadius: 'var(--r-md)', fontSize: 13, color: 'var(--fg)',
-                  outline: 'none', fontFamily: 'inherit',
-                }}
+                style={{ flex: 1, minWidth: 0, ...(emailError && { boxShadow: 'inset 0 0 0 2px var(--coral)' }) }}
               />
-              <button
-                onClick={handleSendEmail}
-                disabled={emailStep === 'sending'}
-                style={{
-                  padding: '12px 16px',
-                  background: 'var(--kiuvo-blue)', color: '#fff',
-                  borderRadius: 'var(--r-md)', fontSize: 13, fontWeight: 500,
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  opacity: emailStep === 'sending' ? 0.7 : 1,
-                }}
-              >
-                {emailStep === 'sending' ? <Spinner size={14} /> : <IcoMail size={14} color="#fff" />}
+              <Button icon="mail" loading={emailStep === 'sending'} onClick={handleSendEmail}>
                 {emailStep === 'sending' ? 'Enviando…' : 'Enviar'}
-              </button>
+              </Button>
             </div>
             {emailError && (
-              <div style={{ fontSize: 12, color: 'var(--danger-fg)', paddingLeft: 4 }}>{emailError}</div>
+              <div style={{ fontSize: 13, color: 'var(--coral-fg)', paddingLeft: 4 }}>{emailError}</div>
             )}
           </div>
         ) : (
-          <button
-            onClick={() => setEmailStep('input')}
-            style={{
-              width: '100%', padding: '13px',
-              background: 'var(--surface)', border: '0.5px solid var(--border)',
-              color: 'var(--fg)', borderRadius: 'var(--r-md)', fontSize: 14, fontWeight: 500,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            }}
-          >
-            <IcoMail size={17} color="var(--fg-secondary)" />
+          <Button variant="primary" block icon="mail" onClick={() => setEmailStep('input')}>
             Enviar por correo
-          </button>
+          </Button>
         )}
 
-        {/* Download */}
         {pdfFile && (
-          <button
-            onClick={handleDownload}
-            style={{
-              width: '100%', padding: '12px',
-              background: 'transparent', border: '0.5px solid var(--border)',
-              color: 'var(--fg-secondary)', borderRadius: 'var(--r-md)', fontSize: 13,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-            }}
-          >
-            <IcoDownload size={15} color="var(--fg-tertiary)" />
+          <Button variant="outline" block icon="download" onClick={handleDownload}>
             Descargar PDF
-          </button>
+          </Button>
         )}
 
-        <button
-          onClick={onClose}
-          style={{
-            width: '100%', padding: '11px',
-            background: 'transparent', color: 'var(--fg-tertiary)',
-            borderRadius: 'var(--r-md)', fontSize: 13,
-          }}
-        >
-          Cerrar
-        </button>
+        <Button variant="soft" block onClick={onClose}>Cerrar</Button>
       </div>
     </div>
   )
@@ -488,6 +341,7 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
     } catch {}
 
     // Intentar Supabase; si falla (sin red) se queda con el caché
+    if (!supabase) return
     supabase
       .from('prospects')
       .select('id, name, email, contact, notes, phone')
@@ -811,528 +665,401 @@ export default function QuoteModal({ onClose, onGenerated, initialProspectId = n
     p.name.toLowerCase().includes(prospectName.toLowerCase())
   )
 
+  if (step === 'success') {
+    return (
+      <Sheet title="Cotización lista" onClose={onClose}>
+        <SuccessView
+          items={items}
+          prospectName={prospectName}
+          prospectEmail={prospectEmail}
+          prospectPhone={prospects.find(p => p.id === prospectId)?.phone ?? ''}
+          sellerName={profile?.full_name}
+          pdfFile={pdfFile}
+          onClose={onClose}
+        />
+      </Sheet>
+    )
+  }
+
+  const stepBtn = { width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg)' }
+  const closeEditBtn = {
+    width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
+    background: 'var(--bg-secondary)', color: 'var(--fg-secondary)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  }
+
   return (
     <>
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-
-      {/* Backdrop */}
-      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100 }} />
-
-      {/* Sheet */}
-      <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 101,
-        background: 'var(--bg)', borderRadius: '20px 20px 0 0',
-        maxHeight: '94%', display: 'flex', flexDirection: 'column', overflow: 'hidden',
-      }}>
-        {step === 'success' ? (
-          <SuccessView
-            items={items}
-            prospectName={prospectName}
-            prospectEmail={prospectEmail}
-            prospectPhone={prospects.find(p => p.id === prospectId)?.phone ?? ''}
-            sellerName={profile?.full_name}
-            pdfFile={pdfFile}
-            onClose={onClose}
-          />
-        ) : (
+      <Sheet
+        full
+        title="Nueva cotización"
+        onClose={onClose}
+        footer={
           <>
-            {/* Handle */}
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 2px' }}>
-              <div style={{ width: 40, height: 4, borderRadius: 2, background: 'var(--border-strong)' }} />
-            </div>
-
-            {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px 10px' }}>
-              <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--fg)' }}>Nueva cotización</div>
-              <button onClick={onClose} style={{
-                width: 32, height: 32, borderRadius: '50%', background: 'var(--bg-secondary)',
-                border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-secondary)',
+            {items.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                  <span style={{ fontSize: 14, color: 'var(--fg-secondary)' }}>{items.length} producto{items.length !== 1 ? 's' : ''}</span>
+                  <span className="k-num" style={{ fontSize: 30 }}>{fmt(total)}</span>
+                </div>
+                {savings > 0 && (
+                  <div style={{
+                    marginTop: 6, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 5,
+                    fontSize: 14, color: 'var(--success-fg)', fontWeight: 600,
+                  }}>
+                    <Icon name="discount" size={16} />
+                    {hasExtraDisc ? 'Descuentos aplicados' : 'Ahorro por volumen'}: {fmt(savings)}
+                  </div>
+                )}
+              </div>
+            )}
+            {serverError && (
+              <div style={{
+                marginBottom: 12, padding: '12px 14px', borderRadius: 'var(--r-md)',
+                background: 'var(--coral-soft)', color: 'var(--coral-fg)', fontSize: 14,
               }}>
-                <Icon name="x" size={16} />
-              </button>
+                {serverError}
+              </div>
+            )}
+            <Button variant="accent" size="lg" block icon="file-invoice" loading={submitting} disabled={!canSubmit} onClick={handleSubmit}>
+              {submitting ? 'Generando…' : 'Generar cotización'}
+            </Button>
+          </>
+        }
+      >
+        {/* Prospect picker */}
+        <Label>Cliente</Label>
+        <div style={{ position: 'relative', marginBottom: 22 }}>
+          <SearchInput
+            value={prospectName}
+            onChange={v => {
+              setProspectName(v)
+              setProspectId(null)
+              setShowProspects(true)
+            }}
+            onFocus={() => setShowProspects(true)}
+            onBlur={() => setTimeout(() => setShowProspects(false), 150)}
+            placeholder="Buscar o escribir el cliente…"
+          />
+          {prospectId && (
+            <span style={{
+              position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+              width: 28, height: 28, borderRadius: '50%', background: 'var(--primary-bg)', color: 'var(--primary-fg)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none',
+            }}>
+              <Icon name="check" size={16} />
+            </span>
+          )}
+          {showProspects && prospectMatches.length > 0 && (
+            <div style={{
+              position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
+              background: 'var(--surface)', borderRadius: 'var(--r-lg)', marginTop: 6,
+              maxHeight: 230, overflowY: 'auto', boxShadow: 'var(--shadow-float)',
+            }}>
+              {prospectMatches.map(p => (
+                <button
+                  key={p.id}
+                  className="k-row"
+                  onMouseDown={() => {
+                    setProspectName(p.name)
+                    setProspectId(p.id)
+                    setProspectEmail(p.email ?? '')
+                    // contact column first; fall back to "Contacto: X" inside notes
+                    const contact = p.contact ||
+                      p.notes?.match(/^Contacto:\s*(.+?)(\n|$)/m)?.[1]?.trim() || ''
+                    if (contact) setContactName(contact)
+                    setShowProspects(false)
+                  }}
+                  style={{ fontSize: 15, minHeight: 48 }}
+                >
+                  {p.name}
+                </button>
+              ))}
             </div>
+          )}
+        </div>
 
-            {/* Body */}
-            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+        {/* Extra quote fields */}
+        <Label>Datos del documento</Label>
+        <div style={{ marginBottom: 6 }}>
+          <Field label="Nombre del encargado">
+            <input
+              className="k-input"
+              value={contactName}
+              onChange={e => setContactName(e.target.value)}
+              placeholder="Ej. Juan Pérez"
+            />
+          </Field>
 
-              {/* Prospect picker */}
-              <div style={{ padding: '0 16px 12px' }}>
-                <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', letterSpacing: 0.5, marginBottom: 6 }}>CLIENTE</div>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    value={prospectName}
-                    onChange={e => {
-                      setProspectName(e.target.value)
-                      setProspectId(null)
-                      setShowProspects(true)
-                    }}
-                    onFocus={() => setShowProspects(true)}
-                    onBlur={() => setTimeout(() => setShowProspects(false), 150)}
-                    placeholder="Buscar o escribir nombre del cliente…"
-                    style={{
-                      width: '100%', boxSizing: 'border-box', padding: '10px 12px 10px 32px',
-                      background: 'var(--bg-secondary)', border: `0.5px solid ${prospectId ? 'var(--kiuvo-blue)' : 'var(--border)'}`,
-                      borderRadius: 'var(--r-md)', fontSize: 13, color: 'var(--fg)', outline: 'none', fontFamily: 'inherit',
-                    }}
-                  />
-                  <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-                    <IcoSearch size={14} color="var(--fg-tertiary)" />
-                  </span>
-                  {prospectId && (
-                    <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)' }}>
-                      <IcoCheck size={16} color="var(--kiuvo-blue)" />
-                    </span>
-                  )}
-                  {showProspects && prospectMatches.length > 0 && (
-                    <div style={{
-                      position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
-                      background: 'var(--surface)', border: '0.5px solid var(--border)',
-                      borderRadius: 'var(--r-md)', marginTop: 4, maxHeight: 160, overflowY: 'auto',
-                      boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
-                    }}>
-                      {prospectMatches.map(p => (
-                        <button
-                          key={p.id}
-                          onMouseDown={() => {
-                            setProspectName(p.name)
-                            setProspectId(p.id)
-                            setProspectEmail(p.email ?? '')
-                            // contact column first; fall back to "Contacto: X" inside notes
-                            const contact = p.contact ||
-                              p.notes?.match(/^Contacto:\s*(.+?)(\n|$)/m)?.[1]?.trim() || ''
-                            if (contact) setContactName(contact)
-                            setShowProspects(false)
-                          }}
-                          style={{
-                            width: '100%', textAlign: 'left', padding: '10px 14px',
-                            fontSize: 13, color: 'var(--fg)',
-                            borderBottom: '0.5px solid var(--border)',
-                          }}
-                        >
-                          {p.name}
-                        </button>
-                      ))}
+          <Field label="Forma de pago">
+            <select
+              className="k-input"
+              value={paymentSel}
+              onChange={e => setPaymentSel(e.target.value)}
+              style={{ color: paymentSel ? 'var(--fg)' : 'var(--fg-tertiary)' }}
+            >
+              <option value="">— Seleccionar —</option>
+              {PAYMENT_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+            {paymentSel === 'Otro' && (
+              <input
+                className="k-input"
+                value={paymentOther}
+                onChange={e => setPaymentOther(e.target.value)}
+                placeholder="Especificar forma de pago…"
+                autoFocus
+              />
+            )}
+          </Field>
+
+          <Field label="Tiempo de entrega">
+            <input
+              className="k-input"
+              value={deliveryTime}
+              onChange={e => setDeliveryTime(e.target.value)}
+              placeholder="7 días hábiles"
+            />
+          </Field>
+        </div>
+
+        {/* Items added */}
+        {items.length > 0 && (
+          <div style={{ marginBottom: 22 }}>
+            <Label>Productos en cotización ({items.length})</Label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {items.map(item => {
+                const disc = item.specialPrice != null ? 0 : (item.discountPct || 0)
+                const effP = effectivePrice(item)
+                const lineTotal = effP * item.qty
+                return (
+                <Card key={item.id} style={{ padding: 14 }}>
+                  {/* Nombre */}
+                  {nameEditing === item.id ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10 }}>
+                      <input
+                        className="k-input"
+                        value={nameEditData.name}
+                        onChange={e => setNameEditData(d => ({ ...d, name: e.target.value }))}
+                        onKeyDown={e => { if (e.key === 'Enter') confirmNameEdit(item.id) }}
+                        autoFocus
+                        placeholder="Nombre del producto"
+                      />
+                      <input
+                        className="k-input"
+                        value={nameEditData.sku}
+                        onChange={e => setNameEditData(d => ({ ...d, sku: e.target.value }))}
+                        onKeyDown={e => { if (e.key === 'Enter') confirmNameEdit(item.id) }}
+                        placeholder="Descripción o SKU (opcional)"
+                      />
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <Button onClick={() => confirmNameEdit(item.id)} style={{ flex: 1 }}>Listo</Button>
+                        <Button variant="soft" onClick={() => setNameEditing(null)}>Cancelar</Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <div style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {item.name}
+                      </div>
+                      <button onClick={() => openNameEdit(item)} aria-label="Editar nombre" title="Editar nombre"
+                        style={{ flexShrink: 0, width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-secondary)' }}>
+                        <Icon name="pencil" size={18} />
+                      </button>
+                      <button onClick={() => removeItem(item.id)} aria-label="Quitar producto" title="Quitar producto"
+                        style={{ flexShrink: 0, width: 44, height: 44, borderRadius: '50%', background: 'var(--coral-soft)', color: 'var(--coral-fg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <Icon name="trash" size={18} />
+                      </button>
                     </div>
                   )}
-                </div>
-              </div>
 
-              {/* Extra quote fields */}
-              <div style={{ padding: '0 16px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', letterSpacing: 0.5 }}>DATOS DEL DOCUMENTO</div>
-
-                {/* Contact name */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  <label style={{ fontSize: 10, color: 'var(--fg-tertiary)', fontWeight: 500 }}>Nombre del encargado</label>
-                  <input
-                    value={contactName}
-                    onChange={e => setContactName(e.target.value)}
-                    placeholder="Ej. Juan Pérez"
-                    style={{
-                      padding: '9px 10px', background: 'var(--bg-secondary)',
-                      border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)',
-                      fontSize: 13, color: 'var(--fg)', outline: 'none', fontFamily: 'inherit',
-                    }}
-                  />
-                </div>
-
-                {/* Payment terms — select */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  <label style={{ fontSize: 10, color: 'var(--fg-tertiary)', fontWeight: 500 }}>Forma de pago</label>
-                  <select
-                    value={paymentSel}
-                    onChange={e => setPaymentSel(e.target.value)}
-                    style={{
-                      padding: '9px 10px', background: 'var(--bg-secondary)',
-                      border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)',
-                      fontSize: 13, color: paymentSel ? 'var(--fg)' : 'var(--fg-tertiary)',
-                      outline: 'none', fontFamily: 'inherit', appearance: 'auto',
-                    }}
-                  >
-                    <option value="">— Seleccionar —</option>
-                    {PAYMENT_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                  {paymentSel === 'Otro' && (
-                    <input
-                      value={paymentOther}
-                      onChange={e => setPaymentOther(e.target.value)}
-                      placeholder="Especificar forma de pago…"
-                      autoFocus
-                      style={{
-                        padding: '9px 10px', background: 'var(--bg-secondary)',
-                        border: '0.5px solid var(--kiuvo-blue)', borderRadius: 'var(--r-md)',
-                        fontSize: 13, color: 'var(--fg)', outline: 'none', fontFamily: 'inherit', marginTop: 4,
-                      }}
-                    />
+                  {/* Etiquetas de precio */}
+                  {(item.specialPrice != null || disc > 0 || item.extraDiscount?.value > 0) && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+                      {item.specialPrice != null
+                        ? <Pill tone="lilac">Precio esp.</Pill>
+                        : disc > 0 ? <Pill tone="success">−{disc}%</Pill> : null}
+                      {item.extraDiscount?.value > 0 && (
+                        <Pill tone="warning">
+                          {item.extraDiscount.type === 'pct' ? `−${item.extraDiscount.value}%` : `−${fmt(item.extraDiscount.value)}`} esp.
+                        </Pill>
+                      )}
+                    </div>
                   )}
-                </div>
 
-                {/* Delivery time */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  <label style={{ fontSize: 10, color: 'var(--fg-tertiary)', fontWeight: 500 }}>Tiempo de entrega</label>
-                  <input
-                    value={deliveryTime}
-                    onChange={e => setDeliveryTime(e.target.value)}
-                    placeholder="7 días hábiles"
-                    style={{
-                      padding: '9px 10px', background: 'var(--bg-secondary)',
-                      border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)',
-                      fontSize: 13, color: 'var(--fg)', outline: 'none', fontFamily: 'inherit',
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Items added */}
-              {items.length > 0 && (
-                <div style={{ padding: '0 16px 12px' }}>
-                  <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', letterSpacing: 0.5, marginBottom: 8 }}>
-                    PRODUCTOS EN COTIZACIÓN ({items.length})
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {items.map(item => {
-                      const disc = item.specialPrice != null ? 0 : (item.discountPct || 0)
-                      const effP = effectivePrice(item)
-                      const lineTotal = effP * item.qty
-                      return (
-                      <div key={item.id} style={{
-                        padding: '10px 12px', background: 'var(--surface)',
-                        border: `0.5px solid ${item.specialPrice != null ? '#7C3AED' : disc > 0 ? 'var(--success)' : 'var(--border)'}`,
-                        borderRadius: 'var(--r-md)',
-                      }}>
-                        {/* Fila principal */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          {nameEditing === item.id ? (
-                            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 5 }}>
-                              <input
-                                value={nameEditData.name}
-                                onChange={e => setNameEditData(d => ({ ...d, name: e.target.value }))}
-                                onKeyDown={e => { if (e.key === 'Enter') confirmNameEdit(item.id) }}
-                                autoFocus
-                                placeholder="Nombre del producto"
-                                style={{ padding: '6px 9px', background: 'var(--bg-secondary)', border: '0.5px solid var(--kiuvo-blue)', borderRadius: 'var(--r-md)', fontSize: 13, color: 'var(--fg)', outline: 'none', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' }}
-                              />
-                              <input
-                                value={nameEditData.sku}
-                                onChange={e => setNameEditData(d => ({ ...d, sku: e.target.value }))}
-                                onKeyDown={e => { if (e.key === 'Enter') confirmNameEdit(item.id) }}
-                                placeholder="Descripción o SKU (opcional)"
-                                style={{ padding: '6px 9px', background: 'var(--bg-secondary)', border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)', fontSize: 12, color: 'var(--fg)', outline: 'none', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' }}
-                              />
-                              <div style={{ display: 'flex', gap: 6 }}>
-                                <button onClick={() => confirmNameEdit(item.id)} style={{ flex: 1, padding: '5px', background: 'var(--kiuvo-blue)', color: '#fff', borderRadius: 'var(--r-md)', fontSize: 12, fontWeight: 500, border: 'none' }}>Listo</button>
-                                <button onClick={() => setNameEditing(null)} style={{ padding: '5px 10px', background: 'var(--bg-secondary)', color: 'var(--fg-secondary)', borderRadius: 'var(--r-md)', fontSize: 12, border: '0.5px solid var(--border)' }}>Cancelar</button>
-                              </div>
-                            </div>
-                          ) : (
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1, minWidth: 0 }}>
-                                  {item.name}
-                                </div>
-                                <button onClick={() => openNameEdit(item)} title="Editar nombre" style={{ flexShrink: 0, width: 20, height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-tertiary)', background: 'transparent', border: 'none', padding: 0 }}>
-                                  <Icon name="pencil" size={11} />
-                                </button>
-                                {item.specialPrice != null ? (
-                                  <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: '#EDE9FE', color: '#6D28D9', border: '0.5px solid #7C3AED' }}>
-                                    Precio esp.
-                                  </span>
-                                ) : disc > 0 ? (
-                                  <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: 'var(--success-bg)', color: 'var(--success-fg)', border: '0.5px solid var(--success)' }}>
-                                    −{disc}%
-                                  </span>
-                                ) : null}
-                                {item.extraDiscount?.value > 0 && (
-                                  <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: '#FFF7ED', color: '#C2410C', border: '0.5px solid #F97316' }}>
-                                    {item.extraDiscount.type === 'pct' ? `−${item.extraDiscount.value}%` : `−${fmt(item.extraDiscount.value)}`} esp.
-                                  </span>
-                                )}
-                              </div>
-                              <div style={{ fontSize: 11, color: 'var(--fg-secondary)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 5 }}>
-                                {item.specialPrice != null ? (
-                                  <>
-                                    <span style={{ color: '#7C3AED', fontWeight: 500 }}>{fmt(item.specialPrice)}/{item.unit}</span>
-                                    <span>·</span>
-                                    <span style={{ color: 'var(--kiuvo-blue)', fontWeight: 500 }}>{fmt(lineTotal)}</span>
-                                  </>
-                                ) : disc > 0 ? (
-                                  <>
-                                    <span style={{ textDecoration: 'line-through', color: 'var(--fg-tertiary)' }}>{fmt(item.price)}</span>
-                                    <span style={{ color: 'var(--success-fg)', fontWeight: 500 }}>{fmt(effP)}</span>
-                                    <span>/{item.unit}</span>
-                                    <span>·</span>
-                                    <span style={{ color: 'var(--kiuvo-blue)', fontWeight: 500 }}>{fmt(lineTotal)}</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <span>{fmt(item.price)}/{item.unit}</span>
-                                    <span>·</span>
-                                    <span style={{ color: 'var(--kiuvo-blue)', fontWeight: 500 }}>{fmt(lineTotal)}</span>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                          <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-secondary)', borderRadius: 'var(--r-md)', border: '0.5px solid var(--border)' }}>
-                            <button onClick={() => setQty(item.id, item.qty - 1)}
-                              style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-secondary)' }}>
-                              <IcoMinus size={14} />
-                            </button>
-                            <QtyInput
-                              qty={item.qty}
-                              onChange={n => setQty(item.id, n)}
-                              style={{ width: 36, textAlign: 'center', fontSize: 13, fontWeight: 500, color: 'var(--fg)', background: 'transparent', border: 'none', outline: 'none', fontFamily: 'inherit', padding: 0 }}
-                            />
-                            <button onClick={() => setQty(item.id, item.qty + 1)}
-                              style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-secondary)' }}>
-                              <IcoPlus size={14} />
-                            </button>
-                          </div>
-                          <button onClick={() => removeItem(item.id)}
-                            style={{ width: 28, height: 28, borderRadius: 'var(--r-sm)', background: 'var(--danger-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            <IcoTrash size={13} color="var(--danger)" />
-                          </button>
-                        </div>
-
-                        {/* Control de precio especial */}
-                        {specialPriceEditing === item.id ? (
-                          <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 8 }}>
-                            <span style={{ fontSize: 13, color: '#7C3AED', fontWeight: 600, flexShrink: 0 }}>$</span>
-                            <input
-                              type="number" min="0" step="0.01"
-                              value={specialPriceInput}
-                              onChange={e => setSpecialPriceInput(e.target.value)}
-                              onKeyDown={e => { if (e.key === 'Enter') confirmSpecialPrice(item.id) }}
-                              autoFocus
-                              placeholder="Precio especial…"
-                              style={{ flex: 1, padding: '7px 10px', background: 'var(--bg-secondary)', border: '0.5px solid #7C3AED', borderRadius: 'var(--r-md)', fontSize: 13, color: 'var(--fg)', outline: 'none', fontFamily: 'inherit' }}
-                            />
-                            <button
-                              onClick={() => confirmSpecialPrice(item.id)}
-                              style={{ padding: '7px 12px', background: '#7C3AED', color: '#fff', borderRadius: 'var(--r-md)', fontSize: 12, fontWeight: 500, border: 'none', flexShrink: 0 }}
-                            >Listo</button>
-                            <button
-                              onClick={() => setSpecialPriceEditing(null)}
-                              style={{ width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-secondary)', color: 'var(--fg-secondary)', borderRadius: 'var(--r-md)', border: '0.5px solid var(--border)', flexShrink: 0 }}
-                            ><Icon name="x" size={13} /></button>
-                          </div>
-                        ) : item.specialPrice != null ? (
-                          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-                            <button
-                              onClick={() => openSpecialPrice(item)}
-                              style={{ flex: 1, padding: '5px 8px', background: 'transparent', border: '0.5px dashed #7C3AED', borderRadius: 'var(--r-md)', fontSize: 11, color: '#7C3AED', textAlign: 'center' }}
-                            >Editar precio especial · {fmt(item.specialPrice)}</button>
-                            <button
-                              onClick={() => removeSpecialPrice(item.id)}
-                              style={{ padding: '5px 8px', background: '#EDE9FE', border: '0.5px solid #7C3AED', borderRadius: 'var(--r-md)', fontSize: 11, color: '#6D28D9' }}
-                            >Quitar</button>
-                          </div>
+                  {/* Precio + cantidad */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 10 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div className="k-num" style={{ fontSize: 20 }}>{fmt(lineTotal)}</div>
+                      <div style={{ fontSize: 13, color: 'var(--fg-secondary)', marginTop: 4, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 5 }}>
+                        {item.specialPrice != null ? (
+                          <span style={{ color: 'var(--accent-2-fg)', fontWeight: 600 }}>{fmt(item.specialPrice)}/{item.unit}</span>
+                        ) : disc > 0 ? (
+                          <>
+                            <span style={{ textDecoration: 'line-through', color: 'var(--fg-tertiary)' }}>{fmt(item.price)}</span>
+                            <span style={{ color: 'var(--success-fg)', fontWeight: 600 }}>{fmt(effP)}</span>
+                            <span>/{item.unit}</span>
+                          </>
                         ) : (
-                          <button
-                            onClick={() => openSpecialPrice(item)}
-                            style={{ marginTop: 8, width: '100%', padding: '5px 8px', background: 'transparent', border: '0.5px dashed var(--border)', borderRadius: 'var(--r-md)', fontSize: 11, color: 'var(--fg-tertiary)', textAlign: 'center' }}
-                          >$ Precio especial</button>
-                        )}
-
-                        {/* ── Descuento adicional (% o $) ── */}
-                        {extraDiscEditing === item.id ? (
-                          <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 6 }}>
-                            {/* Toggle % / $ */}
-                            <div style={{ display: 'flex', border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)', overflow: 'hidden', flexShrink: 0 }}>
-                              {[['pct','%'],['mxn','$']].map(([t,label]) => (
-                                <button key={t} onClick={() => setExtraDiscType(t)} style={{
-                                  padding: '7px 11px', fontSize: 12, fontWeight: 600,
-                                  background: extraDiscType === t ? '#F97316' : 'var(--bg-secondary)',
-                                  color: extraDiscType === t ? '#fff' : 'var(--fg-secondary)',
-                                  border: 'none', cursor: 'pointer',
-                                }}>{label}</button>
-                              ))}
-                            </div>
-                            <input
-                              type="number" min="0" step="0.01"
-                              value={extraDiscInput}
-                              onChange={e => setExtraDiscInput(e.target.value)}
-                              onKeyDown={e => { if (e.key === 'Enter') confirmExtraDisc(item.id) }}
-                              autoFocus
-                              placeholder={extraDiscType === 'pct' ? 'Ej. 10' : 'Ej. 500'}
-                              style={{ flex: 1, padding: '7px 10px', background: 'var(--bg-secondary)', border: '0.5px solid #F97316', borderRadius: 'var(--r-md)', fontSize: 13, color: 'var(--fg)', outline: 'none', fontFamily: 'inherit' }}
-                            />
-                            <button onClick={() => confirmExtraDisc(item.id)} style={{ padding: '7px 12px', background: '#F97316', color: '#fff', borderRadius: 'var(--r-md)', fontSize: 12, fontWeight: 500, border: 'none', flexShrink: 0 }}>
-                              Listo
-                            </button>
-                            <button onClick={() => setExtraDiscEditing(null)} style={{ width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-secondary)', color: 'var(--fg-secondary)', borderRadius: 'var(--r-md)', border: '0.5px solid var(--border)', flexShrink: 0 }}>
-                              <Icon name="x" size={13} />
-                            </button>
-                          </div>
-                        ) : item.extraDiscount?.value > 0 ? (
-                          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-                            <button onClick={() => openExtraDisc(item)} style={{ flex: 1, padding: '5px 8px', background: 'transparent', border: '0.5px dashed #F97316', borderRadius: 'var(--r-md)', fontSize: 11, color: '#C2410C', textAlign: 'center' }}>
-                              Dto. adicional: {item.extraDiscount.type === 'pct' ? `−${item.extraDiscount.value}%` : `−${fmt(item.extraDiscount.value)}`} · Final: {fmt(effectivePrice(item))}
-                            </button>
-                            <button onClick={() => removeExtraDisc(item.id)} style={{ padding: '5px 8px', background: '#FFF7ED', border: '0.5px solid #F97316', borderRadius: 'var(--r-md)', fontSize: 11, color: '#C2410C' }}>
-                              Quitar
-                            </button>
-                          </div>
-                        ) : (
-                          <button onClick={() => openExtraDisc(item)} style={{ marginTop: 6, width: '100%', padding: '5px 8px', background: 'transparent', border: '0.5px dashed var(--border)', borderRadius: 'var(--r-md)', fontSize: 11, color: 'var(--fg-tertiary)', textAlign: 'center' }}>
-                            % / $ Descuento adicional
-                          </button>
+                          <span>{fmt(item.price)}/{item.unit}</span>
                         )}
                       </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Paquete escolar */}
-              <div style={{ padding: '0 16px 12px' }}>
-                <button
-                  onClick={() => setShowSchoolPkg(true)}
-                  style={{
-                    width: '100%', padding: '12px 14px',
-                    background: 'var(--kiuvo-blue-soft)', border: '0.5px solid var(--kiuvo-blue)',
-                    borderRadius: 'var(--r-md)', textAlign: 'left',
-                    display: 'flex', alignItems: 'center', gap: 11,
-                  }}>
-                  <div style={{
-                    width: 34, height: 34, borderRadius: 'var(--r-md)', flexShrink: 0,
-                    background: 'var(--kiuvo-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <Icon name="school" size={18} color="#fff" />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--kiuvo-blue-deep)' }}>
-                      Paquete escolar de credenciales
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--fg-secondary)', marginTop: 1 }}>
-                      Captura los alumnos y calcula todo automático
-                    </div>
-                  </div>
-                  <Icon name="chevron-right" size={16} color="var(--kiuvo-blue)" />
-                </button>
-              </div>
-
-              {/* Catalog */}
-              <div style={{ padding: '0 16px', flex: 1 }}>
-                <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', letterSpacing: 0.5, marginBottom: 8 }}>CATÁLOGO DE PRODUCTOS</div>
-
-                <div style={{ position: 'relative', marginBottom: 8 }}>
-                  <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-                    <IcoSearch size={14} color="var(--fg-tertiary)" />
-                  </span>
-                  <input
-                    value={search} onChange={e => setSearch(e.target.value)}
-                    placeholder="Buscar por nombre o SKU…"
-                    style={{
-                      width: '100%', boxSizing: 'border-box', padding: '9px 10px 9px 30px',
-                      background: 'var(--bg-secondary)', border: '0.5px solid var(--border)',
-                      borderRadius: 'var(--r-md)', fontSize: 13, color: 'var(--fg)', outline: 'none', fontFamily: 'inherit',
-                    }}
-                  />
-                </div>
-
-                <div style={{ display: 'flex', gap: 6, marginBottom: 10, overflowX: 'auto', paddingBottom: 2 }}>
-                  {cats.map(c => {
-                    const on = cat === c
-                    return (
-                      <button key={c} onClick={() => setCat(c)} style={{
-                        flexShrink: 0, padding: '5px 12px', borderRadius: 'var(--r-full)', fontSize: 12, fontWeight: on ? 500 : 400,
-                        border: `0.5px solid ${on ? 'var(--kiuvo-blue)' : 'var(--border)'}`,
-                        background: on ? 'var(--kiuvo-blue-soft)' : 'var(--surface)',
-                        color: on ? 'var(--kiuvo-blue-deep)' : 'var(--fg)',
-                      }}>{c}</button>
-                    )
-                  })}
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingBottom: 16 }}>
-                  {catalog.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--fg-tertiary)', fontSize: 13 }}>Sin resultados</div>
-                  ) : catalog.map(p => {
-                    const inCart = items.find(i => i.id === p.id)
-                    return (
-                      <button
-                        key={p.id} onClick={() => addItem(p)}
-                        style={{
-                          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
-                          padding: '11px 12px',
-                          background: inCart ? 'var(--kiuvo-blue-soft)' : 'var(--surface)',
-                          border: `0.5px solid ${inCart ? 'var(--kiuvo-blue)' : 'var(--border)'}`,
-                          borderRadius: 'var(--r-md)', textAlign: 'left',
-                        }}
-                      >
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 500, color: inCart ? 'var(--kiuvo-blue-deep)' : 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {p.name}
-                          </div>
-                          <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginTop: 2 }}>{p.sku} · {p.category}</div>
-                        </div>
-                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 500, color: inCart ? 'var(--kiuvo-blue)' : 'var(--fg)', fontVariantNumeric: 'tabular-nums' }}>{fmt(p.price)}</div>
-                          <div style={{ fontSize: 11, color: 'var(--fg-tertiary)' }}>/{p.unit}</div>
-                        </div>
-                        <div style={{
-                          width: 28, height: 28, borderRadius: 'var(--r-sm)', flexShrink: 0,
-                          background: inCart ? 'var(--kiuvo-blue)' : 'var(--bg-secondary)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }}>
-                          {inCart ? <IcoCheck size={14} color="#fff" /> : <IcoPlus size={14} color="var(--fg-secondary)" />}
-                        </div>
+                    <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-secondary)', borderRadius: 'var(--r-full)', flexShrink: 0 }}>
+                      <button aria-label="Menos" onClick={() => setQty(item.id, item.qty - 1)} style={stepBtn}>
+                        <Icon name="minus" size={18} />
                       </button>
-                    )
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div style={{ padding: '10px 16px 20px', borderTop: '0.5px solid var(--border)' }}>
-              {items.length > 0 && (
-                <div style={{ marginBottom: 10 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                    <span style={{ fontSize: 13, color: 'var(--fg-secondary)' }}>{items.length} producto{items.length !== 1 ? 's' : ''}</span>
-                    <span style={{ fontSize: 18, fontWeight: 500, color: 'var(--fg)', fontVariantNumeric: 'tabular-nums' }}>{fmt(total)}</span>
-                  </div>
-                  {savings > 0 && (
-                    <div style={{
-                      marginTop: 4, display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 5,
-                      fontSize: 12, color: 'var(--success-fg)', fontWeight: 500,
-                    }}>
-                      <Icon name="discount" size={13} color="var(--success)" />
-                      {hasExtraDisc ? 'Descuentos aplicados' : 'Ahorro por volumen'}: {fmt(savings)}
+                      <QtyInput
+                        qty={item.qty}
+                        onChange={n => setQty(item.id, n)}
+                        style={{ width: 48, textAlign: 'center', fontSize: 16, fontWeight: 600, color: 'var(--fg)', background: 'transparent', border: 'none', outline: 'none', fontFamily: 'inherit', padding: 0 }}
+                      />
+                      <button aria-label="Más" onClick={() => setQty(item.id, item.qty + 1)} style={stepBtn}>
+                        <Icon name="plus" size={18} />
+                      </button>
                     </div>
+                  </div>
+
+                  {/* Control de precio especial */}
+                  {specialPriceEditing === item.id ? (
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12 }}>
+                      <span style={{ fontSize: 16, fontWeight: 600, flexShrink: 0 }}>$</span>
+                      <input
+                        type="number" min="0" step="0.01" inputMode="decimal"
+                        className="k-input"
+                        value={specialPriceInput}
+                        onChange={e => setSpecialPriceInput(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') confirmSpecialPrice(item.id) }}
+                        autoFocus
+                        placeholder="Precio especial…"
+                        style={{ flex: 1, minWidth: 0 }}
+                      />
+                      <Button onClick={() => confirmSpecialPrice(item.id)}>Listo</Button>
+                      <button aria-label="Cancelar" onClick={() => setSpecialPriceEditing(null)} style={closeEditBtn}>
+                        <Icon name="x" size={18} />
+                      </button>
+                    </div>
+                  ) : item.specialPrice != null ? (
+                    <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                      <Button variant="outline" size="sm" onClick={() => openSpecialPrice(item)} style={{ flex: 1, minHeight: 44, minWidth: 0, whiteSpace: 'normal' }}>
+                        Precio especial · {fmt(item.specialPrice)}
+                      </Button>
+                      <Button variant="soft" size="sm" onClick={() => removeSpecialPrice(item.id)} style={{ minHeight: 44 }}>Quitar</Button>
+                    </div>
+                  ) : (
+                    <Button variant="outline" size="sm" block onClick={() => openSpecialPrice(item)} style={{ marginTop: 12, minHeight: 44 }}>
+                      $ Precio especial
+                    </Button>
                   )}
-                </div>
-              )}
-              {serverError && (
-                <div style={{
-                  marginBottom: 10, padding: '10px 14px',
-                  background: 'var(--danger-bg)', border: '0.5px solid var(--danger-border)',
-                  borderRadius: 'var(--r-md)', fontSize: 13, color: 'var(--danger-fg)',
-                }}>
-                  {serverError}
-                </div>
-              )}
+
+                  {/* ── Descuento adicional (% o $) ── */}
+                  {extraDiscEditing === item.id ? (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginTop: 8 }}>
+                      <Segmented
+                        size="lg"
+                        options={[{ id: 'pct', label: '%' }, { id: 'mxn', label: '$' }]}
+                        value={extraDiscType} onChange={setExtraDiscType}
+                        style={{ flexShrink: 0 }}
+                      />
+                      <input
+                        type="number" min="0" step="0.01" inputMode="decimal"
+                        className="k-input"
+                        value={extraDiscInput}
+                        onChange={e => setExtraDiscInput(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') confirmExtraDisc(item.id) }}
+                        autoFocus
+                        placeholder={extraDiscType === 'pct' ? 'Ej. 10' : 'Ej. 500'}
+                        style={{ flex: '1 1 90px', minWidth: 0 }}
+                      />
+                      <Button onClick={() => confirmExtraDisc(item.id)}>Listo</Button>
+                      <button aria-label="Cancelar" onClick={() => setExtraDiscEditing(null)} style={closeEditBtn}>
+                        <Icon name="x" size={18} />
+                      </button>
+                    </div>
+                  ) : item.extraDiscount?.value > 0 ? (
+                    <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                      <Button variant="outline" size="sm" onClick={() => openExtraDisc(item)} style={{ flex: 1, minHeight: 44, minWidth: 0, whiteSpace: 'normal' }}>
+                        Dto. adicional: {item.extraDiscount.type === 'pct' ? `−${item.extraDiscount.value}%` : `−${fmt(item.extraDiscount.value)}`} · Final: {fmt(effectivePrice(item))}
+                      </Button>
+                      <Button variant="soft" size="sm" onClick={() => removeExtraDisc(item.id)} style={{ minHeight: 44 }}>Quitar</Button>
+                    </div>
+                  ) : (
+                    <Button variant="outline" size="sm" block onClick={() => openExtraDisc(item)} style={{ marginTop: 8, minHeight: 44 }}>
+                      % / $ Descuento adicional
+                    </Button>
+                  )}
+                </Card>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Paquete escolar */}
+        <button
+          onClick={() => setShowSchoolPkg(true)}
+          className="k-card k-card--lilac"
+          style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 12, minHeight: 72, marginBottom: 22 }}
+        >
+          <span className="k-iconbtn k-iconbtn--ink" aria-hidden="true">
+            <Icon name="school" size={22} />
+          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 16, fontWeight: 600 }}>Paquete escolar de credenciales</div>
+            <div style={{ fontSize: 13, marginTop: 2, opacity: 0.8 }}>
+              Captura los alumnos y calcula todo automático
+            </div>
+          </div>
+          <Icon name="chevron-right" size={20} />
+        </button>
+
+        {/* Catalog */}
+        <Label>Catálogo de productos</Label>
+        <SearchInput value={search} onChange={setSearch} placeholder="Buscar por nombre o SKU…" style={{ marginBottom: 10 }} />
+        <Segmented
+          size="lg" surface
+          options={cats.map(c => ({ id: c, label: c }))}
+          value={cat} onChange={setCat}
+          style={{ display: 'flex', marginBottom: 12 }}
+        />
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {catalog.length === 0 ? (
+            <Empty icon="package">Sin resultados</Empty>
+          ) : catalog.map(p => {
+            const inCart = items.find(i => i.id === p.id)
+            return (
               <button
-                onClick={handleSubmit}
-                disabled={!canSubmit}
+                key={p.id} onClick={() => addItem(p)}
+                className="k-card"
                 style={{
-                  width: '100%', padding: '14px',
-                  background: canSubmit ? '#854F0B' : 'var(--bg-tertiary)',
-                  color: canSubmit ? '#fff' : 'var(--fg-tertiary)',
-                  borderRadius: 'var(--r-md)', fontSize: 15, fontWeight: 500,
-                  opacity: canSubmit ? 1 : 0.6,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', minHeight: 64,
+                  textAlign: 'left', width: '100%',
+                  boxShadow: inCart ? 'inset 0 0 0 2px var(--fg)' : 'none',
                 }}
               >
-                {submitting && <Spinner size={16} />}
-                {submitting ? 'Generando…' : 'Generar cotización'}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {p.name}
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--fg-tertiary)', marginTop: 2 }}>{p.sku} · {p.category}</div>
+                </div>
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <div className="k-num" style={{ fontSize: 16 }}>{fmt(p.price)}</div>
+                  <div style={{ fontSize: 13, color: 'var(--fg-tertiary)', marginTop: 3 }}>/{p.unit}</div>
+                </div>
+                <span style={{
+                  width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+                  background: inCart ? 'var(--primary-bg)' : 'var(--bg-secondary)',
+                  color: inCart ? 'var(--primary-fg)' : 'var(--fg-secondary)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Icon name={inCart ? 'check' : 'plus'} size={18} />
+                </span>
               </button>
-            </div>
-          </>
-        )}
-      </div>
+            )
+          })}
+        </div>
+      </Sheet>
 
       {showSchoolPkg && (
         <SchoolPackageModal

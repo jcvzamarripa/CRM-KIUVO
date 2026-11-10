@@ -1,34 +1,31 @@
 import React, { useState, useEffect } from 'react'
-import Icon from '../shared/Icon'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { APP_ENV, APP_NAME } from '../../lib/supabase'
+import { Card, Button, Pill, Segmented } from '../ui'
 
 // ── Section wrapper ──────────────────────────────────────────────────────────
 function Section({ title, description, children }) {
   return (
-    <div style={{
-      background: 'var(--surface)', border: '0.5px solid var(--border)',
-      borderRadius: 'var(--r-lg)', overflow: 'hidden', marginBottom: 16,
-    }}>
-      <div style={{ padding: '16px 20px 12px', borderBottom: '0.5px solid var(--border)' }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)' }}>{title}</div>
-        {description && <div style={{ fontSize: 12, color: 'var(--fg-tertiary)', marginTop: 2 }}>{description}</div>}
+    <Card style={{ marginBottom: 16, padding: 20 }}>
+      <div style={{ marginBottom: 18 }}>
+        <div className="k-h2">{title}</div>
+        {description && <div className="k-muted" style={{ fontSize: 13, marginTop: 4 }}>{description}</div>}
       </div>
-      <div style={{ padding: '16px 20px' }}>{children}</div>
-    </div>
+      {children}
+    </Card>
   )
 }
 
 // ── Field row ────────────────────────────────────────────────────────────────
-function Field({ label, hint, children }) {
+function SettingRow({ label, hint, children }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, marginBottom: 16 }}>
-      <div style={{ flex: '0 0 200px' }}>
-        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>{label}</div>
-        {hint && <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginTop: 2, lineHeight: 1.4 }}>{hint}</div>}
+    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: '8px 16px', marginBottom: 18 }}>
+      <div style={{ flex: '1 1 200px', maxWidth: 260 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--fg)' }}>{label}</div>
+        {hint && <div className="k-dim" style={{ fontSize: 12, marginTop: 2, lineHeight: 1.4 }}>{hint}</div>}
       </div>
-      <div style={{ flex: 1 }}>{children}</div>
+      <div style={{ flex: '2 1 260px', minWidth: 0 }}>{children}</div>
     </div>
   )
 }
@@ -41,24 +38,17 @@ function Input({ value, onChange, placeholder, type = 'text', readOnly = false }
       onChange={onChange}
       placeholder={placeholder}
       readOnly={readOnly}
-      style={{
-        width: '100%', boxSizing: 'border-box',
-        padding: '9px 12px',
-        background: readOnly ? 'var(--bg-secondary)' : 'var(--bg)',
-        border: '0.5px solid var(--border)',
-        borderRadius: 'var(--r-md)', fontSize: 13,
-        color: readOnly ? 'var(--fg-secondary)' : 'var(--fg)',
-        outline: 'none', fontFamily: 'inherit',
-      }}
+      className="k-input k-input--sm"
+      style={readOnly ? { background: 'var(--bg-secondary)', color: 'var(--fg-secondary)' } : undefined}
     />
   )
 }
 
 // ── Badge de ambiente ────────────────────────────────────────────────────────
 const ENV_COLORS = {
-  development: { bg: '#EBF2FB', color: '#185FA5', label: 'Development' },
-  staging:     { bg: '#FEF3E2', color: '#854F0B', label: 'Staging' },
-  production:  { bg: '#E8F8F2', color: '#1D9E75', label: 'Production' },
+  development: { tone: 'sky',     label: 'Development' },
+  staging:     { tone: 'warning', label: 'Staging' },
+  production:  { tone: 'success', label: 'Production' },
 }
 
 export default function SettingsView({ dark, onToggleDark }) {
@@ -124,48 +114,34 @@ export default function SettingsView({ dark, onToggleDark }) {
   const envCfg = ENV_COLORS[APP_ENV] ?? ENV_COLORS.development
 
   return (
-    <div style={{ overflowY: 'auto', padding: '20px 28px 40px', flex: 1 }}>
+    <div className="sv-scroll">
+      <div style={{ maxWidth: 860 }}>
 
       {/* ── Perfil ── */}
       <Section
         title="Perfil de administrador"
         description="Nombre e iniciales que aparecen en el panel"
       >
-        <Field label="Nombre completo" hint="Se muestra en la barra lateral y en reportes">
+        <SettingRow label="Nombre completo" hint="Se muestra en la barra lateral y en reportes">
           <Input value={fullName} onChange={handleNameChange} placeholder="Ej. Juan García" />
-        </Field>
-        <Field label="Iniciales" hint="2 letras para el avatar cuando no hay foto">
+        </SettingRow>
+        <SettingRow label="Iniciales" hint="2 letras para el avatar cuando no hay foto">
           <Input
             value={initials}
             onChange={e => setInitials(e.target.value.toUpperCase().slice(0, 2))}
             placeholder="JG"
           />
-        </Field>
-        <Field label="Correo" hint="Tu correo de acceso (no editable)">
+        </SettingRow>
+        <SettingRow label="Correo" hint="Tu correo de acceso (no editable)">
           <Input value={user?.email ?? ''} readOnly />
-        </Field>
+        </SettingRow>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
-          <button
-            onClick={handleSaveProfile}
-            disabled={saving}
-            style={{
-              padding: '9px 20px', background: 'var(--kiuvo-blue)', color: '#fff',
-              borderRadius: 'var(--r-md)', fontSize: 13, fontWeight: 500,
-              opacity: saving ? 0.7 : 1, display: 'flex', alignItems: 'center', gap: 6,
-            }}
-          >
-            <Icon name="device-floppy" size={15} color="#fff" />
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12 }}>
+          <Button icon="check" loading={saving} onClick={handleSaveProfile}>
             {saving ? 'Guardando…' : 'Guardar perfil'}
-          </button>
-          {saveMsg === 'ok' && (
-            <span style={{ fontSize: 12, color: 'var(--success-fg)', display: 'flex', alignItems: 'center', gap: 4 }}>
-              <Icon name="circle-check" size={14} color="var(--success)" /> Guardado correctamente
-            </span>
-          )}
-          {saveMsg === 'error' && (
-            <span style={{ fontSize: 12, color: 'var(--danger-fg)' }}>Error al guardar. Intenta de nuevo.</span>
-          )}
+          </Button>
+          {saveMsg === 'ok' && <Pill tone="success" icon="circle-check">Guardado correctamente</Pill>}
+          {saveMsg === 'error' && <Pill tone="coral" icon="alert-circle">Error al guardar. Intenta de nuevo.</Pill>}
         </div>
       </Section>
 
@@ -174,7 +150,7 @@ export default function SettingsView({ dark, onToggleDark }) {
         title="Meta del equipo"
         description="Objetivo de ventas semanal visible en el dashboard"
       >
-        <Field label="Meta semanal (MXN)" hint="Suma de cierres que el equipo debe alcanzar por semana">
+        <SettingRow label="Meta semanal (MXN)" hint="Suma de cierres que el equipo debe alcanzar por semana">
           <div style={{ display: 'flex', gap: 8 }}>
             <Input
               type="number"
@@ -182,87 +158,49 @@ export default function SettingsView({ dark, onToggleDark }) {
               onChange={e => setWeeklyGoal(e.target.value)}
               placeholder="100000"
             />
-            <button
-              onClick={handleSaveGoal}
-              disabled={goalSaving}
-              style={{
-                padding: '9px 18px', background: 'var(--kiuvo-blue)', color: '#fff',
-                borderRadius: 'var(--r-md)', fontSize: 13, fontWeight: 500,
-                opacity: goalSaving ? 0.7 : 1, flexShrink: 0,
-              }}
-            >
+            <Button size="sm" loading={goalSaving} onClick={handleSaveGoal}>
               {goalSaving ? 'Guardando…' : 'Guardar'}
-            </button>
+            </Button>
           </div>
-          {goalMsg === 'ok' && (
-            <div style={{ fontSize: 12, color: 'var(--success-fg)', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
-              <Icon name="circle-check" size={13} color="var(--success)" /> Meta actualizada
-            </div>
-          )}
-          {goalMsg === 'error' && (
-            <div style={{ fontSize: 12, color: 'var(--danger-fg)', marginTop: 6 }}>Error al guardar.</div>
-          )}
-        </Field>
+          {goalMsg === 'ok' && <div style={{ marginTop: 8 }}><Pill tone="success" icon="circle-check">Meta actualizada</Pill></div>}
+          {goalMsg === 'error' && <div style={{ marginTop: 8 }}><Pill tone="coral" icon="alert-circle">Error al guardar.</Pill></div>}
+        </SettingRow>
       </Section>
 
       {/* ── Apariencia ── */}
       <Section title="Apariencia" description="Personaliza la interfaz del panel">
-        <Field label="Tema" hint="Claro u oscuro para el panel de administración">
-          <div style={{ display: 'flex', gap: 8 }}>
-            {[
-              { label: 'Claro', icon: 'sun', value: false },
-              { label: 'Oscuro', icon: 'moon', value: true },
-            ].map(opt => {
-              const on = dark === opt.value
-              return (
-                <button
-                  key={opt.label}
-                  onClick={() => !on && onToggleDark?.()}
-                  style={{
-                    padding: '9px 18px', borderRadius: 'var(--r-md)',
-                    background: on ? 'var(--kiuvo-blue)' : 'var(--bg-secondary)',
-                    border: `0.5px solid ${on ? 'var(--kiuvo-blue)' : 'var(--border)'}`,
-                    color: on ? '#fff' : 'var(--fg-secondary)',
-                    fontSize: 13, fontWeight: on ? 500 : 400,
-                    display: 'flex', alignItems: 'center', gap: 6,
-                  }}
-                >
-                  <Icon name={opt.icon} size={14} color={on ? '#fff' : 'var(--fg-secondary)'} />
-                  {opt.label}
-                </button>
-              )
-            })}
-          </div>
-        </Field>
+        <SettingRow label="Tema" hint="Claro u oscuro para el panel de administración">
+          <Segmented
+            value={dark ? 'dark' : 'light'}
+            onChange={id => { if ((id === 'dark') !== !!dark) onToggleDark?.() }}
+            options={[
+              { id: 'light', label: 'Claro',  icon: 'sun' },
+              { id: 'dark',  label: 'Oscuro', icon: 'moon' },
+            ]}
+          />
+        </SettingRow>
       </Section>
 
       {/* ── Sistema ── */}
       <Section title="Sistema" description="Información del entorno y versión">
-        <Field label="Ambiente">
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            padding: '5px 12px', borderRadius: 99,
-            background: envCfg.bg, color: envCfg.color,
-            fontSize: 12, fontWeight: 600, letterSpacing: 0.4,
-          }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: envCfg.color }} />
-            {envCfg.label}
-          </span>
-        </Field>
-        <Field label="Aplicación" hint="Nombre configurado en variables de entorno">
-          <span style={{ fontSize: 13, color: 'var(--fg-secondary)' }}>{APP_NAME}</span>
-        </Field>
-        <Field label="Base de datos" hint="Backend de datos y autenticación">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--success)' }} />
-            <span style={{ fontSize: 13, color: 'var(--fg-secondary)' }}>Supabase (PostgreSQL)</span>
+        <SettingRow label="Ambiente">
+          <Pill tone={envCfg.tone}>{envCfg.label}</Pill>
+        </SettingRow>
+        <SettingRow label="Aplicación" hint="Nombre configurado en variables de entorno">
+          <span className="k-muted" style={{ fontSize: 14 }}>{APP_NAME}</span>
+        </SettingRow>
+        <SettingRow label="Base de datos" hint="Backend de datos y autenticación">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--success)' }} />
+            <span className="k-muted" style={{ fontSize: 14 }}>Supabase (PostgreSQL)</span>
           </div>
-        </Field>
-        <Field label="Mapa" hint="Proveedor de mapas y geocodificación">
-          <span style={{ fontSize: 13, color: 'var(--fg-secondary)' }}>OpenStreetMap + Leaflet</span>
-        </Field>
+        </SettingRow>
+        <SettingRow label="Mapa" hint="Proveedor de mapas y geocodificación">
+          <span className="k-muted" style={{ fontSize: 14 }}>OpenStreetMap + Leaflet</span>
+        </SettingRow>
       </Section>
 
+      </div>
     </div>
   )
 }

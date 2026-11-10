@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { pdf } from '@react-pdf/renderer'
 import Icon from '../shared/Icon'
+import { IconButton, Card, Pill, Segmented, SearchInput, Empty, Bone } from '../ui'
 import { useAuth } from '../../contexts/AuthContext'
 import { useQuoteHistory } from '../../hooks/useQuoteHistory'
 import { QuotePDFDoc } from '../../lib/quotePDF'
@@ -9,22 +10,20 @@ import { saveFile } from '../../lib/saveFile'
 
 const fmt = n => '$' + Number(n).toLocaleString('es-MX', { minimumFractionDigits: 0 })
 
-const STATUS_STYLE = {
-  draft:    { label: 'Borrador',   bg: 'var(--bg-secondary)',  fg: 'var(--fg-secondary)' },
-  sent:     { label: 'Enviada',    bg: 'var(--info-bg)',       fg: 'var(--info)'         },
-  approved: { label: 'Aprobada',   bg: 'var(--success-bg)',    fg: 'var(--success)'      },
-  rejected: { label: 'Rechazada',  bg: 'var(--danger-bg)',     fg: 'var(--danger)'       },
+const STATUS = {
+  draft:    { label: 'Borrador',  tone: undefined },
+  sent:     { label: 'Enviada',   tone: 'sky' },
+  approved: { label: 'Aprobada',  tone: 'success' },
+  rejected: { label: 'Rechazada', tone: 'coral' },
 }
 
-function Spinner({ size = 20 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth="2.5" strokeLinecap="round"
-      style={{ animation: 'spin 0.7s linear infinite', flexShrink: 0 }}>
-      <path d="M12 2a10 10 0 0 1 10 10" />
-    </svg>
-  )
-}
+const FILTERS = [
+  { id: 'all',      label: 'Todas' },
+  { id: 'sent',     label: 'Enviadas' },
+  { id: 'approved', label: 'Aprobadas' },
+  { id: 'draft',    label: 'Borradores' },
+  { id: 'rejected', label: 'Rechazadas' },
+]
 
 export default function SellerQuotesScreen({ onBack }) {
   const { user } = useAuth()
@@ -103,159 +102,73 @@ export default function SellerQuotesScreen({ onBack }) {
 
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
-      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
-
-      {/* Header */}
-      <div style={{
-        padding: '14px 16px 10px',
-        borderBottom: '0.5px solid var(--border)',
-        display: 'flex', alignItems: 'center', gap: 10,
-        background: 'var(--surface)', flexShrink: 0,
-      }}>
-        <button onClick={onBack} style={{
-          width: 32, height: 32, borderRadius: '50%',
-          background: 'var(--bg-secondary)', border: 'none',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: 'var(--fg-secondary)', flexShrink: 0,
-        }}>
-          <Icon name="arrow-left" size={16} />
-        </button>
-        <div>
-          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--fg)' }}>Mis cotizaciones</div>
-          <div style={{ fontSize: 11, color: 'var(--fg-tertiary)' }}>{quotes.length} en total</div>
+      <div className="k-screenhead">
+        <IconButton icon="arrow-left" label="Volver" onClick={onBack} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="k-screenhead__title">Mis cotizaciones</div>
+          <div style={{ fontSize: 13, color: 'var(--fg-secondary)' }}>{quotes.length} en total</div>
         </div>
-        <button onClick={reload} style={{ marginLeft: 'auto', color: 'var(--fg-tertiary)', padding: 6 }}>
-          <Icon name="refresh" size={16} />
-        </button>
+        <IconButton icon="refresh" label="Actualizar" onClick={reload} />
       </div>
 
-      {/* Search */}
-      <div style={{ padding: '10px 16px 0', flexShrink: 0 }}>
-        <div style={{ position: 'relative' }}>
-          <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-            <Icon name="search" size={14} color="var(--fg-tertiary)" />
-          </span>
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar por cliente…"
-            style={{
-              width: '100%', boxSizing: 'border-box',
-              padding: '9px 10px 9px 30px',
-              background: 'var(--bg-secondary)', border: '0.5px solid var(--border)',
-              borderRadius: 'var(--r-md)', fontSize: 13, color: 'var(--fg)',
-              outline: 'none', fontFamily: 'inherit',
-            }}
-          />
-        </div>
+      <div style={{ padding: '4px 14px 0', flexShrink: 0 }}>
+        <SearchInput value={search} onChange={setSearch} placeholder="Buscar por cliente…" />
       </div>
 
-      {/* Filter tabs */}
-      <div style={{ padding: '8px 16px', display: 'flex', gap: 6, overflowX: 'auto', flexShrink: 0 }}>
-        {[
-          { key: 'all',      label: 'Todas' },
-          { key: 'sent',     label: 'Enviadas' },
-          { key: 'approved', label: 'Aprobadas' },
-          { key: 'draft',    label: 'Borradores' },
-          { key: 'rejected', label: 'Rechazadas' },
-        ].map(f => (
-          <button key={f.key} onClick={() => setFilter(f.key)} style={{
-            flexShrink: 0, padding: '5px 12px', borderRadius: 'var(--r-full)', fontSize: 12,
-            fontWeight: filter === f.key ? 500 : 400,
-            border: `0.5px solid ${filter === f.key ? 'var(--kiuvo-blue)' : 'var(--border)'}`,
-            background: filter === f.key ? 'var(--kiuvo-blue-soft)' : 'var(--surface)',
-            color: filter === f.key ? 'var(--kiuvo-blue-deep)' : 'var(--fg)',
-          }}>{f.label}</button>
-        ))}
+      <div style={{ padding: '12px 14px 4px', flexShrink: 0 }}>
+        <Segmented size="lg" surface options={FILTERS} value={filter} onChange={setFilter} style={{ display: 'flex' }} />
       </div>
 
-      {/* Body */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px 92px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '8px 14px 120px' }}>
         {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '48px 0', color: 'var(--fg-tertiary)', gap: 8 }}>
-            <Spinner size={18} /> Cargando…
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: 8 }}>
+            {[0, 1, 2].map(i => <Bone key={i} h={84} r="var(--r-lg)" />)}
           </div>
         ) : filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--fg-tertiary)' }}>
-            <Icon name="file-invoice" size={32} color="var(--border-strong)" />
-            <div style={{ marginTop: 8, fontSize: 13 }}>Sin cotizaciones</div>
-          </div>
+          <Empty icon="file-invoice">Sin cotizaciones</Empty>
         ) : (
           Object.entries(grouped).map(([prospect, qs]) => (
-            <div key={prospect} style={{ marginBottom: 20 }}>
-              {/* Prospect header */}
-              <div style={{
-                fontSize: 11, fontWeight: 600, color: 'var(--fg-tertiary)',
-                letterSpacing: 0.4, textTransform: 'uppercase',
-                padding: '12px 0 6px', borderBottom: '0.5px solid var(--border)', marginBottom: 8,
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              }}>
-                <span>{prospect}</span>
-                <span style={{ fontWeight: 400, color: 'var(--fg-tertiary)', fontSize: 10 }}>
+            <div key={prospect} style={{ marginBottom: 22 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, margin: '10px 4px' }}>
+                <span className="k-h3" style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{prospect}</span>
+                <span style={{ fontSize: 13, color: 'var(--fg-tertiary)', flexShrink: 0 }}>
                   {qs.length} cotización{qs.length !== 1 ? 'es' : ''}
                 </span>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {qs.map(q => {
-                  const st = STATUS_STYLE[q.status] || STATUS_STYLE.draft
+                  const st = STATUS[q.status] || STATUS.draft
                   const isDown = downloading === q.id
                   return (
-                    <div key={q.id} style={{
-                      padding: '12px 14px',
-                      background: 'var(--surface)',
-                      border: '0.5px solid var(--border)',
-                      borderRadius: 'var(--r-md)',
-                      display: 'flex', alignItems: 'center', gap: 10,
-                    }}>
-                      {/* PDF icon */}
-                      <div style={{
-                        width: 38, height: 38, borderRadius: 'var(--r-md)', flexShrink: 0,
-                        background: '#FEF3E2',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}>
-                        <Icon name="file-invoice" size={20} color="#854F0B" />
-                      </div>
+                    <Card key={q.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 14 }}>
+                      <span className="k-iconbtn k-iconbtn--soft" aria-hidden="true">
+                        <Icon name="file-invoice" size={22} />
+                      </span>
 
-                      {/* Info */}
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg)', fontVariantNumeric: 'tabular-nums' }}>
-                            {fmt(q.total)}
-                          </span>
-                          <span style={{
-                            fontSize: 10, fontWeight: 600,
-                            padding: '1px 6px', borderRadius: 99,
-                            background: st.bg, color: st.fg,
-                          }}>{st.label}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                          <span className="k-num" style={{ fontSize: 20 }}>{fmt(q.total)}</span>
+                          <Pill tone={st.tone}>{st.label}</Pill>
                         </div>
-                        <div style={{ fontSize: 11, color: 'var(--fg-tertiary)' }}>
-                          {q.itemCount} producto{q.itemCount !== 1 ? 's' : ''} · {q.dateStr}
-                        </div>
-                        <div style={{ fontSize: 10, color: 'var(--fg-tertiary)', marginTop: 1, fontFamily: 'monospace' }}>
-                          {q.quoteNumber ? `Cotización #${q.quoteNumber}` : `#${q.shortId}`}
+                        <div style={{ fontSize: 13, color: 'var(--fg-secondary)', marginTop: 5 }}>
+                          {q.quoteNumber ? `Cotización #${q.quoteNumber}` : `#${q.shortId}`} · {q.itemCount} producto{q.itemCount !== 1 ? 's' : ''} · {q.dateStr}
                         </div>
                       </div>
 
-                      {/* Download button */}
                       <button
+                        className="k-iconbtn k-iconbtn--ink"
                         onClick={() => handleDownload(q)}
                         disabled={isDown}
+                        aria-label="Descargar PDF"
                         title="Descargar PDF"
-                        style={{
-                          width: 36, height: 36, borderRadius: 'var(--r-md)', flexShrink: 0,
-                          background: isDown ? 'var(--bg-secondary)' : 'var(--kiuvo-blue)',
-                          border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          cursor: isDown ? 'default' : 'pointer',
-                          opacity: isDown ? 0.7 : 1,
-                        }}
+                        style={{ opacity: isDown ? 0.6 : 1 }}
                       >
                         {isDown
-                          ? <Spinner size={14} />
-                          : <Icon name="download" size={16} color="#fff" />
-                        }
+                          ? <span className="k-spin" style={{ display: 'inline-flex' }}><Icon name="loader" size={20} /></span>
+                          : <Icon name="download" size={20} />}
                       </button>
-                    </div>
+                    </Card>
                   )
                 })}
               </div>

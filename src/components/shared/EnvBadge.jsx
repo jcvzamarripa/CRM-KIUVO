@@ -6,8 +6,8 @@ import { APP_ENV, isProd } from '../../lib/supabase'
  * Renders nothing in production.
  */
 const CFG = {
-  development: { label: 'DEV',     bg: '#185FA5', color: '#fff' },
-  staging:     { label: 'STAGING', bg: '#EF9F27', color: '#fff' },
+  development: { label: 'DEV',     bg: 'var(--accent-2-soft)', color: 'var(--accent-2-fg)' },
+  staging:     { label: 'STAGING', bg: 'var(--warning-bg)',    color: 'var(--warning-fg)' },
 }
 
 export default function EnvBadge({ style = {} }) {
@@ -19,11 +19,11 @@ export default function EnvBadge({ style = {} }) {
     <span style={{
       display: 'inline-flex',
       alignItems: 'center',
-      padding: '2px 8px',
-      borderRadius: 99,
-      fontSize: 10,
+      padding: '4px 10px',
+      borderRadius: 'var(--r-full)',
+      fontSize: 12,
       fontWeight: 700,
-      letterSpacing: 0.6,
+      letterSpacing: '0.06em',
       background: cfg.bg,
       color: cfg.color,
       userSelect: 'none',

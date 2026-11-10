@@ -166,3 +166,115 @@
 @media (prefers-reduced-motion: reduce) {
   .k-sheet, .k-sheet__backdrop, .k-btn, .k-chip, .k-iconbtn { animation: none !important; transition: none !important; }
 }
+
+/* ── Hoja centrada en pantallas anchas ───────────────────────────────────── */
+@media (min-width: 720px) {
+  .kiuvo .k-sheet {
+    left: calc(50% - 270px); right: auto; width: 540px; bottom: 24px;
+    max-height: calc(100% - 48px); border-radius: var(--r-xl);
+  }
+  .kiuvo .k-sheet--full { top: 24px; }
+}
+
+/* ── Supervisión de campo ────────────────────────────────────────────────── */
+.kiuvo .sv-scroll { flex: 1; overflow-y: auto; padding: 20px 28px 40px; }
+.kiuvo .sv-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+.kiuvo .sv-grid { display: grid; grid-template-columns: minmax(300px, 380px) 1fr; gap: 20px; align-items: start; }
+.kiuvo .sv-map { height: 420px; width: 100%; border-radius: var(--r-lg); z-index: 0; }
+@media (max-width: 1100px) {
+  .kiuvo .sv-tiles { grid-template-columns: repeat(2, 1fr); }
+  .kiuvo .sv-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+  .kiuvo .sv-scroll { padding: 12px 12px 32px; }
+  .kiuvo .sv-map { height: 320px; }
+}
+
+/* ── Tipografía ──────────────────────────────────────────────────────────── */
+.kiuvo .k-h1 { font-family: var(--font-display); font-size: 26px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
+.kiuvo .k-h2 { font-family: var(--font-display); font-size: 20px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; }
+.kiuvo .k-h3 { font-size: 16px; font-weight: 600; line-height: 1.3; }
+.kiuvo .k-num { font-family: var(--font-display); font-weight: 700; letter-spacing: -0.02em; line-height: 1; font-variant-numeric: tabular-nums; }
+.kiuvo .k-muted { color: var(--fg-secondary); }
+.kiuvo .k-dim { color: var(--fg-tertiary); }
+
+/* ── Control segmentado (filtros, pestañas) ──────────────────────────────── */
+.kiuvo .k-seg {
+  display: inline-flex; gap: 4px; padding: 4px; max-width: 100%; overflow-x: auto;
+  background: var(--bg-tertiary); border-radius: var(--r-full);
+}
+.kiuvo .k-seg--surface { background: var(--surface); }
+.kiuvo .k-seg__item {
+  flex-shrink: 0; min-height: 36px; padding: 0 14px; border-radius: var(--r-full);
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 500; color: var(--fg-secondary); white-space: nowrap;
+}
+.kiuvo .k-seg__item[aria-pressed="true"] { background: var(--primary-bg); color: var(--primary-fg); font-weight: 600; }
+.kiuvo .k-seg--lg .k-seg__item { min-height: 44px; font-size: 14px; padding: 0 18px; }
+
+/* ── Avatar ──────────────────────────────────────────────────────────────── */
+.kiuvo .k-avatar {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 40px; height: 40px; border-radius: 50%; overflow: hidden;
+  background: var(--ink); color: #fff; font-size: 14px; font-weight: 700; letter-spacing: 0.02em;
+}
+.kiuvo .k-avatar--sm { width: 30px; height: 30px; font-size: 11px; }
+.kiuvo .k-avatar--lg { width: 56px; height: 56px; font-size: 19px; }
+.kiuvo .k-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+/* ── Tabla (panel admin) ─────────────────────────────────────────────────── */
+.kiuvo .k-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.kiuvo .k-table th {
+  padding: 12px 16px; text-align: left; white-space: nowrap;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-tertiary);
+}
+.kiuvo .k-table td { padding: 14px 16px; border-top: 1px solid var(--border); vertical-align: middle; }
+.kiuvo .k-table tbody tr:hover td { background: var(--bg-secondary); }
+.kiuvo .k-table--click tbody tr { cursor: pointer; }
+
+/* ── Fila de lista ───────────────────────────────────────────────────────── */
+.kiuvo .k-row {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px;
+  padding: 10px 16px; text-align: left;
+}
+.kiuvo .k-row + .k-row { border-top: 1px solid var(--border); }
+
+/* ── Campo con etiqueta, select y buscador ───────────────────────────────── */
+.kiuvo .k-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.kiuvo .k-field__label { font-size: 13px; font-weight: 600; color: var(--fg-secondary); }
+.kiuvo .k-field__error { font-size: 13px; color: var(--coral-fg); }
+.kiuvo select.k-input {
+  appearance: none; -webkit-appearance: none; padding-right: 40px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%236B6B67%22 stroke-width=%222.2%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpath d=%22m6 9 6 6 6-6%22/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 14px center;
+}
+.kiuvo .k-input--sm { min-height: 40px; padding: 8px 14px; font-size: 14px; }
+.kiuvo .k-input--pill { border-radius: var(--r-full); }
+.kiuvo .k-search { position: relative; display: block; }
+.kiuvo .k-search > svg { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--fg-tertiary); pointer-events: none; }
+.kiuvo .k-search .k-input { padding-left: 46px; border-radius: var(--r-full); }
+
+/* ── Diálogo centrado (panel admin) ──────────────────────────────────────── */
+.kiuvo .k-modal {
+  position: fixed; z-index: 301; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 48px);
+  display: flex; flex-direction: column;
+  background: var(--bg); color: var(--fg); border-radius: var(--r-xl);
+  box-shadow: var(--shadow-float);
+}
+.kiuvo .k-modal--wide { width: min(880px, calc(100vw - 32px)); }
+
+/* ── Estado vacío ────────────────────────────────────────────────────────── */
+.kiuvo .k-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  padding: 40px 20px; text-align: center; color: var(--fg-secondary); font-size: 15px;
+}
+.kiuvo .k-empty > svg { color: var(--fg-tertiary); }
+
+/* ── Encabezado de pantalla móvil ────────────────────────────────────────── */
+.kiuvo .k-screenhead { display: flex; align-items: center; gap: 12px; padding: 14px 14px 10px; }
+.kiuvo .k-screenhead__title { flex: 1; min-width: 0; font-family: var(--font-display); font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
+
+/* ── Esqueleto de carga ──────────────────────────────────────────────────── */
+.kiuvo .k-bone { background: var(--bg-tertiary); border-radius: var(--r-sm); animation: k-pulse 1.4s ease-in-out infinite; }
+@keyframes k-pulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 0.9; } }

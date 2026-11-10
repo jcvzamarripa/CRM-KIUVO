@@ -1,10 +1,13 @@
 import React, { useState, useMemo } from 'react'
 import Icon from '../shared/Icon'
+import { Sheet, Button, Card, Label, Segmented, SearchInput, Empty } from '../ui'
 import { useProducts } from '../../hooks/useProducts'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 
 const fmt = n => '$' + (n ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 0 })
+
+const stepBtn = { width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg)' }
 
 export default function ProductionOrderModal({ prospect, onClose, onCreated }) {
   const { user } = useAuth()
@@ -82,223 +85,150 @@ export default function ProductionOrderModal({ prospect, onClose, onCreated }) {
 
   // ── Success screen ────────────────────────────────────────────────
   if (done) return (
-    <>
-      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100 }} />
-      <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 101,
-        background: 'var(--bg)', borderRadius: '20px 20px 0 0',
-        padding: '28px 24px 36px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14,
-      }}>
-        <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#E1F5EE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Icon name="clipboard-check" size={30} color="#1D9E75" />
+    <Sheet title="Listo" onClose={onClose} footer={<Button block size="lg" onClick={onClose}>Entendido</Button>}>
+      <div style={{ padding: '12px 0 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, textAlign: 'center' }}>
+        <div style={{
+          width: 84, height: 84, borderRadius: '50%', background: 'var(--accent)', color: 'var(--accent-fg)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Icon name="clipboard-check" size={40} />
         </div>
-        <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--fg)' }}>¡Orden enviada!</div>
-        <div style={{ fontSize: 13, color: 'var(--fg-secondary)', textAlign: 'center', lineHeight: 1.6 }}>
+        <div className="k-display" style={{ fontSize: 24, fontWeight: 700 }}>¡Orden enviada!</div>
+        <div style={{ fontSize: 15, color: 'var(--fg-secondary)', lineHeight: 1.5 }}>
           La orden de producción para <b style={{ color: 'var(--fg)' }}>{prospect.name}</b> fue enviada al administrador para su aprobación.
         </div>
-        <div style={{ width: '100%', padding: '12px 16px', background: 'var(--bg-secondary)', borderRadius: 'var(--r-md)', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Icon name="info-circle" size={16} color="var(--fg-tertiary)" />
-          <div style={{ fontSize: 12, color: 'var(--fg-tertiary)', lineHeight: 1.5 }}>
+        <Card style={{ width: '100%', display: 'flex', alignItems: 'flex-start', gap: 10, textAlign: 'left' }}>
+          <Icon name="info-circle" size={20} color="var(--fg-tertiary)" style={{ marginTop: 1 }} />
+          <div style={{ fontSize: 14, color: 'var(--fg-secondary)', lineHeight: 1.5 }}>
             Si la orden es rechazada, el prospecto volverá automáticamente a <b>Negociación</b> y recibirás una notificación.
           </div>
-        </div>
-        <button onClick={onClose} style={{
-          width: '100%', padding: '13px',
-          background: '#1D9E75', color: '#fff',
-          borderRadius: 'var(--r-md)', fontSize: 14, fontWeight: 500,
-        }}>
-          Entendido
-        </button>
+        </Card>
       </div>
-    </>
+    </Sheet>
   )
 
   // ── Form ─────────────────────────────────────────────────────────
   return (
-    <>
-      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100 }} />
-      <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 101,
-        background: 'var(--bg)', borderRadius: '20px 20px 0 0',
-        maxHeight: '94%', display: 'flex', flexDirection: 'column', overflow: 'hidden',
-      }}>
-        {/* Handle */}
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 2px' }}>
-          <div style={{ width: 40, height: 4, borderRadius: 2, background: 'var(--border-strong)' }} />
-        </div>
-
-        {/* Header */}
-        <div style={{ padding: '8px 16px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{ fontSize: 17, fontWeight: 500, color: 'var(--fg)' }}>Orden de producción</div>
-            <div style={{ fontSize: 12, color: '#1D9E75', fontWeight: 500, marginTop: 1 }}>{prospect.name}</div>
-          </div>
-          <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--bg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="x" size={16} />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-
-          {/* Items added */}
+    <Sheet
+      full
+      title="Orden de producción"
+      onClose={onClose}
+      footer={
+        <>
           {items.length > 0 && (
-            <div style={{ padding: '0 16px 12px' }}>
-              <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', letterSpacing: 0.5, marginBottom: 8 }}>
-                PRODUCTOS EN LA ORDEN ({items.length})
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {items.map(item => (
-                  <div key={item.id} style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    padding: '10px 12px', background: 'var(--surface)',
-                    border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)',
-                  }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {item.name}
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--fg-secondary)', marginTop: 1 }}>
-                        {fmt(item.price)}/{item.unit} · <b style={{ color: 'var(--fg)' }}>{fmt(item.price * item.qty)}</b>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-secondary)', borderRadius: 'var(--r-md)', border: '0.5px solid var(--border)' }}>
-                      <button onClick={() => setQty(item.id, item.qty - 1)} style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-secondary)' }}>
-                        <Icon name="minus" size={14} />
-                      </button>
-                      <input
-                        type="number" min="1" value={item.qty}
-                        onChange={e => setQty(item.id, parseInt(e.target.value) || 1)}
-                        style={{ width: 36, textAlign: 'center', fontSize: 13, fontWeight: 600, color: 'var(--fg)', background: 'transparent', border: 'none', outline: 'none', padding: 0, fontFamily: 'inherit' }}
-                      />
-                      <button onClick={() => setQty(item.id, item.qty + 1)} style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-secondary)' }}>
-                        <Icon name="plus" size={14} />
-                      </button>
-                    </div>
-                    <button onClick={() => removeItem(item.id)} style={{ width: 28, height: 28, borderRadius: 'var(--r-sm)', background: 'var(--danger-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Icon name="trash" size={13} color="var(--danger)" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Catalog */}
-          <div style={{ padding: '0 16px', flex: 1 }}>
-            <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', letterSpacing: 0.5, marginBottom: 8 }}>CATÁLOGO</div>
-
-            <div style={{ position: 'relative', marginBottom: 8 }}>
-              <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}>
-                <Icon name="search" size={14} color="var(--fg-tertiary)" />
-              </span>
-              <input
-                value={search} onChange={e => setSearch(e.target.value)}
-                placeholder="Buscar por nombre o SKU…"
-                style={{
-                  width: '100%', boxSizing: 'border-box', padding: '9px 10px 9px 30px',
-                  background: 'var(--bg-secondary)', border: '0.5px solid var(--border)',
-                  borderRadius: 'var(--r-md)', fontSize: 13, color: 'var(--fg)', outline: 'none', fontFamily: 'inherit',
-                }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: 6, marginBottom: 10, overflowX: 'auto', paddingBottom: 2 }}>
-              {cats.map(c => {
-                const on = cat === c
-                return (
-                  <button key={c} onClick={() => setCat(c)} style={{
-                    flexShrink: 0, padding: '5px 12px', borderRadius: 'var(--r-full)', fontSize: 12, fontWeight: on ? 500 : 400,
-                    border: `0.5px solid ${on ? '#1D9E75' : 'var(--border)'}`,
-                    background: on ? '#E1F5EE' : 'var(--surface)',
-                    color: on ? '#1D9E75' : 'var(--fg)',
-                  }}>{c}</button>
-                )
-              })}
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingBottom: 16 }}>
-              {catalog.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--fg-tertiary)', fontSize: 13 }}>Sin resultados</div>
-              ) : catalog.map(p => {
-                const inOrder = items.find(i => i.id === p.id)
-                return (
-                  <button key={p.id} onClick={() => addItem(p)} style={{
-                    display: 'flex', alignItems: 'center', gap: 10, padding: '11px 12px',
-                    background: inOrder ? '#E1F5EE' : 'var(--surface)',
-                    border: `0.5px solid ${inOrder ? '#1D9E75' : 'var(--border)'}`,
-                    borderRadius: 'var(--r-md)', textAlign: 'left',
-                  }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: inOrder ? '#0D6E50' : 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {p.name}
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginTop: 2 }}>{p.sku} · {p.category}</div>
-                    </div>
-                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: inOrder ? '#1D9E75' : 'var(--fg)' }}>{fmt(p.price)}</div>
-                      <div style={{ fontSize: 11, color: 'var(--fg-tertiary)' }}>/{p.unit}</div>
-                    </div>
-                    <div style={{
-                      width: 28, height: 28, borderRadius: 'var(--r-sm)', flexShrink: 0,
-                      background: inOrder ? '#1D9E75' : 'var(--bg-secondary)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      <Icon name={inOrder ? 'check' : 'plus'} size={14} color={inOrder ? '#fff' : 'var(--fg-secondary)'} />
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Notes */}
-          <div style={{ padding: '0 16px 12px' }}>
-            <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', letterSpacing: 0.5, marginBottom: 6 }}>NOTAS PARA PRODUCCIÓN (opcional)</div>
-            <textarea
-              value={notes} onChange={e => setNotes(e.target.value)}
-              placeholder="Instrucciones especiales, tiempos de entrega, especificaciones…"
-              rows={2}
-              style={{
-                width: '100%', boxSizing: 'border-box', padding: '10px 12px',
-                background: 'var(--bg-secondary)', border: '0.5px solid var(--border)',
-                borderRadius: 'var(--r-md)', fontSize: 13, color: 'var(--fg)',
-                outline: 'none', fontFamily: 'inherit', resize: 'none',
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div style={{ padding: '10px 16px 20px', borderTop: '0.5px solid var(--border)' }}>
-          {items.length > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
-              <span style={{ fontSize: 13, color: 'var(--fg-secondary)' }}>{items.length} producto{items.length !== 1 ? 's' : ''}</span>
-              <span style={{ fontSize: 18, fontWeight: 500, color: 'var(--fg)' }}>{fmt(total)}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
+              <span style={{ fontSize: 14, color: 'var(--fg-secondary)' }}>{items.length} producto{items.length !== 1 ? 's' : ''}</span>
+              <span className="k-num" style={{ fontSize: 28 }}>{fmt(total)}</span>
             </div>
           )}
           {error && (
-            <div style={{ marginBottom: 10, padding: '10px 14px', background: 'var(--danger-bg)', border: '0.5px solid var(--danger-border)', borderRadius: 'var(--r-md)', fontSize: 13, color: 'var(--danger-fg)' }}>
+            <div style={{ marginBottom: 12, padding: '12px 14px', background: 'var(--coral-soft)', borderRadius: 'var(--r-md)', fontSize: 14, color: 'var(--coral-fg)' }}>
               {error}
             </div>
           )}
-          <button
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-            style={{
-              width: '100%', padding: '14px',
-              background: canSubmit ? '#1D9E75' : 'var(--bg-tertiary)',
-              color: canSubmit ? '#fff' : 'var(--fg-tertiary)',
-              borderRadius: 'var(--r-md)', fontSize: 15, fontWeight: 500,
-              opacity: canSubmit ? 1 : 0.6,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            }}
-          >
-            <Icon name="clipboard-list" size={18} color={canSubmit ? '#fff' : 'var(--fg-tertiary)'} />
+          <Button block size="lg" icon="clipboard-list" loading={submitting} disabled={!canSubmit} onClick={handleSubmit}>
             {submitting ? 'Enviando…' : 'Enviar orden de producción'}
-          </button>
+          </Button>
+        </>
+      }
+    >
+      <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--fg-secondary)', marginBottom: 20 }}>{prospect.name}</div>
+
+      {/* Items added */}
+      {items.length > 0 && (
+        <div style={{ marginBottom: 22 }}>
+          <Label>Productos en la orden ({items.length})</Label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {items.map(item => (
+              <Card key={item.id} style={{ padding: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0, fontSize: 16, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {item.name}
+                  </div>
+                  <button aria-label="Quitar producto" onClick={() => removeItem(item.id)} style={{
+                    width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
+                    background: 'var(--coral-soft)', color: 'var(--coral-fg)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <Icon name="trash" size={18} />
+                  </button>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 8 }}>
+                  <div style={{ fontSize: 14, color: 'var(--fg-secondary)' }}>
+                    {fmt(item.price)}/{item.unit} · <b style={{ color: 'var(--fg)' }}>{fmt(item.price * item.qty)}</b>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-secondary)', borderRadius: 'var(--r-full)', flexShrink: 0 }}>
+                    <button aria-label="Menos" onClick={() => setQty(item.id, item.qty - 1)} style={stepBtn}>
+                      <Icon name="minus" size={18} />
+                    </button>
+                    <input
+                      type="number" min="1" value={item.qty} aria-label="Cantidad"
+                      onChange={e => setQty(item.id, parseInt(e.target.value) || 1)}
+                      style={{ width: 44, textAlign: 'center', fontSize: 16, fontWeight: 600, color: 'var(--fg)', background: 'transparent', border: 'none', outline: 'none', padding: 0, fontFamily: 'inherit' }}
+                    />
+                    <button aria-label="Más" onClick={() => setQty(item.id, item.qty + 1)} style={stepBtn}>
+                      <Icon name="plus" size={18} />
+                    </button>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
         </div>
+      )}
+
+      {/* Catalog */}
+      <Label>Catálogo</Label>
+      <SearchInput value={search} onChange={setSearch} placeholder="Buscar por nombre o SKU…" style={{ marginBottom: 10 }} />
+      <Segmented
+        size="lg" surface
+        options={cats.map(c => ({ id: c, label: c }))}
+        value={cat} onChange={setCat}
+        style={{ display: 'flex', marginBottom: 12 }}
+      />
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 22 }}>
+        {catalog.length === 0 ? (
+          <Empty icon="package">Sin resultados</Empty>
+        ) : catalog.map(p => {
+          const inOrder = items.find(i => i.id === p.id)
+          return (
+            <button key={p.id} onClick={() => addItem(p)} className="k-card" style={{
+              display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', minHeight: 64,
+              textAlign: 'left', width: '100%',
+              boxShadow: inOrder ? 'inset 0 0 0 2px var(--fg)' : 'none',
+            }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {p.name}
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--fg-tertiary)', marginTop: 2 }}>{p.sku} · {p.category}</div>
+              </div>
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <div className="k-num" style={{ fontSize: 16 }}>{fmt(p.price)}</div>
+                <div style={{ fontSize: 13, color: 'var(--fg-tertiary)', marginTop: 3 }}>/{p.unit}</div>
+              </div>
+              <span style={{
+                width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+                background: inOrder ? 'var(--primary-bg)' : 'var(--bg-secondary)',
+                color: inOrder ? 'var(--primary-fg)' : 'var(--fg-secondary)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Icon name={inOrder ? 'check' : 'plus'} size={18} />
+              </span>
+            </button>
+          )
+        })}
       </div>
-    </>
+
+      {/* Notes */}
+      <Label>Notas para producción (opcional)</Label>
+      <textarea
+        className="k-input"
+        value={notes} onChange={e => setNotes(e.target.value)}
+        placeholder="Instrucciones especiales, tiempos de entrega, especificaciones…"
+        rows={3}
+      />
+    </Sheet>
   )
 }

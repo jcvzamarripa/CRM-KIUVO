@@ -1,64 +1,68 @@
 import Icon from '../shared/Icon'
 import { useActivities } from '../../hooks/useActivities'
+import { Card, Pill, Empty, Bone } from '../ui'
 
 const KIND_ICON = {
-  win:   { icon: 'trophy',         color: 'var(--success)'     },
-  visit: { icon: 'map-pin',        color: 'var(--kiuvo-blue)'  },
-  quote: { icon: 'file-text',      color: 'var(--warning)'     },
-  add:   { icon: 'user-plus',      color: 'var(--info)'        },
-  stage: { icon: 'arrow-right',    color: '#D85A30'            },
-  msg:   { icon: 'brand-whatsapp', color: 'var(--success)'     },
+  win:      { icon: 'trophy',         bg: 'var(--accent)',        fg: 'var(--accent-fg)' },
+  visit:    { icon: 'map-pin',        bg: 'var(--info-bg)',       fg: 'var(--kiuvo-blue-deep)' },
+  call:     { icon: 'phone',          bg: 'var(--bg-secondary)',  fg: 'var(--fg)' },
+  whatsapp: { icon: 'brand-whatsapp', bg: 'var(--success-bg)',    fg: 'var(--success-fg)' },
+  email:    { icon: 'mail',           bg: 'var(--bg-secondary)',  fg: 'var(--fg)' },
+  quote:    { icon: 'file-text',      bg: 'var(--warning-bg)',    fg: 'var(--warning-fg)' },
+  add:      { icon: 'user-plus',      bg: 'var(--accent-2-soft)', fg: 'var(--accent-2-fg)' },
+  new:      { icon: 'user-plus',      bg: 'var(--accent-2-soft)', fg: 'var(--accent-2-fg)' },
+  stage:    { icon: 'arrow-right',    bg: 'var(--coral-soft)',    fg: 'var(--coral-fg)' },
+  msg:      { icon: 'brand-whatsapp', bg: 'var(--success-bg)',    fg: 'var(--success-fg)' },
 }
 
 export default function ActivityFeed() {
   const { activities, loading } = useActivities({ limit: 10 })
 
   return (
-    <div className="card" style={{ padding: 0, gridColumn: 'span 4', background: 'var(--surface)', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ padding: '16px 18px 12px', borderBottom: '0.5px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg)' }}>Actividad reciente</div>
-          <div style={{ fontSize: 11, color: 'var(--fg-secondary)' }}>En vivo</div>
-        </div>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--success)', fontWeight: 500 }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--success)' }} />
-          activo
-        </span>
+    <Card flush style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ padding: '20px 20px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <div className="k-h2">Actividad reciente</div>
+        <Pill tone="success">
+          <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--success)' }} />
+          En vivo
+        </Pill>
       </div>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         {loading ? (
-          <div style={{ padding: 24, textAlign: 'center', color: 'var(--fg-tertiary)', fontSize: 12 }}>Cargando…</div>
+          <div style={{ padding: '4px 20px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {[0, 1, 2, 3].map(i => <Bone key={i} h={40} r="var(--r-md)" />)}
+          </div>
         ) : activities.length === 0 ? (
-          <div style={{ padding: 24, textAlign: 'center', color: 'var(--fg-tertiary)', fontSize: 12 }}>Sin actividad reciente</div>
+          <Empty icon="history">Sin actividad reciente</Empty>
         ) : (
           activities.map((a, i) => {
             const k = KIND_ICON[a.kind] || KIND_ICON.visit
             return (
               <div key={a.id || i} style={{
-                padding: '10px 18px', display: 'flex', gap: 10, alignItems: 'flex-start',
-                borderBottom: i < activities.length - 1 ? '0.5px solid var(--border)' : 'none',
+                padding: '12px 20px', display: 'flex', gap: 12, alignItems: 'flex-start',
+                borderTop: '1px solid var(--border)',
               }}>
                 <div style={{
-                  width: 28, height: 28, borderRadius: '50%',
-                  background: k.color + '18', color: k.color, flexShrink: 0,
+                  width: 36, height: 36, borderRadius: '50%',
+                  background: k.bg, color: k.fg, flexShrink: 0,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
-                  <Icon name={k.icon} size={14} />
+                  <Icon name={k.icon} size={18} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, color: 'var(--fg)', lineHeight: 1.45 }}>
-                    <b style={{ fontWeight: 500 }}>{a.who}</b>{' '}
-                    <span style={{ color: 'var(--fg-secondary)' }}>{a.what}</span>{' '}
-                    {a.target && <b style={{ fontWeight: 500 }}>{a.target}</b>}
-                    {a.amount && <span style={{ color: 'var(--fg-secondary)' }}> · {a.amount}</span>}
+                  <div style={{ fontSize: 14, lineHeight: 1.4 }}>
+                    <b style={{ fontWeight: 600 }}>{a.who}</b>{' '}
+                    <span className="k-muted">{a.what}</span>{' '}
+                    {a.target && <b style={{ fontWeight: 600 }}>{a.target}</b>}
+                    {a.amount && <span className="k-muted"> · {a.amount}</span>}
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginTop: 2 }}>{a.time}</div>
+                  <div className="k-dim" style={{ fontSize: 12, marginTop: 2 }}>{a.time}</div>
                 </div>
               </div>
             )
           })
         )}
       </div>
-    </div>
+    </Card>
   )
 }

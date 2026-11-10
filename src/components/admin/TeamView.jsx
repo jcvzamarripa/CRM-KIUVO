@@ -1,265 +1,79 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useState } from 'react'
 import Icon from '../shared/Icon'
 import { useSellers } from '../../hooks/useSellers'
 import { supabase, isSupabaseConfigured } from '../../lib/supabase'
+import { Card, Button, IconButton, Pill, Label, Avatar, Segmented, SearchInput, Modal, Empty, ProgressBar } from '../ui'
 
 // Extended seller data — populated from state when admin edits (starts empty for real sellers)
 const INIT_EXT = {}
 const SELLER_ACTIVITY = {}
 
-const KIND_CFG = {
-  win:   { color: 'var(--success)',         icon: 'trophy'   },
-  visit: { color: 'var(--kiuvo-blue)',      icon: 'map-pin'  },
-  quote: { color: 'var(--stage-cotizacion,#EF9F27)', icon: 'file-text' },
-  stage: { color: '#7C5CBF',               icon: 'arrows-horizontal' },
-  call:  { color: 'var(--info,#378ADD)',    icon: 'phone'    },
-  new:   { color: 'var(--success)',         icon: 'user-plus' },
+const KIND_ICON = {
+  win:   'trophy',
+  visit: 'map-pin',
+  quote: 'file-text',
+  stage: 'arrows-horizontal',
+  call:  'phone',
+  new:   'user-plus',
 }
 
 const ROLE_CFG = {
-  seller: { label: 'Vendedor',   color: '#378ADD',       bg: '#378ADD18' },
-  admin:  { label: 'Admin',      color: 'var(--kiuvo-blue)', bg: 'var(--kiuvo-blue-soft,#185FA518)' },
+  seller: { label: 'Vendedor', icon: 'user-cog',     tone: 'sky' },
+  admin:  { label: 'Admin',    icon: 'shield-check', tone: 'lilac' },
 }
+const ROLE_OPTIONS = Object.entries(ROLE_CFG).map(([id, cfg]) => ({ id, label: cfg.label, icon: cfg.icon }))
 
 const fmt = n => '$' + (n||0).toLocaleString('es-MX')
+const compTone = c => (c >= 85 ? 'success' : c >= 75 ? 'warning' : 'coral')
 
-// ─── Utils ────────────────────────────────────────────────────────────────────
-function useClickOutside(ref, handler) {
-  useEffect(() => {
-    function h(e) { if (ref.current && !ref.current.contains(e.target)) handler() }
-    document.addEventListener('mousedown', h)
-    return () => document.removeEventListener('mousedown', h)
-  }, [ref, handler])
-}
-
-// ─── Role Dropdown ────────────────────────────────────────────────────────────
-function RoleDropdown({ current, onChange, onClose }) {
-  const ref = useRef(null)
-  useClickOutside(ref, onClose)
+function StatusPill({ status }) {
   return (
-    <div ref={ref} style={{
-      position: 'absolute', top: '100%', left: 0, zIndex: 200, marginTop: 4,
-      background: 'var(--surface)', border: '0.5px solid var(--border)',
-      borderRadius: 'var(--r-md)', boxShadow: '0 8px 24px rgba(0,0,0,0.13)',
-      padding: 6, minWidth: 150,
-    }}>
-      <div style={{ fontSize: 10, fontWeight: 500, color: 'var(--fg-tertiary)', padding: '2px 8px 6px', letterSpacing: 0.4 }}>
-        CAMBIAR ROL
-      </div>
-      {Object.entries(ROLE_CFG).map(([k, cfg]) => (
-        <button
-          key={k}
-          onClick={() => { onChange(k); onClose() }}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-            padding: '7px 10px', borderRadius: 'var(--r-sm)', textAlign: 'left',
-            background: current === k ? cfg.bg : 'transparent',
-            transition: 'background 0.1s',
-          }}
-          onMouseEnter={e => { if (current !== k) e.currentTarget.style.background = 'var(--bg-secondary)' }}
-          onMouseLeave={e => { if (current !== k) e.currentTarget.style.background = 'transparent' }}
-        >
-          <Icon name={k === 'admin' ? 'shield-check' : 'user-cog'} size={14} color={cfg.color} />
-          <span style={{ fontSize: 12, fontWeight: current === k ? 500 : 400, color: current === k ? cfg.color : 'var(--fg)' }}>
-            {cfg.label}
-          </span>
-          {current === k && <Icon name="check" size={12} color={cfg.color} style={{ marginLeft: 'auto' }} />}
-        </button>
-      ))}
-    </div>
+    <Pill tone={status === 'active' ? 'success' : undefined}>
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} />
+      {status === 'active' ? 'Activo' : 'Inactivo'}
+    </Pill>
   )
 }
 
-// ─── Invite Modal ─────────────────────────────────────────────────────────────
+// ─── Alta de vendedores ───────────────────────────────────────────────────────
 function InviteModal({ onClose }) {
-  const [role, setRole] = useState('seller')
-  const [name, setName] = useState('')
-  const [token]  = useState(() => Math.random().toString(36).slice(2, 12))
-  const [copied, setCopied] = useState(false)
-  const backdropRef = useRef(null)
-
-  const link = `https://crm.kiuvo.org/registro?inv=${token}&rol=${role}${name ? '&nombre=' + encodeURIComponent(name) : ''}`
-
-  function copyLink() {
-    navigator.clipboard?.writeText(link).catch(() => {})
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2200)
-  }
-
-  function shareWhatsApp() {
-    const msg = `Te invito a unirte a KIUVO CRM${name ? `, ${name}` : ''}.\n\nCompleta tu registro aquí:\n${link}`
-    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
-  }
-
   return (
-    <div
-      ref={backdropRef}
-      onClick={e => { if (e.target === backdropRef.current) onClose() }}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 300,
-        background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(2px)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        animation: 'fadeIn 0.15s ease',
-      }}
-    >
-      <style>{`
-        @keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
-        @keyframes slideUp { from { transform:translateY(16px); opacity:0 } to { transform:translateY(0); opacity:1 } }
-      `}</style>
-      <div style={{
-        width: 440, background: 'var(--surface)', borderRadius: 'var(--r-lg)',
-        border: '0.5px solid var(--border)', boxShadow: '0 24px 64px rgba(0,0,0,0.22)',
-        animation: 'slideUp 0.18s ease', overflow: 'hidden',
-      }}>
-        {/* Header */}
-        <div style={{
-          padding: '18px 20px 16px',
-          borderBottom: '0.5px solid var(--border)',
-          display: 'flex', alignItems: 'center', gap: 12,
-        }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: 'var(--kiuvo-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <Icon name="user-plus" size={18} color="#fff" />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--fg)' }}>Invitar al equipo</div>
-            <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginTop: 1 }}>Genera un link de registro · válido 7 días</div>
-          </div>
-          <button onClick={onClose} style={{ color: 'var(--fg-tertiary)', padding: 4 }}>
-            <Icon name="x" size={18} />
-          </button>
-        </div>
-
-        <div style={{ padding: '20px' }}>
-          {/* Name field */}
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', display: 'block', marginBottom: 6 }}>
-              Nombre del invitado (opcional)
-            </label>
-            <input
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="Ej. Juan Pérez"
-              style={{
-                width: '100%', padding: '8px 10px', fontSize: 13,
-                background: 'var(--bg)', border: '0.5px solid var(--border)',
-                borderRadius: 'var(--r-md)', color: 'var(--fg)', outline: 'none', boxSizing: 'border-box',
-              }}
-            />
-          </div>
-
-          {/* Role selector */}
-          <div style={{ marginBottom: 18 }}>
-            <label style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', display: 'block', marginBottom: 6 }}>
-              Rol asignado al registrarse
-            </label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {Object.entries(ROLE_CFG).map(([k, cfg]) => (
-                <button
-                  key={k}
-                  onClick={() => setRole(k)}
-                  style={{
-                    flex: 1, padding: '10px 0', borderRadius: 'var(--r-md)',
-                    border: `1.5px solid ${role === k ? cfg.color : 'var(--border)'}`,
-                    background: role === k ? cfg.bg : 'var(--bg)',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
-                    transition: 'all 0.12s',
-                  }}
-                >
-                  <Icon name={k === 'admin' ? 'shield-check' : 'user-cog'} size={20} color={role === k ? cfg.color : 'var(--fg-tertiary)'} />
-                  <span style={{ fontSize: 12, fontWeight: role === k ? 600 : 400, color: role === k ? cfg.color : 'var(--fg-secondary)' }}>
-                    {cfg.label}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Generated link */}
-          <div style={{ marginBottom: 18 }}>
-            <label style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', display: 'block', marginBottom: 6 }}>
-              Link de registro
-            </label>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 0,
-              background: 'var(--bg)', border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)',
-              overflow: 'hidden',
-            }}>
-              <div style={{
-                flex: 1, padding: '9px 12px', fontSize: 11,
-                color: 'var(--fg-secondary)', fontFamily: 'monospace',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }}>
-                {link}
-              </div>
-              <button
-                onClick={copyLink}
-                style={{
-                  padding: '9px 14px', borderLeft: '0.5px solid var(--border)',
-                  background: copied ? 'var(--success)' : 'var(--surface)',
-                  color: copied ? '#fff' : 'var(--fg-secondary)',
-                  display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 500,
-                  flexShrink: 0, transition: 'all 0.2s',
-                }}
-              >
-                <Icon name={copied ? 'check' : 'copy'} size={14} color={copied ? '#fff' : 'var(--fg-secondary)'} />
-                {copied ? '¡Copiado!' : 'Copiar'}
-              </button>
-            </div>
-            <div style={{ fontSize: 10, color: 'var(--fg-tertiary)', marginTop: 5, display: 'flex', alignItems: 'center', gap: 4 }}>
-              <Icon name="alert-circle" size={11} color="var(--fg-tertiary)" />
-              Link de un solo uso · expira en 7 días
-            </div>
-          </div>
-
-          {/* Share actions */}
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              onClick={copyLink}
-              style={{
-                flex: 1, padding: '10px 0', borderRadius: 'var(--r-md)',
-                background: 'var(--bg)', border: '0.5px solid var(--border)',
-                color: 'var(--fg)', fontSize: 13, fontWeight: 500,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              }}
-            >
-              <Icon name="link" size={15} />
-              Copiar link
-            </button>
-            <button
-              onClick={shareWhatsApp}
-              style={{
-                flex: 1, padding: '10px 0', borderRadius: 'var(--r-md)',
-                background: '#25D366', color: '#fff',
-                fontSize: 13, fontWeight: 500,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              }}
-            >
-              <Icon name="brand-whatsapp" size={15} color="#fff" />
-              Enviar por WhatsApp
-            </button>
-            <button
-              onClick={() => { window.open(`mailto:?subject=Invitación KIUVO CRM&body=Te invito a unirte: ${link}`) }}
-              style={{
-                flex: 1, padding: '10px 0', borderRadius: 'var(--r-md)',
-                background: 'var(--surface)', border: '0.5px solid var(--border)',
-                color: 'var(--fg)', fontSize: 13, fontWeight: 500,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              }}
-            >
-              <Icon name="mail" size={15} />
-              Email
-            </button>
+    <Modal title="Agregar vendedor" onClose={onClose} footer={<Button block onClick={onClose}>Entendido</Button>}>
+      <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', padding: '4px 0 8px' }}>
+        <span className="k-avatar" style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}>
+          <Icon name="user-plus" size={20} />
+        </span>
+        <div style={{ fontSize: 15, lineHeight: 1.5 }}>
+          Las cuentas nuevas se crean desde Supabase (Authentication → Users). Al crearse, el vendedor aparece aquí automáticamente.
+          <div className="k-muted" style={{ fontSize: 13, marginTop: 10 }}>
+            Toda cuenta nueva entra como vendedor. Desde esta pantalla puedes ajustar su meta mensual.
           </div>
         </div>
       </div>
+    </Modal>
+  )
+}
+
+function Section({ label, children }) {
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <Label>{label}</Label>
+      {children}
     </div>
   )
 }
 
-// ─── Detail Panel ─────────────────────────────────────────────────────────────
+function InfoRow({ icon, children, action }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 48, padding: '6px 6px 6px 16px', background: 'var(--surface)', borderRadius: 'var(--r-md)' }}>
+      <Icon name={icon} size={18} color="var(--fg-secondary)" />
+      <div style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis' }}>{children}</div>
+      {action}
+    </div>
+  )
+}
+
+// ─── Detail ───────────────────────────────────────────────────────────────────
 function SellerDetailPanel({ seller, ext: extProp, onUpdateExt, onClose }) {
   const ext = extProp || { role: 'seller', status: 'active', zone: '—', email: '', lastSeen: '—', meta: seller?.goal || 0 }
   const [tab, setTab]         = useState('activity')
@@ -267,11 +81,9 @@ function SellerDetailPanel({ seller, ext: extProp, onUpdateExt, onClose }) {
   const [metaDraft, setMetaDraft] = useState(String(ext.meta))
   const [editZone, setEditZone]  = useState(false)
   const [zoneDraft, setZoneDraft] = useState(ext.zone)
-  const [roleOpen, setRoleOpen]  = useState(false)
-  const roleBtnRef = useRef(null)
 
-  const pct        = Math.round((seller.current / (ext.meta || seller.goal)) * 100)
-  const compColor  = seller.compliance >= 85 ? 'var(--success)' : seller.compliance >= 75 ? 'var(--warning)' : 'var(--danger)'
+  const goal       = ext.meta || seller.goal
+  const pct        = Math.round((seller.current / goal) * 100)
   const roleCfg    = ROLE_CFG[ext.role] || ROLE_CFG.seller
   const acts       = SELLER_ACTIVITY[seller.init] || []
 
@@ -285,345 +97,165 @@ function SellerDetailPanel({ seller, ext: extProp, onUpdateExt, onClose }) {
     setEditZone(false)
   }
 
+  const kpis = [
+    { label: 'Meta',         value: fmt(goal) },
+    { label: 'Avance',       value: fmt(seller.current) },
+    { label: 'Prospectos',   value: seller.prospects },
+    { label: 'Ganado total', value: fmt(seller.won) },
+  ]
+
   return (
-    <div style={{
-      width: 340, flexShrink: 0, borderLeft: '0.5px solid var(--border)',
-      background: 'var(--surface)', display: 'flex', flexDirection: 'column',
-      animation: 'slideInRight 0.18s ease',
-    }}>
-      <style>{`@keyframes slideInRight { from { transform:translateX(20px);opacity:0 } to { transform:translateX(0);opacity:1 } }`}</style>
-
-      {/* Header */}
-      <div style={{ padding: '16px 18px', borderBottom: '0.5px solid var(--border)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>Perfil del vendedor</div>
-          <button onClick={onClose} style={{ color: 'var(--fg-tertiary)', padding: 2 }}>
-            <Icon name="x" size={16} />
-          </button>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{
-            width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
-            background: seller.color + '22', color: seller.color,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 15, fontWeight: 600, border: `2px solid ${seller.color}44`,
-          }}>{seller.init}</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--fg)' }}>{seller.name}</div>
-            <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginTop: 1 }}>{ext.email}</div>
-          </div>
-        </div>
-
-        {/* Status + role row */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
-          {/* Role badge + dropdown */}
-          <div ref={roleBtnRef} style={{ position: 'relative' }}>
-            <button
-              onClick={() => setRoleOpen(v => !v)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                padding: '4px 10px', borderRadius: 'var(--r-full)',
-                background: roleCfg.bg, color: roleCfg.color,
-                fontSize: 11, fontWeight: 500, border: `1px solid ${roleCfg.color}40`,
-              }}
-            >
-              <Icon name={ext.role === 'admin' ? 'shield-check' : 'user-cog'} size={12} color={roleCfg.color} />
-              {roleCfg.label}
-              <Icon name="chevron-down" size={10} color={roleCfg.color} style={{ transition: 'transform 0.15s', transform: roleOpen ? 'rotate(180deg)' : 'none' }} />
-            </button>
-            {roleOpen && (
-              <RoleDropdown current={ext.role} onChange={v => { onUpdateExt('role', v); setRoleOpen(false) }} onClose={() => setRoleOpen(false)} />
-            )}
-          </div>
-
-          {/* Status toggle */}
-          <button
-            onClick={() => onUpdateExt('status', ext.status === 'active' ? 'inactive' : 'active')}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              padding: '4px 10px', borderRadius: 'var(--r-full)', fontSize: 11, fontWeight: 500,
-              background: ext.status === 'active' ? '#1D9E7518' : 'var(--bg-secondary)',
-              color: ext.status === 'active' ? 'var(--success)' : 'var(--fg-tertiary)',
-              border: `1px solid ${ext.status === 'active' ? '#1D9E7540' : 'var(--border)'}`,
-              transition: 'all 0.15s',
-            }}
-          >
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: ext.status === 'active' ? 'var(--success)' : 'var(--fg-tertiary)', flexShrink: 0 }} />
-            {ext.status === 'active' ? 'Activo' : 'Inactivo'}
-          </button>
-
-          <div style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--fg-tertiary)' }}>
-            {ext.lastSeen}
-          </div>
+    <Modal title="Perfil del vendedor" onClose={onClose}>
+      {/* Encabezado */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 12 }}>
+        <Avatar initials={seller.init} color={seller.color} size="lg" />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="k-h2">{seller.name}</div>
+          {ext.email && <div className="k-muted" style={{ fontSize: 13, marginTop: 2 }}>{ext.email}</div>}
         </div>
       </div>
-
-      {/* Tabs */}
-      <div style={{
-        display: 'flex', borderBottom: '0.5px solid var(--border)', flexShrink: 0,
-        padding: '0 18px', background: 'var(--bg)',
-      }}>
-        {[['activity', 'history', 'Actividad'], ['config', 'settings', 'Configuración']].map(([id, icon, label]) => (
-          <button
-            key={id}
-            onClick={() => setTab(id)}
-            style={{
-              padding: '10px 14px', fontSize: 12, fontWeight: tab === id ? 600 : 400,
-              color: tab === id ? 'var(--kiuvo-blue)' : 'var(--fg-secondary)',
-              borderBottom: tab === id ? '2px solid var(--kiuvo-blue)' : '2px solid transparent',
-              display: 'flex', alignItems: 'center', gap: 5, marginBottom: -1,
-              transition: 'color 0.12s',
-            }}
-          >
-            <Icon name={icon} size={13} />
-            {label}
-          </button>
-        ))}
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 18 }}>
+        <Pill tone={roleCfg.tone} icon={roleCfg.icon}>{roleCfg.label}</Pill>
+        <StatusPill status={ext.status} />
+        <span className="k-dim" style={{ fontSize: 13, marginLeft: 'auto' }}>Último acceso: {ext.lastSeen}</span>
       </div>
 
-      {/* ── Actividad tab ── */}
+      <Segmented
+        surface value={tab} onChange={setTab} style={{ marginBottom: 18 }}
+        options={[
+          { id: 'activity', label: 'Actividad',     icon: 'history' },
+          { id: 'config',   label: 'Configuración', icon: 'settings' },
+        ]}
+      />
+
+      {/* ── Actividad ── */}
       {tab === 'activity' && (
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 18px' }}>
-          {/* KPI grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
-            {[
-              { label: 'Meta',           value: fmt(ext.meta || seller.goal), icon: 'target',      color: 'var(--kiuvo-blue)' },
-              { label: 'Avance',         value: fmt(seller.current),          icon: 'trending-up', color: pct >= 80 ? 'var(--success)' : 'var(--warning)' },
-              { label: 'Prospectos',     value: seller.prospects,             icon: 'users',       color: 'var(--fg)' },
-              { label: 'Ganado total',   value: fmt(seller.won),              icon: 'trophy',      color: 'var(--success)' },
-            ].map(m => (
-              <div key={m.label} style={{
-                padding: '10px 12px', background: 'var(--bg)',
-                borderRadius: 'var(--r-md)', border: '0.5px solid var(--border)',
-                display: 'flex', alignItems: 'center', gap: 8,
-              }}>
-                <div style={{ width: 28, height: 28, borderRadius: 8, background: m.color + '15', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Icon name={m.icon} size={14} color={m.color} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 10, color: 'var(--fg-tertiary)' }}>{m.label}</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)', fontVariantNumeric: 'tabular-nums' }}>{m.value}</div>
-                </div>
-              </div>
+        <div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10, marginBottom: 18 }}>
+            {kpis.map(m => (
+              <Card key={m.label} style={{ padding: 14 }}>
+                <div className="k-muted" style={{ fontSize: 13 }}>{m.label}</div>
+                <div className="k-num" style={{ fontSize: 22, marginTop: 8 }}>{m.value}</div>
+              </Card>
             ))}
           </div>
 
-          {/* Meta progress */}
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 5 }}>
-              <span style={{ color: 'var(--fg-secondary)' }}>Meta mensual</span>
-              <span style={{ fontWeight: 600, color: compColor }}>{pct}%</span>
+          <Card style={{ marginBottom: 18 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+              <span style={{ fontSize: 14, fontWeight: 600 }}>Meta mensual</span>
+              <span className="k-num" style={{ fontSize: 18 }}>{pct}%</span>
             </div>
-            <div style={{ height: 6, background: 'var(--bg-tertiary)', borderRadius: 3, overflow: 'hidden' }}>
-              <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', background: pct >= 80 ? 'var(--success)' : seller.color, borderRadius: 3, transition: 'width 0.4s' }} />
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--fg-tertiary)', marginTop: 3 }}>
+            <ProgressBar value={seller.current} max={goal} color={pct >= 80 ? 'var(--success)' : 'var(--primary-bg)'} />
+            <div className="k-dim" style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginTop: 6 }}>
               <span>{fmt(seller.current)}</span>
-              <span>{fmt(ext.meta || seller.goal)}</span>
+              <span>{fmt(goal)}</span>
             </div>
-          </div>
 
-          {/* Compliance */}
-          <div style={{ marginBottom: 18 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 5 }}>
-              <span style={{ color: 'var(--fg-secondary)' }}>Cumplimiento seguimiento</span>
-              <span style={{ fontWeight: 600, color: compColor }}>{seller.compliance}%</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '18px 0 8px' }}>
+              <span style={{ fontSize: 14, fontWeight: 600 }}>Cumplimiento de seguimiento</span>
+              <Pill tone={compTone(seller.compliance)}>{seller.compliance}%</Pill>
             </div>
-            <div style={{ height: 4, background: 'var(--bg-tertiary)', borderRadius: 2, overflow: 'hidden' }}>
-              <div style={{ width: `${seller.compliance}%`, height: '100%', background: compColor, borderRadius: 2 }} />
-            </div>
-          </div>
+            <ProgressBar value={seller.compliance} max={100} color="var(--accent-2)" height={6} />
+          </Card>
 
-          {/* Activity timeline */}
-          <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--fg-secondary)', marginBottom: 10 }}>Actividad reciente</div>
-          {acts.length === 0 && (
-            <div style={{ textAlign: 'center', color: 'var(--fg-tertiary)', fontSize: 12, padding: '16px 0' }}>
-              Sin actividad registrada.
-            </div>
-          )}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-            {acts.map((a, i) => {
-              const kc = KIND_CFG[a.kind] || KIND_CFG.visit
-              return (
-                <div key={i} style={{
-                  display: 'flex', gap: 10, paddingBottom: 12,
-                  borderLeft: i < acts.length - 1 ? `1.5px solid var(--border)` : 'none',
-                  paddingLeft: 14, marginLeft: 5, position: 'relative',
-                }}>
-                  {/* dot */}
-                  <div style={{
-                    position: 'absolute', left: -5, top: 2,
-                    width: 10, height: 10, borderRadius: '50%',
-                    background: kc.color, border: '2px solid var(--surface)',
-                    flexShrink: 0,
-                  }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 12, color: 'var(--fg)' }}>
-                      <span style={{ color: 'var(--fg-secondary)' }}>{a.what}</span>{' '}
-                      <span style={{ fontWeight: 500 }}>{a.target}</span>
-                      {a.detail && <span style={{ color: kc.color, fontWeight: 500, marginLeft: 4 }}>· {a.detail}</span>}
+          <Label>Actividad reciente</Label>
+          {acts.length === 0 ? (
+            <Empty icon="history">Sin actividad registrada.</Empty>
+          ) : (
+            <Card flush>
+              {acts.map((a, i) => (
+                <div key={i} className="k-row">
+                  <span className="k-avatar k-avatar--sm" style={{ background: 'var(--bg-secondary)', color: 'var(--fg)' }}>
+                    <Icon name={KIND_ICON[a.kind] || KIND_ICON.visit} size={15} />
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14 }}>
+                      <span className="k-muted">{a.what}</span>{' '}
+                      <span style={{ fontWeight: 600 }}>{a.target}</span>
+                      {a.detail && <span className="k-muted"> · {a.detail}</span>}
                     </div>
-                    <div style={{ fontSize: 10, color: 'var(--fg-tertiary)', marginTop: 2 }}>{a.time}</div>
+                    <div className="k-dim" style={{ fontSize: 12, marginTop: 2 }}>{a.time}</div>
                   </div>
                 </div>
-              )
-            })}
-          </div>
+              ))}
+            </Card>
+          )}
         </div>
       )}
 
-      {/* ── Configuración tab ── */}
+      {/* ── Configuración ── */}
       {tab === 'config' && (
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 18px' }}>
-
-          {/* Rol */}
+        <div>
           <Section label="Rol en el sistema">
-            <div style={{ display: 'flex', gap: 8 }}>
-              {Object.entries(ROLE_CFG).map(([k, cfg]) => (
-                <button
-                  key={k}
-                  onClick={() => onUpdateExt('role', k)}
-                  style={{
-                    flex: 1, padding: '10px 0', borderRadius: 'var(--r-md)',
-                    border: `1.5px solid ${ext.role === k ? cfg.color : 'var(--border)'}`,
-                    background: ext.role === k ? cfg.bg : 'var(--bg)',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
-                    transition: 'all 0.12s',
-                  }}
-                >
-                  <Icon name={k === 'admin' ? 'shield-check' : 'user-cog'} size={20} color={ext.role === k ? cfg.color : 'var(--fg-tertiary)'} />
-                  <span style={{ fontSize: 12, fontWeight: ext.role === k ? 600 : 400, color: ext.role === k ? cfg.color : 'var(--fg-secondary)' }}>
-                    {cfg.label}
-                  </span>
-                </button>
-              ))}
-            </div>
+            <Segmented size="lg" surface options={ROLE_OPTIONS} value={ext.role} onChange={k => onUpdateExt('role', k)} />
           </Section>
 
-          {/* Estado */}
           <Section label="Estado de la cuenta">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'var(--bg)', border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)' }}>
-              <div>
-                <div style={{ fontSize: 13, color: 'var(--fg)', fontWeight: 500 }}>
-                  {ext.status === 'active' ? 'Cuenta activa' : 'Cuenta desactivada'}
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginTop: 1 }}>
-                  {ext.status === 'active' ? 'El vendedor puede iniciar sesión' : 'No puede iniciar sesión'}
-                </div>
+            <InfoRow
+              icon={ext.status === 'active' ? 'circle-check' : 'circle-dashed'}
+              action={
+                <Button variant={ext.status === 'active' ? 'danger' : 'soft'} size="sm"
+                  onClick={() => onUpdateExt('status', ext.status === 'active' ? 'inactive' : 'active')}>
+                  {ext.status === 'active' ? 'Desactivar' : 'Reactivar'}
+                </Button>
+              }
+            >
+              {ext.status === 'active' ? 'Cuenta activa' : 'Cuenta desactivada'}
+              <div className="k-dim" style={{ fontSize: 12, fontWeight: 400 }}>
+                {ext.status === 'active' ? 'El vendedor puede iniciar sesión' : 'No puede iniciar sesión'}
               </div>
-              <button
-                onClick={() => onUpdateExt('status', ext.status === 'active' ? 'inactive' : 'active')}
-                style={{ padding: '6px 14px', borderRadius: 'var(--r-full)', fontSize: 12, fontWeight: 500,
-                  background: ext.status === 'active' ? 'var(--success)' : 'var(--bg-tertiary)',
-                  color: ext.status === 'active' ? '#fff' : 'var(--fg-secondary)',
-                  transition: 'all 0.15s',
-                }}
-              >
-                {ext.status === 'active' ? 'Activo' : 'Inactivo'}
-              </button>
-            </div>
+            </InfoRow>
           </Section>
 
-          {/* Zona */}
           <Section label="Zona asignada">
             {editZone ? (
-              <div style={{ display: 'flex', gap: 6 }}>
+              <div style={{ display: 'flex', gap: 8 }}>
                 <input
                   autoFocus
+                  className="k-input"
                   value={zoneDraft}
                   onChange={e => setZoneDraft(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') saveZone(); if (e.key === 'Escape') setEditZone(false) }}
-                  style={{ flex: 1, padding: '8px 10px', fontSize: 13, background: 'var(--bg)', border: '0.5px solid var(--kiuvo-blue)', borderRadius: 'var(--r-md)', color: 'var(--fg)', outline: 'none' }}
                 />
-                <button onClick={saveZone} style={{ padding: '8px 12px', borderRadius: 'var(--r-md)', background: 'var(--kiuvo-blue)', color: '#fff', fontSize: 12 }}>
-                  <Icon name="check" size={14} color="#fff" />
-                </button>
-                <button onClick={() => setEditZone(false)} style={{ padding: '8px 12px', borderRadius: 'var(--r-md)', background: 'var(--bg)', border: '0.5px solid var(--border)', color: 'var(--fg)', fontSize: 12 }}>
-                  <Icon name="x" size={14} />
-                </button>
+                <IconButton icon="check" label="Guardar zona" variant="ink" onClick={saveZone} />
+                <IconButton icon="x" label="Cancelar" variant="soft" onClick={() => setEditZone(false)} />
               </div>
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px', background: 'var(--bg)', border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                  <Icon name="map-pin" size={14} color="var(--fg-secondary)" />
-                  <span style={{ fontSize: 13, color: 'var(--fg)', fontWeight: 500 }}>{ext.zone}</span>
-                </div>
-                <button onClick={() => setEditZone(true)} style={{ color: 'var(--fg-tertiary)' }}>
-                  <Icon name="pencil" size={14} />
-                </button>
-              </div>
+              <InfoRow icon="map-pin" action={<IconButton icon="pencil" label="Editar zona" variant="soft" iconSize={18} onClick={() => setEditZone(true)} />}>
+                {ext.zone}
+              </InfoRow>
             )}
           </Section>
 
-          {/* Meta mensual */}
           <Section label="Meta mensual de ventas">
             {editMeta ? (
-              <div style={{ display: 'flex', gap: 6 }}>
-                <div style={{ position: 'relative', flex: 1 }}>
-                  <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: 'var(--fg-tertiary)' }}>$</span>
-                  <input
-                    autoFocus
-                    value={metaDraft}
-                    onChange={e => setMetaDraft(e.target.value.replace(/\D/g, ''))}
-                    onKeyDown={e => { if (e.key === 'Enter') saveMeta(); if (e.key === 'Escape') setEditMeta(false) }}
-                    style={{ width: '100%', padding: '8px 10px 8px 20px', fontSize: 13, background: 'var(--bg)', border: '0.5px solid var(--kiuvo-blue)', borderRadius: 'var(--r-md)', color: 'var(--fg)', outline: 'none', boxSizing: 'border-box' }}
-                  />
-                </div>
-                <button onClick={saveMeta} style={{ padding: '8px 12px', borderRadius: 'var(--r-md)', background: 'var(--kiuvo-blue)', color: '#fff' }}>
-                  <Icon name="check" size={14} color="#fff" />
-                </button>
-                <button onClick={() => setEditMeta(false)} style={{ padding: '8px 12px', borderRadius: 'var(--r-md)', background: 'var(--bg)', border: '0.5px solid var(--border)', color: 'var(--fg)' }}>
-                  <Icon name="x" size={14} />
-                </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  autoFocus
+                  className="k-input"
+                  inputMode="numeric"
+                  value={metaDraft}
+                  onChange={e => setMetaDraft(e.target.value.replace(/\D/g, ''))}
+                  onKeyDown={e => { if (e.key === 'Enter') saveMeta(); if (e.key === 'Escape') setEditMeta(false) }}
+                />
+                <IconButton icon="check" label="Guardar meta" variant="ink" onClick={saveMeta} />
+                <IconButton icon="x" label="Cancelar" variant="soft" onClick={() => setEditMeta(false)} />
               </div>
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px', background: 'var(--bg)', border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                  <Icon name="target" size={14} color="var(--fg-secondary)" />
-                  <span style={{ fontSize: 13, color: 'var(--fg)', fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>{fmt(ext.meta)}</span>
-                </div>
-                <button onClick={() => { setMetaDraft(String(ext.meta)); setEditMeta(true) }} style={{ color: 'var(--fg-tertiary)' }}>
-                  <Icon name="pencil" size={14} />
-                </button>
-              </div>
+              <InfoRow icon="target" action={<IconButton icon="pencil" label="Editar meta" variant="soft" iconSize={18} onClick={() => { setMetaDraft(String(ext.meta)); setEditMeta(true) }} />}>
+                <span className="k-num" style={{ fontSize: 18 }}>{fmt(ext.meta)}</span>
+              </InfoRow>
             )}
           </Section>
 
-          {/* Contact */}
-          <Section label="Contacto">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', background: 'var(--bg)', border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)' }}>
-              <Icon name="mail" size={14} color="var(--fg-secondary)" />
-              <span style={{ fontSize: 12, color: 'var(--fg)', fontVariantNumeric: 'tabular-nums' }}>{ext.email}</span>
-            </div>
-          </Section>
-
-          {/* Danger zone */}
-          <div style={{ marginTop: 24, padding: '14px', background: 'var(--danger-bg,#FF545410)', border: '0.5px solid var(--danger,#E53E3E)30', borderRadius: 'var(--r-md)' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--danger,#E53E3E)', marginBottom: 8, letterSpacing: 0.4 }}>ZONA DE PELIGRO</div>
-            <button
-              onClick={() => onUpdateExt('status', ext.status === 'inactive' ? 'active' : 'inactive')}
-              style={{
-                width: '100%', padding: '9px 0', borderRadius: 'var(--r-md)',
-                border: '0.5px solid var(--danger,#E53E3E)',
-                background: 'transparent', color: 'var(--danger,#E53E3E)',
-                fontSize: 12, fontWeight: 500,
-              }}
-            >
-              {ext.status === 'active' ? 'Desactivar cuenta' : 'Reactivar cuenta'}
-            </button>
-          </div>
+          {ext.email && (
+            <Section label="Contacto">
+              <InfoRow icon="mail">{ext.email}</InfoRow>
+            </Section>
+          )}
         </div>
       )}
-    </div>
-  )
-}
-
-function Section({ label, children }) {
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', marginBottom: 7, letterSpacing: 0.2 }}>{label}</div>
-      {children}
-    </div>
+    </Modal>
   )
 }
 
@@ -636,7 +268,6 @@ export default function TeamView() {
   const [statFilter,  setStatFilter]  = useState('all')
   const [selected,    setSelected]    = useState(null)
   const [showInvite,  setShowInvite]  = useState(false)
-  const [roleDropFor, setRoleDropFor] = useState(null) // init of seller with open dropdown
 
   const sellers = sellerList.map(s => ({
     ...s,
@@ -667,232 +298,102 @@ export default function TeamView() {
     }
   }
 
-  function handleRoleChange(init, newRole) {
-    updateExt(init, 'role', newRole)
-    setRoleDropFor(null)
-  }
-
   const sorted = [...filtered].sort((a, b) => {
     const statOrder = { active: 0, inactive: 1 }
     return (statOrder[a.ext.status] || 0) - (statOrder[b.ext.status] || 0) || (b.current / b.goal) - (a.current / a.goal)
   })
 
   return (
-    <div style={{ display: 'flex', height: '100%', minHeight: 0, width: '100%', minWidth: 0, overflow: 'hidden' }}>
+    <div className="sv-scroll" style={{ minWidth: 0 }}>
 
-      {/* ── Main area ── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
-
-        {/* Toolbar */}
-        <div style={{
-          padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 10,
-          borderBottom: '0.5px solid var(--border)', background: 'var(--bg)', flexShrink: 0,
-        }}>
-          {/* Invite button */}
-          <button
-            onClick={() => setShowInvite(true)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '7px 14px', borderRadius: 'var(--r-md)',
-              background: 'var(--kiuvo-blue)', color: '#fff',
-              fontSize: 13, fontWeight: 500, flexShrink: 0,
-            }}
-          >
-            <Icon name="user-plus" size={15} color="#fff" />
-            Invitar vendedor
-          </button>
-
-          <div style={{ width: '0.5px', height: 24, background: 'var(--border)' }} />
-
-          {/* Search */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '7px 12px', background: 'var(--surface)',
-            border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)', flex: 1, maxWidth: 260,
-          }}>
-            <Icon name="search" size={14} color="var(--fg-tertiary)" />
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Buscar vendedor, zona o email…"
-              style={{ border: 'none', background: 'transparent', fontSize: 13, color: 'var(--fg)', outline: 'none', width: '100%' }}
-            />
-          </div>
-
-          {/* Role filter */}
-          <div style={{ display: 'flex', gap: 3, background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)', padding: 2 }}>
-            {[['all', 'Todos'], ['seller', 'Vendedores'], ['admin', 'Admins']].map(([k, l]) => (
-              <button key={k} onClick={() => setRoleFilter(k)} style={{
-                padding: '4px 10px', borderRadius: 'var(--r-sm)', fontSize: 11,
-                background: roleFilter === k ? 'var(--bg)' : 'transparent',
-                color: roleFilter === k ? 'var(--fg)' : 'var(--fg-secondary)',
-                fontWeight: roleFilter === k ? 500 : 400,
-                border: roleFilter === k ? '0.5px solid var(--border)' : 'none',
-              }}>{l}</button>
-            ))}
-          </div>
-
-          {/* Status filter */}
-          <div style={{ display: 'flex', gap: 3, background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)', padding: 2 }}>
-            {[['all', 'Todos'], ['active', 'Activos'], ['inactive', 'Inactivos']].map(([k, l]) => (
-              <button key={k} onClick={() => setStatFilter(k)} style={{
-                padding: '4px 10px', borderRadius: 'var(--r-sm)', fontSize: 11,
-                background: statFilter === k ? 'var(--bg)' : 'transparent',
-                color: statFilter === k ? 'var(--fg)' : 'var(--fg-secondary)',
-                fontWeight: statFilter === k ? 500 : 400,
-                border: statFilter === k ? '0.5px solid var(--border)' : 'none',
-              }}>{l}</button>
-            ))}
-          </div>
-
-          <div style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--fg-tertiary)' }}>
-            {filtered.length} vendedor{filtered.length !== 1 ? 'es' : ''}
-          </div>
-        </div>
-
-        {/* Table */}
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
-              <tr style={{ background: 'var(--bg-secondary)' }}>
-                {['Vendedor', 'Rol', 'Zona', 'Meta mensual', 'Cumplimiento', 'Prospectos', 'Último acceso', 'Estado', ''].map((h, i) => (
-                  <th key={i} style={{
-                    padding: '9px 14px', textAlign: i === 0 ? 'left' : 'center',
-                    fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)',
-                    borderBottom: '0.5px solid var(--border)', whiteSpace: 'nowrap',
-                  }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map(s => {
-                const { ext } = s
-                const roleCfg = ROLE_CFG[ext.role] || ROLE_CFG.seller
-                const compColor = s.compliance >= 85 ? 'var(--success)' : s.compliance >= 75 ? 'var(--warning)' : 'var(--danger)'
-                const pct = Math.round((s.current / (ext.meta || s.goal)) * 100)
-                const isSelected = selected?.init === s.init
-                const isInactive = ext.status === 'inactive'
-
-                return (
-                  <tr
-                    key={s.id}
-                    onClick={() => { setSelected(isSelected ? null : { ...s }); setRoleDropFor(null) }}
-                    style={{
-                      cursor: 'pointer',
-                      background: isSelected ? 'var(--kiuvo-blue-soft)' : 'transparent',
-                      opacity: isInactive ? 0.55 : 1,
-                      transition: 'background 0.1s, opacity 0.15s',
-                    }}
-                  >
-                    {/* Vendedor */}
-                    <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <div style={{
-                          width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
-                          background: s.color + '22', color: s.color,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: 11, fontWeight: 600,
-                        }}>{s.init}</div>
-                        <div>
-                          <div style={{ fontWeight: 500, color: 'var(--fg)' }}>{s.name}</div>
-                          <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginTop: 1 }}>{ext.email}</div>
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* Rol (clickable dropdown) */}
-                    <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', textAlign: 'center' }}>
-                      <div style={{ position: 'relative', display: 'inline-block' }}>
-                        <button
-                          onClick={e => { e.stopPropagation(); setRoleDropFor(prev => prev === s.init ? null : s.init) }}
-                          style={{
-                            display: 'inline-flex', alignItems: 'center', gap: 4,
-                            padding: '3px 10px', borderRadius: 'var(--r-full)',
-                            background: roleCfg.bg, color: roleCfg.color,
-                            fontSize: 11, fontWeight: 500, border: `1px solid ${roleCfg.color}40`,
-                          }}
-                        >
-                          <Icon name={ext.role === 'admin' ? 'shield-check' : 'user-cog'} size={11} color={roleCfg.color} />
-                          {roleCfg.label}
-                          <Icon name="chevron-down" size={9} color={roleCfg.color} />
-                        </button>
-                        {roleDropFor === s.init && (
-                          <RoleDropdown
-                            current={ext.role}
-                            onChange={role => handleRoleChange(s.init, role)}
-                            onClose={() => setRoleDropFor(null)}
-                          />
-                        )}
-                      </div>
-                    </td>
-
-                    {/* Zona */}
-                    <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', textAlign: 'center', fontSize: 12, color: 'var(--fg-secondary)' }}>
-                      {ext.zone}
-                    </td>
-
-                    {/* Meta mensual con barra */}
-                    <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', textAlign: 'center' }}>
-                      <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--fg)', fontVariantNumeric: 'tabular-nums', marginBottom: 3 }}>
-                        {pct}%
-                      </div>
-                      <div style={{ height: 3, background: 'var(--bg-tertiary)', borderRadius: 2, width: 80, margin: '0 auto' }}>
-                        <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', background: pct >= 80 ? 'var(--success)' : s.color, borderRadius: 2 }} />
-                      </div>
-                      <div style={{ fontSize: 10, color: 'var(--fg-tertiary)', marginTop: 2, fontVariantNumeric: 'tabular-nums' }}>
-                        {fmt(s.current)} / {fmt(ext.meta)}
-                      </div>
-                    </td>
-
-                    {/* Cumplimiento */}
-                    <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', textAlign: 'center' }}>
-                      <span style={{
-                        padding: '3px 9px', borderRadius: 'var(--r-full)', fontSize: 11, fontWeight: 500,
-                        background: compColor + '18', color: compColor,
-                      }}>{s.compliance}%</span>
-                    </td>
-
-                    {/* Prospectos */}
-                    <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', textAlign: 'center', color: 'var(--fg)', fontVariantNumeric: 'tabular-nums' }}>
-                      {s.prospects}
-                    </td>
-
-                    {/* Último acceso */}
-                    <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', textAlign: 'center', fontSize: 11, color: 'var(--fg-tertiary)' }}>
-                      {ext.lastSeen}
-                    </td>
-
-                    {/* Estado */}
-                    <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', textAlign: 'center' }}>
-                      <button
-                        onClick={e => { e.stopPropagation(); updateExt(s.init, 'status', ext.status === 'active' ? 'inactive' : 'active') }}
-                        style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 5,
-                          padding: '3px 9px', borderRadius: 'var(--r-full)', fontSize: 11, fontWeight: 500,
-                          background: ext.status === 'active' ? '#1D9E7518' : 'var(--bg-secondary)',
-                          color: ext.status === 'active' ? 'var(--success)' : 'var(--fg-tertiary)',
-                          border: `1px solid ${ext.status === 'active' ? '#1D9E7540' : 'var(--border)'}`,
-                          transition: 'all 0.15s',
-                        }}
-                      >
-                        <span style={{ width: 5, height: 5, borderRadius: '50%', background: ext.status === 'active' ? 'var(--success)' : 'var(--fg-tertiary)', flexShrink: 0 }} />
-                        {ext.status === 'active' ? 'Activo' : 'Inactivo'}
-                      </button>
-                    </td>
-
-                    {/* Arrow */}
-                    <td style={{ padding: '11px 10px', borderBottom: '0.5px solid var(--border)', textAlign: 'center' }}>
-                      <Icon name="chevron-right" size={14} color="var(--fg-tertiary)" />
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+      {/* Toolbar */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+        <SearchInput small value={search} onChange={setSearch} placeholder="Buscar vendedor, zona o email…" style={{ flex: '1 1 220px', maxWidth: 320 }} />
+        <Segmented value={roleFilter} onChange={setRoleFilter}
+          options={[{ id: 'all', label: 'Todos' }, { id: 'seller', label: 'Vendedores' }, { id: 'admin', label: 'Admins' }]} />
+        <Segmented value={statFilter} onChange={setStatFilter}
+          options={[{ id: 'all', label: 'Todos' }, { id: 'active', label: 'Activos' }, { id: 'inactive', label: 'Inactivos' }]} />
+        <div style={{ flex: 1 }} />
+        <span className="k-dim" style={{ fontSize: 13 }}>
+          {filtered.length} vendedor{filtered.length !== 1 ? 'es' : ''}
+        </span>
+        <Button variant="accent" icon="user-plus" onClick={() => setShowInvite(true)}>Agregar vendedor</Button>
       </div>
 
-      {/* ── Detail panel ── */}
+      {/* Table */}
+      <Card flush>
+        {sorted.length === 0 ? (
+          <Empty icon="users-group">Sin vendedores con estos filtros</Empty>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table className="k-table k-table--click" style={{ minWidth: 920 }}>
+              <thead>
+                <tr>
+                  {['Vendedor', 'Rol', 'Zona', 'Meta mensual', 'Cumplimiento', 'Prospectos', 'Último acceso', 'Estado', ''].map((h, i) => (
+                    <th key={i} style={{ textAlign: i === 0 || i === 3 ? 'left' : 'center' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {sorted.map(s => {
+                  const { ext } = s
+                  const roleCfg = ROLE_CFG[ext.role] || ROLE_CFG.seller
+                  const goal = ext.meta || s.goal
+                  const pct = Math.round((s.current / goal) * 100)
+                  const isInactive = ext.status === 'inactive'
+
+                  return (
+                    <tr key={s.id} onClick={() => setSelected({ ...s })} style={{ opacity: isInactive ? 0.55 : 1 }}>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <Avatar initials={s.init} color={s.color} />
+                          <div>
+                            <div style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{s.name}</div>
+                            {ext.email && <div className="k-dim" style={{ fontSize: 12, marginTop: 1 }}>{ext.email}</div>}
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <Pill tone={roleCfg.tone} icon={roleCfg.icon}>{roleCfg.label}</Pill>
+                      </td>
+                      <td className="k-muted" style={{ textAlign: 'center' }}>{ext.zone}</td>
+                      <td style={{ minWidth: 190 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+                          <span className="k-num" style={{ fontSize: 16 }}>{pct}%</span>
+                          <span className="k-dim" style={{ fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>{fmt(s.current)} / {fmt(ext.meta)}</span>
+                        </div>
+                        <ProgressBar value={s.current} max={goal} color={pct >= 80 ? 'var(--success)' : 'var(--primary-bg)'} height={6} />
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <Pill tone={compTone(s.compliance)}>{s.compliance}%</Pill>
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <span className="k-num" style={{ fontSize: 16 }}>{s.prospects}</span>
+                      </td>
+                      <td className="k-dim" style={{ textAlign: 'center', fontSize: 13, whiteSpace: 'nowrap' }}>{ext.lastSeen}</td>
+                      <td style={{ textAlign: 'center' }}>
+                        <button
+                          type="button"
+                          title={ext.status === 'active' ? 'Desactivar' : 'Reactivar'}
+                          onClick={e => { e.stopPropagation(); updateExt(s.init, 'status', ext.status === 'active' ? 'inactive' : 'active') }}
+                          style={{ minHeight: 36 }}
+                        >
+                          <StatusPill status={ext.status} />
+                        </button>
+                      </td>
+                      <td style={{ textAlign: 'center', width: 40 }}>
+                        <Icon name="chevron-right" size={18} color="var(--fg-tertiary)" />
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      {/* ── Detail ── */}
       {selected && (
         <SellerDetailPanel
           seller={selected}
@@ -902,7 +403,7 @@ export default function TeamView() {
         />
       )}
 
-      {/* ── Invite modal ── */}
+      {/* ── Alta ── */}
       {showInvite && <InviteModal onClose={() => setShowInvite(false)} />}
     </div>
   )

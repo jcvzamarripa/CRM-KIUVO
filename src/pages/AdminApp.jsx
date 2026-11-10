@@ -21,11 +21,14 @@ import GoalsView from '../components/admin/GoalsView'
 import ActivitiesView from '../components/admin/ActivitiesView'
 import SettingsView from '../components/admin/SettingsView'
 import ProductionOrdersView from '../components/admin/ProductionOrdersView'
+import SupervisionView from '../components/admin/SupervisionView'
 import useDashboardKPIs from '../hooks/useDashboardKPIs'
 import { useSalesTrend } from '../hooks/useSalesTrend'
+import { Card, Bone, Empty } from '../components/ui'
 
 const VIEW_META = {
-  dashboard:  { title: 'Dashboard',     subtitle: 'Resumen operativo del equipo · esta semana' },
+  dashboard:  { title: 'Dashboard',     subtitle: 'Resumen operativo del equipo · este mes' },
+  field:      { title: 'Supervisión',    subtitle: 'Visitas del día, verificación y tareas del equipo de campo' },
   pipeline:   { title: 'Embudo',         subtitle: 'Vista kanban de todos los prospectos' },
   prospects:  { title: 'Prospectos',     subtitle: 'Todos los prospectos del equipo' },
   map:        { title: 'Mapa',           subtitle: 'Actividad geográfica · últimos 7 días' },
@@ -35,177 +38,128 @@ const VIEW_META = {
   team:       { title: 'Equipo',         subtitle: 'Vendedores y cumplimiento de metas' },
   reports:      { title: 'Reportes',      subtitle: 'Análisis de ventas y métricas' },
   activities:   { title: 'Actividades',  subtitle: 'Historial completo de visitas, llamadas y acciones del equipo' },
-  goals:        { title: 'Metas',        subtitle: 'Objetivos y gamificación del equipo' },
+  goals:        { title: 'Metas',        subtitle: 'Objetivos por vendedor y por periodo' },
   production:   { title: 'Producción',    subtitle: 'Órdenes de producción generadas por el equipo de ventas' },
   settings:     { title: 'Configuración', subtitle: 'Perfil, apariencia y parámetros del sistema' },
 }
 
-function PlaceholderView({ icon, label }) {
+function PlaceholderView({ label }) {
   return (
-    <div style={{
-      flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      gap: 12, color: 'var(--fg-tertiary)',
-    }}>
-      <svg width={40} height={40} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="3" width="18" height="18" rx="2" /><line x1="9" y1="3" x2="9" y2="21" /><line x1="15" y1="3" x2="15" y2="21" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" />
-      </svg>
-      <div style={{ fontSize: 13 }}>{label} — próximamente</div>
+    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Empty icon="circle-dashed">{label} — próximamente</Empty>
     </div>
   )
 }
 
-const PULSE = `@keyframes pulse { 0%,100%{opacity:.35} 50%{opacity:.85} }`
-function Bone({ w, h, r = 4, style = {} }) {
-  return (
-    <div style={{
-      width: w, height: h, borderRadius: r,
-      background: 'var(--border)',
-      animation: 'pulse 1.4s ease-in-out infinite',
-      ...style,
-    }} />
-  )
-}
-
-// Skeleton placeholder for KPI cards while loading
 function KPISkeleton() {
   return (
-    <div style={{
-      background: 'var(--surface)', border: '0.5px solid var(--border)',
-      borderRadius: 'var(--r-lg)', padding: '16px 18px',
-      display: 'flex', flexDirection: 'column', gap: 8,
-    }}>
-      <style>{PULSE}</style>
-      <Bone w="55%" h={10} />
-      <Bone w="70%" h={22} />
-      <Bone w="80%" h={8} />
-    </div>
+    <Card style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <Bone w="55%" h={12} />
+      <Bone w="70%" h={30} />
+      <Bone w="80%" h={12} />
+    </Card>
   )
 }
 
-// Skeleton for a chart panel (span 8)
-function ChartSkeleton({ span = 8, h = 240 }) {
+function ChartSkeleton({ h = 240 }) {
   return (
-    <div className="card" style={{
-      padding: 20, gridColumn: `span ${span}`,
-      background: 'var(--surface)', display: 'flex', flexDirection: 'column', gap: 12,
-    }}>
-      <style>{PULSE}</style>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <Bone w={120} h={13} />
-          <Bone w={180} h={9} />
-        </div>
-        <Bone w={64} h={26} r={99} />
-      </div>
-      <div style={{ height: h, borderRadius: 8, background: 'var(--bg-secondary)', animation: 'pulse 1.4s ease-in-out infinite' }} />
-      <div style={{ display: 'flex', gap: 8 }}>
-        {[80, 60, 90, 50, 70].map((w, i) => <Bone key={i} w={w} h={8} />)}
-      </div>
-    </div>
+    <Card style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <Bone w={160} h={20} />
+      <Bone w={220} h={12} />
+      <Bone h={h} r="var(--r-md)" />
+    </Card>
   )
 }
 
-// Skeleton for a table/feed panel (span 4 or 8)
-function TableSkeleton({ span = 8 }) {
+function TableSkeleton() {
   return (
-    <div className="card" style={{
-      padding: 0, gridColumn: `span ${span}`,
-      background: 'var(--surface)', overflow: 'hidden',
-    }}>
-      <style>{PULSE}</style>
-      <div style={{ padding: '16px 20px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <Bone w={110} h={13} />
-          <Bone w={180} h={9} />
-        </div>
-      </div>
+    <Card style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <Bone w={160} h={20} />
       {[1, 2, 3, 4, 5].map(i => (
-        <div key={i} style={{
-          padding: '12px 20px', borderTop: '0.5px solid var(--border)',
-          display: 'flex', alignItems: 'center', gap: 12,
-        }}>
-          <Bone w={28} h={28} r="50%" />
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5 }}>
-            <Bone w="45%" h={11} />
-            <Bone w="30%" h={9} />
-          </div>
-          <Bone w={60} h={11} />
-          <Bone w={48} h={11} />
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Bone w={30} h={30} r="50%" />
+          <Bone w="40%" h={14} />
+          <div style={{ flex: 1 }} />
+          <Bone w={60} h={14} />
         </div>
       ))}
-    </div>
+    </Card>
   )
 }
 
-// Small panel skeleton (span 4)
-function SmallSkeleton({ span = 4 }) {
+function SmallSkeleton() {
   return (
-    <div className="card" style={{
-      padding: 20, gridColumn: `span ${span}`,
-      background: 'var(--surface)', display: 'flex', flexDirection: 'column', gap: 12,
-    }}>
-      <style>{PULSE}</style>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <Bone w={100} h={13} />
-        <Bone w={150} h={9} />
-      </div>
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {[1, 2, 3, 4].map(i => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Bone w={8} h={8} r="50%" />
-            <Bone w="60%" h={10} />
-            <div style={{ flex: 1 }} />
-            <Bone w={32} h={10} />
-          </div>
-        ))}
-      </div>
-    </div>
+    <Card style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14, height: '100%' }}>
+      <Bone w={140} h={20} />
+      {[1, 2, 3, 4].map(i => <Bone key={i} h={32} r="var(--r-full)" />)}
+    </Card>
   )
 }
 
 const RESPONSIVE_CSS = `
-  /* ── Sidebar drawer ── */
-  .admin-sidebar { transition: transform 0.22s cubic-bezier(.4,0,.2,1); }
-  @media (max-width: 1023px) {
-    .admin-sidebar {
-      position: fixed !important;
-      top: 0; left: 0; bottom: 0;
-      z-index: 300;
-      transform: translateX(-100%);
-      box-shadow: 4px 0 24px rgba(0,0,0,0.18);
-    }
-    .admin-sidebar.open { transform: translateX(0); }
+  /* ── Sidebar: bloque negro flotante ── */
+  .kiuvo .admin-sidebar {
+    width: 236px; flex-shrink: 0; margin: 10px 0 10px 10px;
+    display: flex; flex-direction: column; overflow: hidden;
+    background: #0E0E0E; color: #A9A9A4; border-radius: var(--r-xl);
+    transition: transform 0.22s cubic-bezier(.4,0,.2,1);
   }
-  @media (min-width: 1024px) {
-    .admin-sidebar { transform: none !important; position: relative !important; }
+  .kiuvo-dark .admin-sidebar { background: #1A1A18; }
+  @media (max-width: 1023px) {
+    .kiuvo .admin-sidebar {
+      position: fixed; top: 0; left: 0; bottom: 0; z-index: 300;
+      transform: translateX(calc(-100% - 20px));
+      box-shadow: var(--shadow-float);
+    }
+    .kiuvo .admin-sidebar.open { transform: translateX(0); }
   }
 
-  /* ── Backdrop ── */
+  .kiuvo .adm-nav__group {
+    padding: 16px 14px 6px; font-size: 12px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase; color: #6F6F6A;
+  }
+  .kiuvo .adm-nav__item {
+    display: flex; align-items: center; gap: 12px; width: 100%;
+    min-height: 42px; padding: 0 14px; border-radius: var(--r-full);
+    font-size: 14px; font-weight: 500; color: #A9A9A4; text-align: left;
+    transition: background 0.12s, color 0.12s;
+  }
+  .kiuvo .adm-nav__item:hover { background: rgba(255,255,255,0.08); color: #FFFFFF; }
+  .kiuvo .adm-nav__item[aria-current="page"] { background: var(--accent); color: var(--accent-fg); font-weight: 600; }
+  .kiuvo .adm-nav__logout {
+    width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.10); color: #FFFFFF;
+  }
+  .kiuvo .adm-nav__logout:hover { background: var(--coral); }
+
+  /* ── Fondo al abrir el menú en pantallas chicas ── */
   .admin-backdrop {
     display: none; position: fixed; inset: 0;
-    background: rgba(0,0,0,0.4); z-index: 299;
+    background: rgba(0,0,0,0.5); z-index: 299;
   }
   @media (max-width: 1023px) { .admin-backdrop.visible { display: block; } }
 
-  /* ── Hamburger ── */
-  .admin-hamburger { display: none; }
-  @media (max-width: 1023px) { .admin-hamburger { display: flex; } }
-
-  /* ── TopBar: ocultar elementos en pantallas pequeñas ── */
+  /* ── Barra superior ── */
+  .kiuvo .admin-topbar {
+    display: flex; align-items: center; gap: 14px; flex-shrink: 0;
+    padding: 20px 28px 8px; background: var(--bg);
+  }
+  .kiuvo .admin-hamburger { display: none; }
+  @media (max-width: 1023px) { .kiuvo .admin-hamburger { display: inline-flex; } }
   @media (max-width: 768px) {
-    .admin-topbar-search { display: none !important; }
-    .admin-topbar-period { display: none !important; }
-    .admin-topbar-export { display: none !important; }
+    .kiuvo .admin-topbar { padding: 12px 12px 4px; }
+    .kiuvo .admin-topbar .k-h1 { font-size: 22px; }
   }
 
   /* ── KPI grid ── */
-  .admin-kpi-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 16px; }
-  @media (max-width: 1280px) { .admin-kpi-grid { grid-template-columns: repeat(3, 1fr); } }
+  .admin-kpi-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 12px; }
+  @media (max-width: 1500px) { .admin-kpi-grid { grid-template-columns: repeat(3, 1fr); } }
   @media (max-width: 768px)  { .admin-kpi-grid { grid-template-columns: repeat(2, 1fr); } }
   @media (max-width: 480px)  { .admin-kpi-grid { grid-template-columns: 1fr; } }
 
   /* ── 12-col grid ── */
-  .admin-chart-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; margin-bottom: 16px; }
+  .admin-chart-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; margin-bottom: 12px; }
   .admin-col-8 { grid-column: span 8; min-width: 0; }
   .admin-col-4 { grid-column: span 4; min-width: 0; }
   @media (max-width: 1100px) {
@@ -214,13 +168,13 @@ const RESPONSIVE_CSS = `
   }
 
   /* ── Dashboard scroll padding ── */
-  .admin-dashboard-scroll { overflow-y: auto; padding: 20px 28px 28px; flex: 1; }
-  @media (max-width: 768px) { .admin-dashboard-scroll { padding: 12px 12px 20px; } }
+  .admin-dashboard-scroll { overflow-y: auto; padding: 12px 28px 32px; flex: 1; }
+  @media (max-width: 768px) { .admin-dashboard-scroll { padding: 12px 12px 24px; } }
 `
 
 export default function AdminApp({ dark, onToggleDark }) {
   const [activeNav,   setActiveNav]   = useState('dashboard')
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 1024)
   const { kpis, loading: kpiLoading } = useDashboardKPIs()
   const { trend: salesTrend }          = useSalesTrend({ days: 14 })
   const meta = VIEW_META[activeNav] || VIEW_META.dashboard
@@ -239,19 +193,19 @@ export default function AdminApp({ dark, onToggleDark }) {
           {kpiLoading || !kpis ? (
             Array.from({ length: 6 }).map((_, i) => <KPISkeleton key={i} />)
           ) : (<>
-            <KPICard label="Ventas totales"           value={kpis.salesTotal.value}              delta={kpis.salesTotal.delta}              deltaKind={kpis.salesTotal.deltaKind}              sub={kpis.salesTotal.sub}              accent="var(--kiuvo-blue)"         sparkline={salesTrend} />
-            <KPICard label="Prospectos activos"       value={kpis.prospectosActivos.value}       delta={kpis.prospectosActivos.delta}       deltaKind={kpis.prospectosActivos.deltaKind}       sub={kpis.prospectosActivos.sub}       accent="var(--info)"               />
+            <KPICard label="Ventas totales"           value={kpis.salesTotal.value}              delta={kpis.salesTotal.delta}              deltaKind={kpis.salesTotal.deltaKind}              sub={kpis.salesTotal.sub}              accent="var(--brand)"              sparkline={salesTrend} />
+            <KPICard label="Prospectos activos"       value={kpis.prospectosActivos.value}       delta={kpis.prospectosActivos.delta}       deltaKind={kpis.prospectosActivos.deltaKind}       sub={kpis.prospectosActivos.sub}       accent="var(--accent-2)"           />
             <KPICard label="Tasa de conversión"       value={kpis.tasaConversion.value}          delta={kpis.tasaConversion.delta}          deltaKind={kpis.tasaConversion.deltaKind}          sub={kpis.tasaConversion.sub}          accent="var(--success)"            />
-            <KPICard label="Ticket promedio"          value={kpis.ticketPromedio.value}          delta={kpis.ticketPromedio.delta}          deltaKind={kpis.ticketPromedio.deltaKind}          sub={kpis.ticketPromedio.sub}          accent="var(--stage-cotizacion)"   />
+            <KPICard label="Ticket promedio"          value={kpis.ticketPromedio.value}          delta={kpis.ticketPromedio.delta}          deltaKind={kpis.ticketPromedio.deltaKind}          sub={kpis.ticketPromedio.sub}          accent="var(--fg)"                 />
             <KPICard label="Cierres del mes"          value={kpis.cierresMes.value}              delta={kpis.cierresMes.delta}              deltaKind={kpis.cierresMes.deltaKind}              sub={kpis.cierresMes.sub}              accent="var(--warning)"            />
-            <KPICard label="Cotizaciones pendientes"  value={kpis.cotizacionesPendientes.value}  delta={kpis.cotizacionesPendientes.delta}  deltaKind={kpis.cotizacionesPendientes.deltaKind}  sub={kpis.cotizacionesPendientes.sub}  accent="var(--stage-negociacion)"  />
+            <KPICard label="Cotizaciones pendientes"  value={kpis.cotizacionesPendientes.value}  delta={kpis.cotizacionesPendientes.delta}  deltaKind={kpis.cotizacionesPendientes.deltaKind}  sub={kpis.cotizacionesPendientes.sub}  accent="var(--coral)"              />
           </>)}
         </div>
 
         {/* Sales + Funnel */}
         <div className="admin-chart-grid">
           {kpiLoading ? (
-            <><ChartSkeleton span={8} h={200} /><SmallSkeleton span={4} /></>
+            <><div className="admin-col-8"><ChartSkeleton h={200} /></div><div className="admin-col-4"><SmallSkeleton /></div></>
           ) : (<>
             <div className="admin-col-8"><SalesChart /></div>
             <div className="admin-col-4"><FunnelChart /></div>
@@ -261,7 +215,7 @@ export default function AdminApp({ dark, onToggleDark }) {
         {/* Team + Activity */}
         <div className="admin-chart-grid">
           {kpiLoading ? (
-            <><TableSkeleton span={8} /><SmallSkeleton span={4} /></>
+            <><div className="admin-col-8"><TableSkeleton /></div><div className="admin-col-4"><SmallSkeleton /></div></>
           ) : (<>
             <div className="admin-col-8"><TeamTable /></div>
             <div className="admin-col-4"><ActivityFeed /></div>
@@ -271,7 +225,7 @@ export default function AdminApp({ dark, onToggleDark }) {
         {/* Heatmap + Alerts */}
         <div className="admin-chart-grid" style={{ marginBottom: 0 }}>
           {kpiLoading ? (
-            <><ChartSkeleton span={8} h={160} /><SmallSkeleton span={4} /></>
+            <><div className="admin-col-8"><ChartSkeleton h={160} /></div><div className="admin-col-4"><SmallSkeleton /></div></>
           ) : (<>
             <div className="admin-col-8"><GeoHeatmap onOpenMap={() => handleNavChange('map')} /></div>
             <div className="admin-col-4"><AlertsPanel /></div>
@@ -279,6 +233,8 @@ export default function AdminApp({ dark, onToggleDark }) {
         </div>
       </div>
     )
+  } else if (activeNav === 'field') {
+    content = <SupervisionView />
   } else if (activeNav === 'prospects') {
     content = <ProspectsView />
   } else if (activeNav === 'team') {

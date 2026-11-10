@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react'
 import Icon from '../shared/Icon'
+import { Button, IconButton, Card, Field, Label } from '../ui'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase, isSupabaseConfigured } from '../../lib/supabase'
 
@@ -110,206 +111,114 @@ export default function ProfileScreen({ onBack }) {
     await refreshProfile()
   }
 
-  const inputStyle = {
-    width: '100%', padding: '11px 12px', boxSizing: 'border-box',
-    background: 'var(--bg)', border: '0.5px solid var(--border)',
-    borderRadius: 'var(--r-md)', fontSize: 14, color: 'var(--fg)',
-    outline: 'none', fontFamily: 'inherit',
-  }
-  const labelStyle = {
-    fontSize: 12, fontWeight: 500, color: 'var(--fg-secondary)',
-    display: 'block', marginBottom: 6,
-  }
-
   return (
-    <div style={{ background: 'var(--bg)', minHeight: '100%', paddingBottom: 92 }}>
+    <div style={{ background: 'var(--bg)', minHeight: '100%', paddingBottom: 120 }}>
 
       {/* Header */}
-      <div style={{ padding: '8px 16px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button onClick={onBack} style={{
-          width: 36, height: 36, borderRadius: '50%',
-          border: '0.5px solid var(--border)', background: 'var(--surface)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: 'var(--fg-secondary)', flexShrink: 0,
-        }}>
-          <Icon name="arrow-left" size={18} />
-        </button>
-        <div style={{ fontSize: 20, fontWeight: 500, color: 'var(--fg)' }}>Mi perfil</div>
+      <div className="k-screenhead">
+        <IconButton icon="arrow-left" label="Volver" onClick={onBack} />
+        <div className="k-screenhead__title">Mi perfil</div>
       </div>
 
       {/* Avatar */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0 16px 24px', gap: 12 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 14px 24px', gap: 12 }}>
         <div style={{ position: 'relative' }}>
           <div style={{
-            width: 88, height: 88, borderRadius: '50%',
+            width: 104, height: 104, borderRadius: '50%',
             background: displayAvatar ? 'transparent' : accent,
-            border: `3px solid ${accent}`,
+            boxShadow: `0 0 0 4px var(--bg), 0 0 0 7px ${accent}`,
             overflow: 'hidden',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 28, fontWeight: 600, color: '#fff',
-            boxShadow: `0 4px 20px ${accent}44`,
+            fontSize: 34, fontWeight: 700, color: 'var(--on-ink)',
           }}>
             {displayAvatar
               ? <img src={displayAvatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               : initials
             }
           </div>
-          <button
+          <IconButton
+            icon="camera" label="Cambiar foto" variant="ink" iconSize={20}
             onClick={() => fileRef.current?.click()}
-            style={{
-              position: 'absolute', bottom: 0, right: 0,
-              width: 28, height: 28, borderRadius: '50%',
-              background: 'var(--kiuvo-blue)', color: '#fff', border: '2px solid var(--bg)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            <Icon name="camera" size={13} />
-          </button>
+            style={{ position: 'absolute', bottom: -8, right: -12, boxShadow: '0 0 0 3px var(--bg)' }}
+          />
           <input ref={fileRef} type="file" accept="image/*" onChange={handlePhoto} style={{ display: 'none' }} />
         </div>
 
         {displayAvatar && (
-          <button onClick={handleRemovePhoto} style={{ fontSize: 12, color: 'var(--danger)', fontWeight: 500 }}>
-            Quitar foto
-          </button>
+          <Button variant="danger" size="sm" onClick={handleRemovePhoto} style={{ marginTop: 6 }}>Quitar foto</Button>
         )}
 
         {!editing && (
           <>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--fg)' }}>{name || profile?.full_name}</div>
-              <div style={{ fontSize: 13, color: 'var(--fg-secondary)', marginTop: 3 }}>
+              <div className="k-h1">{name || profile?.full_name}</div>
+              <div style={{ fontSize: 15, color: 'var(--fg-secondary)', marginTop: 4 }}>
                 {position || (profile?.role === 'admin' ? 'Administrador' : 'Vendedor de campo')}
               </div>
             </div>
-            <button onClick={() => setEditing(true)} style={{
-              padding: '8px 20px', borderRadius: 'var(--r-full)',
-              border: '0.5px solid var(--border)', background: 'var(--surface)',
-              fontSize: 13, fontWeight: 500, color: 'var(--fg)',
-              display: 'flex', alignItems: 'center', gap: 6,
-            }}>
-              <Icon name="pencil" size={14} />
+            <Button variant="soft" icon="pencil" onClick={() => setEditing(true)} style={{ background: 'var(--surface)' }}>
               Editar perfil
-            </button>
+            </Button>
           </>
         )}
       </div>
 
       {/* Edit form */}
       {editing && (
-        <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div>
-            <label style={labelStyle}>Nombre completo</label>
-            <input value={name} onChange={e => setName(e.target.value)} style={inputStyle} placeholder="Tu nombre" />
-          </div>
-          <div>
-            <label style={labelStyle}>Cargo / Rol</label>
-            <input value={position} onChange={e => setPosition(e.target.value)} style={inputStyle} placeholder="Ej. Vendedor de campo" />
-          </div>
+        <div style={{ padding: '0 14px' }}>
+          <Field label="Nombre completo">
+            <input className="k-input" value={name} onChange={e => setName(e.target.value)} placeholder="Tu nombre" />
+          </Field>
+          <Field label="Cargo / Rol">
+            <input className="k-input" value={position} onChange={e => setPosition(e.target.value)} placeholder="Ej. Vendedor de campo" />
+          </Field>
 
-          <div>
-            <label style={labelStyle}>Color de avatar</label>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <div className="k-field">
+            <span className="k-field__label">Color de avatar</span>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {ACCENT_COLORS.map(c => (
-                <button key={c} onClick={() => setAccent(c)} style={{
-                  width: 32, height: 32, borderRadius: '50%', background: c,
-                  border: accent === c ? '3px solid var(--fg)' : '3px solid transparent',
-                  outline: accent === c ? `2px solid ${c}` : 'none',
-                  outlineOffset: 2,
-                }} />
+                <button key={c} type="button" onClick={() => setAccent(c)} aria-label={`Color ${c}`} aria-pressed={accent === c}
+                  style={{ width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{
+                    width: 36, height: 36, borderRadius: '50%', background: c,
+                    boxShadow: accent === c ? '0 0 0 3px var(--bg), 0 0 0 6px var(--fg)' : 'none',
+                  }} />
+                </button>
               ))}
             </div>
           </div>
 
           {error && (
-            <div style={{
-              padding: '10px 14px', background: 'var(--danger-bg)',
-              border: '0.5px solid var(--danger-border)',
-              borderRadius: 'var(--r-md)', fontSize: 13, color: 'var(--danger-fg)',
-            }}>
+            <div style={{ padding: '12px 16px', marginBottom: 16, background: 'var(--coral-soft)', color: 'var(--coral-fg)', borderRadius: 'var(--r-md)', fontSize: 14 }}>
               {error}
             </div>
           )}
 
           {!canSave && (
-            <div style={{
-              padding: '10px 14px', background: 'var(--surface)',
-              border: '0.5px solid var(--border)',
-              borderRadius: 'var(--r-md)', fontSize: 12, color: 'var(--fg-secondary)',
-            }}>
+            <div style={{ padding: '12px 16px', marginBottom: 16, background: 'var(--surface)', color: 'var(--fg-secondary)', borderRadius: 'var(--r-md)', fontSize: 14 }}>
               Conecta Supabase para guardar cambios en la nube.
             </div>
           )}
 
           <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-            <button onClick={handleCancelEdit} style={{
-              flex: 1, padding: '12px 0', borderRadius: 'var(--r-md)',
-              border: '0.5px solid var(--border)', background: 'var(--surface)',
-              fontSize: 14, fontWeight: 500, color: 'var(--fg)',
-            }}>
-              Cancelar
-            </button>
-            <button onClick={handleSave} disabled={saving || !canSave} style={{
-              flex: 2, padding: '12px 0', borderRadius: 'var(--r-md)',
-              background: 'var(--kiuvo-blue)', color: '#fff',
-              fontSize: 14, fontWeight: 500,
-              opacity: (saving || !canSave) ? 0.65 : 1,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            }}>
-              {saving && (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
-                  style={{ animation: 'kiuvo-spin 0.7s linear infinite' }}>
-                  <path d="M12 2a10 10 0 0 1 10 10" />
-                </svg>
-              )}
+            <Button variant="soft" onClick={handleCancelEdit} style={{ flex: 1, background: 'var(--surface)' }}>Cancelar</Button>
+            <Button loading={saving} disabled={!canSave} onClick={handleSave} style={{ flex: 2 }}>
               {saving ? 'Guardando…' : 'Guardar cambios'}
-            </button>
+            </Button>
           </div>
-        </div>
-      )}
-
-      {/* Stats */}
-      {!editing && (
-        <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ height: '0.5px', background: 'var(--border)', margin: '8px 0 16px' }} />
-          <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--fg-secondary)', letterSpacing: 0.5, marginBottom: 4 }}>RESUMEN</div>
-          {[
-            { label: 'Prospectos activos', value: '34',            icon: 'users' },
-            { label: 'Visitas este mes',   value: '22',            icon: 'map-pin' },
-            { label: 'Meta alcanzada',     value: '68%',           icon: 'target' },
-            { label: 'Nivel de racha',     value: 'Nivel 4 · 5 días', icon: 'flame' },
-          ].map(item => (
-            <div key={item.label} style={{
-              padding: '12px 14px', background: 'var(--surface)',
-              border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)',
-              display: 'flex', alignItems: 'center', gap: 12,
-            }}>
-              <div style={{
-                width: 34, height: 34, borderRadius: 'var(--r-md)',
-                background: 'var(--kiuvo-blue-soft)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-              }}>
-                <Icon name={item.icon} size={16} color="var(--kiuvo-blue)" />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 11, color: 'var(--fg-tertiary)' }}>{item.label}</div>
-                <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg)', marginTop: 1 }}>{item.value}</div>
-              </div>
-            </div>
-          ))}
         </div>
       )}
 
       {saved && (
         <div style={{
-          position: 'fixed', bottom: 100, left: '50%', transform: 'translateX(-50%)',
-          background: 'var(--success)', color: '#fff',
-          padding: '10px 20px', borderRadius: 'var(--r-full)',
-          fontSize: 13, fontWeight: 500, zIndex: 300,
-          display: 'flex', alignItems: 'center', gap: 6,
-          boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+          position: 'fixed', bottom: 'calc(100px + env(safe-area-inset-bottom, 0px))', left: '50%', transform: 'translateX(-50%)',
+          background: 'var(--ink)', color: 'var(--on-ink)',
+          padding: '12px 20px', borderRadius: 'var(--r-full)',
+          fontSize: 14, fontWeight: 600, zIndex: 300, whiteSpace: 'nowrap',
+          display: 'flex', alignItems: 'center', gap: 8,
+          boxShadow: 'var(--shadow-float)',
         }}>
-          <Icon name="check" size={15} color="#fff" />
+          <Icon name="check" size={18} color="var(--accent)" />
           Perfil actualizado
         </div>
       )}

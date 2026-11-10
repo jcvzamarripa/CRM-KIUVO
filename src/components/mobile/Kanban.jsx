@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, Suspense, lazy } from 'react'
 import Icon from '../shared/Icon'
-import { Button } from '../ui'
+import { Button, IconButton, Card, Pill, Chip, Sheet, Label, Segmented, SearchInput, Field, Empty, Bone, ProgressBar } from '../ui'
 import { STAGES, STAGE_BY_ID } from '../../constants/stages'
 import { supabase, isSupabaseConfigured } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -15,7 +15,6 @@ const QuoteModal           = lazy(() => import('./QuoteModal'))
 const ProductionOrderModal = lazy(() => import('./ProductionOrderModal'))
 
 const fmt = n => '$' + (n ?? 0).toLocaleString('es-MX')
-const healthColor = { green: 'var(--success)', amber: 'var(--warning)', red: 'var(--danger)' }
 
 function fmtLast(ts) {
   if (!ts) return 'Sin contacto'
@@ -48,27 +47,45 @@ function normalize(row, visitCounts = {}) {
 }
 
 const QUOTE_STATUS_LABEL = { sent: 'Propuesta', approved: 'Cotización final', rejected: 'Rechazada', draft: 'Borrador' }
-const QUOTE_STATUS_COLOR = { sent: 'var(--kiuvo-blue)', approved: '#1D9E75', rejected: 'var(--danger)', draft: 'var(--fg-tertiary)' }
-const QUOTE_STATUS_BG    = { sent: 'var(--kiuvo-blue-soft)', approved: '#E1F5EE', rejected: 'var(--danger-bg)', draft: 'var(--bg-secondary)' }
+const QUOTE_STATUS_TONE  = { sent: 'sky', approved: 'success', rejected: 'coral' }
+const HEALTH_PILL = {
+  amber: { tone: 'warning', label: 'En riesgo' },
+  red:   { tone: 'coral',   label: 'Estancado' },
+}
+
+const ellipsis = { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }
+
+function Spin({ size = 18 }) {
+  return <span className="k-spin" style={{ display: 'inline-flex' }}><Icon name="loader" size={size} /></span>
+}
+
+function StageDot({ color, size = 10 }) {
+  return <span style={{ width: size, height: size, borderRadius: '50%', background: color, flexShrink: 0 }} />
+}
+
+function SectionHead({ children, action }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 10, minHeight: 40 }}>
+      <Label style={{ marginBottom: 0 }}>{children}</Label>
+      {action}
+    </div>
+  )
+}
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 function SkeletonCard() {
   return (
-    <div style={{
-      background: 'var(--surface)', border: '0.5px solid var(--border)',
-      borderRadius: 'var(--r-md)', padding: '11px 12px',
-      display: 'flex', flexDirection: 'column', gap: 10,
-    }}>
+    <Card style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-        <div style={{ width: '55%', height: 13, borderRadius: 4, background: 'var(--bg-secondary)' }} />
-        <div style={{ width: '22%', height: 13, borderRadius: 4, background: 'var(--bg-secondary)' }} />
+        <Bone w="55%" h={18} />
+        <Bone w="22%" h={18} />
       </div>
-      <div style={{ height: 4, borderRadius: 2, background: 'var(--bg-secondary)' }} />
+      <Bone h={8} r={4} />
       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-        <div style={{ width: '40%', height: 11, borderRadius: 4, background: 'var(--bg-secondary)' }} />
-        <div style={{ width: '25%', height: 11, borderRadius: 4, background: 'var(--bg-secondary)' }} />
+        <Bone w="40%" h={14} />
+        <Bone w="25%" h={14} />
       </div>
-    </div>
+    </Card>
   )
 }
 
@@ -91,108 +108,55 @@ function AddProspectModal({ stage, onClose, onSave }) {
     onClose()
   }
 
-  const inputStyle = {
-    width: '100%', padding: '10px 12px', borderRadius: 'var(--r-md)',
-    border: '0.5px solid var(--border)', background: 'var(--bg)',
-    color: 'var(--fg)', fontSize: 14, outline: 'none', boxSizing: 'border-box',
-  }
-  const labelStyle = {
-    fontSize: 12, fontWeight: 500, color: 'var(--fg-secondary)', marginBottom: 4, display: 'block',
-  }
-
   return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 200,
-      display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
-    }} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: 'var(--bg)', borderRadius: '16px 16px 0 0', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
-
-        <div style={{ padding: '16px 16px 0', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 34, height: 34, borderRadius: 'var(--r-md)', flexShrink: 0,
-            background: stage.color + '18', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <Icon name="user-plus" size={17} color={stage.color} />
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 16, fontWeight: 500, color: 'var(--fg)' }}>Nuevo prospecto</div>
-            <div style={{ fontSize: 12, color: 'var(--fg-secondary)', marginTop: 1 }}>
-              Etapa: <span style={{ color: stage.color, fontWeight: 500 }}>{stage.label}</span>
-            </div>
-          </div>
-          <button onClick={onClose} style={{ color: 'var(--fg-tertiary)', padding: 4 }}>
-            <Icon name="x" size={20} />
-          </button>
+    <Sheet
+      title="Nuevo prospecto"
+      onClose={onClose}
+      footer={
+        <div style={{ display: 'flex', gap: 10 }}>
+          <Button variant="soft" onClick={onClose} style={{ flex: 1 }}>Cancelar</Button>
+          <Button onClick={handleSave} style={{ flex: 2 }}>Guardar prospecto</Button>
         </div>
+      }
+    >
+      <div style={{ marginBottom: 18 }}>
+        <Pill><StageDot color={stage.color} size={8} />{stage.label}</Pill>
+      </div>
 
-        <div style={{ height: '0.5px', background: 'var(--border)', margin: '14px 0 0' }} />
+      <Field label="Empresa">
+        <input className="k-input" value={name} onChange={e => setName(e.target.value)} placeholder="Nombre de la empresa" />
+      </Field>
+      <Field label="Valor del negocio ($) *">
+        <input
+          className="k-input" value={value} onChange={e => setValue(e.target.value)}
+          placeholder="Ej. 15000" type="text" inputMode="numeric"
+          style={{ fontWeight: 600 }}
+        />
+      </Field>
+      <Field label="Persona de contacto">
+        <input className="k-input" value={contact} onChange={e => setContact(e.target.value)} placeholder="Nombre del responsable" />
+      </Field>
+      <Field label="Teléfono">
+        <input className="k-input" value={phone} onChange={e => setPhone(e.target.value)} placeholder="10 dígitos" type="tel" inputMode="numeric" />
+      </Field>
+      <Field label="Notas (opcional)">
+        <textarea
+          className="k-input" value={notes} onChange={e => setNotes(e.target.value)}
+          placeholder="Observaciones, interés del cliente, contexto…" rows={3}
+        />
+      </Field>
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 32px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div>
-            <label style={labelStyle}>Empresa</label>
-            <input
-              value={name} onChange={e => setName(e.target.value)}
-              placeholder="Nombre de la empresa"
-              style={inputStyle}
-            />
-          </div>
-          <div>
-            <label style={{ ...labelStyle, color: 'var(--kiuvo-blue)', fontWeight: 600 }}>
-              Valor del negocio ($) <span style={{ color: 'var(--danger)', fontSize: 13 }}>*</span>
-            </label>
-            <input
-              value={value}
-              onChange={e => setValue(e.target.value)}
-              placeholder="Ej. 15000"
-              type="text"
-              inputMode="numeric"
-              style={{ ...inputStyle, borderColor: 'var(--kiuvo-blue)', fontSize: 16, fontWeight: 500 }}
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>Persona de contacto</label>
-            <input value={contact} onChange={e => setContact(e.target.value)} placeholder="Nombre del responsable" style={inputStyle} />
-          </div>
-          <div>
-            <label style={labelStyle}>Teléfono</label>
-            <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="10 dígitos" type="tel" inputMode="numeric" style={inputStyle} />
-          </div>
-          <div>
-            <label style={labelStyle}>Notas <span style={{ fontWeight: 400, opacity: 0.7 }}>(opcional)</span></label>
-            <textarea
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
-              placeholder="Observaciones, interés del cliente, contexto…"
-              rows={3}
-              style={{ ...inputStyle, resize: 'none', verticalAlign: 'top', lineHeight: 1.45 }}
-            />
-          </div>
-          <div style={{
-            padding: '10px 12px', borderRadius: 'var(--r-md)',
-            background: stage.color + '12', border: `0.5px solid ${stage.color}30`,
-            display: 'flex', alignItems: 'center', gap: 8,
-          }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: stage.color, flexShrink: 0 }} />
-            <div style={{ fontSize: 12, color: 'var(--fg-secondary)' }}>
-              Se añadirá a <b style={{ color: stage.color }}>{stage.label}</b>.
-              Mínimo requerido: {stage.min} visita{stage.min > 1 ? 's' : ''}.
-            </div>
-          </div>
-        </div>
-
-        <div style={{ padding: '12px 16px 28px', display: 'flex', gap: 10, borderTop: '0.5px solid var(--border)' }}>
-          <button onClick={onClose} style={{
-            flex: 1, padding: '12px 0', borderRadius: 'var(--r-md)',
-            border: '0.5px solid var(--border)', background: 'var(--surface)',
-            color: 'var(--fg)', fontSize: 14, fontWeight: 500,
-          }}>Cancelar</button>
-          <button onClick={handleSave} style={{
-            flex: 2, padding: '12px 0', borderRadius: 'var(--r-md)',
-            background: stage.color, color: '#fff', fontSize: 14, fontWeight: 500,
-          }}>Guardar prospecto</button>
+      <div style={{
+        padding: '12px 14px', borderRadius: 'var(--r-md)', background: 'var(--bg-secondary)',
+        display: 'flex', alignItems: 'center', gap: 10, fontSize: 14, color: 'var(--fg-secondary)', lineHeight: 1.35,
+      }}>
+        <StageDot color={stage.color} />
+        <div>
+          Se añadirá a <b style={{ color: 'var(--fg)' }}>{stage.label}</b>.
+          Mínimo requerido: {stage.min} visita{stage.min > 1 ? 's' : ''}.
         </div>
       </div>
-    </div>
+    </Sheet>
   )
 }
 
@@ -390,463 +354,271 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, on
     setImages(prev => prev.filter(i => i.id !== img.id))
   }
 
-  const textareaStyle = {
-    width: '100%', padding: '10px 12px', borderRadius: 'var(--r-md)',
-    border: '0.5px solid var(--border)', background: 'var(--bg-secondary)',
-    color: 'var(--fg)', fontSize: 13, outline: 'none', boxSizing: 'border-box',
-    resize: 'none', lineHeight: 1.45, fontFamily: 'inherit',
-  }
+  const EDIT_FIELDS = [
+    { key: 'name',    label: 'Nombre',         type: 'text',  mode: 'text',    placeholder: 'Nombre del negocio' },
+    { key: 'phone',   label: 'Teléfono',       type: 'tel',   mode: 'tel',     placeholder: 'Ej. 442 123 4567' },
+    { key: 'email',   label: 'Correo',         type: 'email', mode: 'email',   placeholder: 'correo@negocio.com' },
+    { key: 'address', label: 'Dirección',      type: 'text',  mode: 'text',    placeholder: 'Calle y número' },
+    { key: 'value',   label: 'Valor estimado', type: 'text',  mode: 'numeric', placeholder: '0' },
+  ]
 
   return (
-    <>
-      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 200 }} />
-      <div style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 201,
-        background: 'var(--bg)', borderRadius: '20px 20px 0 0',
-        maxHeight: '88vh', display: 'flex', flexDirection: 'column',
-      }}>
-        {/* Handle */}
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 4px', flexShrink: 0 }}>
-          <div style={{ width: 40, height: 4, borderRadius: 2, background: 'var(--border-strong)' }} />
-        </div>
+    <Sheet title={prospect.name} onClose={onClose}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
+        {onCheckIn && (
+          <Button variant="accent" block icon="map-pin-check" onClick={() => { onClose(); onCheckIn(prospect) }}>
+            Check-in en este prospecto
+          </Button>
+        )}
+        <Button variant="soft" block icon={editMode ? 'x' : 'pencil'} onClick={() => { setEditMode(m => !m) }}>
+          {editMode ? 'Cancelar edición' : 'Editar datos'}
+        </Button>
+      </div>
 
-        {/* Prospect name + edit toggle */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px 12px', flexShrink: 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--fg)' }}>{prospect.name}</div>
+      {/* ── Datos del cliente ── */}
+      {editMode && (
+        <Card style={{ marginBottom: 24 }}>
+          <Label>Editar información</Label>
+          {EDIT_FIELDS.map(f => (
+            <Field key={f.key} label={f.label}>
+              <input
+                className="k-input"
+                type={f.type}
+                inputMode={f.mode}
+                value={editData[f.key]}
+                onChange={e => setEditData(d => ({ ...d, [f.key]: e.target.value }))}
+                placeholder={f.placeholder}
+                style={{ background: 'var(--bg-secondary)' }}
+              />
+            </Field>
+          ))}
+          <Button block icon="check" loading={savingEdit} onClick={handleSaveEdit}>
+            {savingEdit ? 'Guardando…' : 'Guardar cambios'}
+          </Button>
+        </Card>
+      )}
+
+      {/* ── Cotizaciones ── */}
+      <div style={{ marginBottom: 24 }}>
+        <SectionHead action={
+          <Button variant="soft" size="sm" icon="plus" onClick={() => { onClose(); onNewProposal(prospect) }}>
+            Nueva propuesta
+          </Button>
+        }>
+          Cotizaciones
+        </SectionHead>
+
+        {loadingQuotes ? (
+          <div style={{ fontSize: 14, color: 'var(--fg-tertiary)', padding: '8px 0' }}>Cargando…</div>
+        ) : quotes.length === 0 ? (
+          <Card style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--fg-secondary)', fontSize: 15 }}>
+            <Icon name="file-invoice" size={22} color="var(--fg-tertiary)" />
+            Sin cotizaciones aún
+          </Card>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {quotes.map(q => {
+              const sLabel = QUOTE_STATUS_LABEL[q.status] || q.status
+              const isUpdating = updatingQuote === q.id
+              const isDownloading = downloadingQuote === q.shortId
+              return (
+                <Card key={q.id} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="k-num" style={{ fontSize: 22 }}>
+                        {'$' + (q.total ?? 0).toLocaleString('es-MX')}
+                      </div>
+                      <div style={{ fontSize: 13, color: 'var(--fg-secondary)', marginTop: 6 }}>
+                        {q.dateStr} · {q.quoteNumber ? `Cotización #${q.quoteNumber}` : `#${q.shortId}`}
+                      </div>
+                    </div>
+                    <Pill tone={QUOTE_STATUS_TONE[q.status]}>{sLabel}</Pill>
+                    <button
+                      type="button"
+                      className="k-iconbtn k-iconbtn--soft"
+                      aria-label="Descargar PDF"
+                      onClick={() => handleDownloadQuote(q)}
+                      disabled={isDownloading}
+                      style={{ opacity: isDownloading ? 0.6 : 1 }}
+                    >
+                      {isDownloading ? <Spin size={20} /> : <Icon name="download" size={20} />}
+                    </button>
+                  </div>
+
+                  {q.status === 'sent' && (
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <Button variant="danger" icon="x" disabled={isUpdating} onClick={() => handleQuoteStatus(q.id, 'rejected')} style={{ flex: 1 }}>
+                        Rechazar
+                      </Button>
+                      <Button icon="check" loading={isUpdating} onClick={() => handleQuoteStatus(q.id, 'approved')} style={{ flex: 1 }}>
+                        Aceptar
+                      </Button>
+                    </div>
+                  )}
+
+                  {q.status === 'approved' && (
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      padding: '10px 12px', borderRadius: 'var(--r-md)',
+                      background: 'var(--success-bg)', color: 'var(--success-fg)', fontSize: 14, fontWeight: 500,
+                    }}>
+                      <Icon name="circle-check" size={18} />
+                      Cotización final — usada para producción
+                    </div>
+                  )}
+                </Card>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── Fotos ── */}
+      <div style={{ marginBottom: 24 }}>
+        <SectionHead action={
+          <Button variant="soft" size="sm" icon="photo" loading={uploading} onClick={() => fileInputRef.current?.click()}>
+            {uploading ? 'Subiendo…' : 'Añadir foto'}
+          </Button>
+        }>
+          Fotos
+        </SectionHead>
+
+        {loadingImages ? (
+          <div style={{ fontSize: 14, color: 'var(--fg-tertiary)', padding: '8px 0' }}>Cargando…</div>
+        ) : images.length === 0 ? (
           <button
-            onClick={() => { setEditMode(m => !m) }}
+            type="button"
+            className="k-card"
+            onClick={() => cameraInputRef.current?.click()}
             style={{
-              display: 'flex', alignItems: 'center', gap: 4,
-              padding: '5px 10px', borderRadius: 'var(--r-md)',
-              background: editMode ? 'var(--bg-secondary)' : 'var(--kiuvo-blue-soft)',
-              color: editMode ? 'var(--fg-secondary)' : 'var(--kiuvo-blue)',
-              fontSize: 11, fontWeight: 500,
+              width: '100%', minHeight: 96,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8,
+              color: 'var(--fg-secondary)', fontSize: 15,
             }}
           >
-            <Icon name={editMode ? 'x' : 'pencil'} size={12} />
-            {editMode ? 'Cancelar' : 'Editar datos'}
+            <Icon name="camera" size={26} />
+            Toca para abrir la cámara
           </button>
-        </div>
-
-        {onCheckIn && (
-          <div style={{ padding: '0 16px 14px', flexShrink: 0 }}>
-            <Button variant="accent" block icon="map-pin-check" onClick={() => { onClose(); onCheckIn(prospect) }}>
-              Check-in en este prospecto
-            </Button>
+        ) : (
+          <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4 }}>
+            {images.map(img => (
+              <div key={img.id} style={{ position: 'relative', flexShrink: 0 }}>
+                <img
+                  src={img.url} alt=""
+                  style={{ width: 104, height: 104, objectFit: 'cover', borderRadius: 'var(--r-md)', display: 'block' }}
+                />
+                <button
+                  type="button"
+                  aria-label="Eliminar foto"
+                  onClick={() => handleDeleteImage(img)}
+                  style={{
+                    position: 'absolute', top: 0, right: 0, width: 44, height: 44,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  <span style={{
+                    width: 28, height: 28, borderRadius: '50%', background: 'rgba(0,0,0,0.6)', color: 'var(--on-ink)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <Icon name="x" size={14} />
+                  </span>
+                </button>
+              </div>
+            ))}
+            {/* Add more — galería */}
+            <button
+              type="button"
+              className="k-card"
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                width: 104, height: 104, flexShrink: 0, padding: 0,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                gap: 6, color: 'var(--fg-secondary)', fontSize: 13,
+              }}
+            >
+              <Icon name="plus" size={22} />
+              Galería
+            </button>
           </div>
         )}
 
-        {/* Scrollable content */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px 32px' }}>
-
-          {/* ── Datos del cliente ── */}
-          {editMode && (
-            <div style={{ marginBottom: 20, padding: '14px', borderRadius: 'var(--r-md)', border: '0.5px solid var(--kiuvo-blue)', background: 'var(--kiuvo-blue-soft)' }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--kiuvo-blue)', letterSpacing: 0.5, marginBottom: 12 }}>
-                EDITAR INFORMACIÓN
-              </div>
-              {[
-                { key: 'name',    label: 'Nombre',       icon: 'building-store', type: 'text',   mode: 'text',    placeholder: 'Nombre del negocio' },
-                { key: 'phone',   label: 'Teléfono',     icon: 'phone',          type: 'tel',    mode: 'tel',     placeholder: 'Ej. 442 123 4567' },
-                { key: 'email',   label: 'Correo',       icon: 'mail',           type: 'email',  mode: 'email',   placeholder: 'correo@negocio.com' },
-                { key: 'address', label: 'Dirección',    icon: 'map-pin',        type: 'text',   mode: 'text',    placeholder: 'Calle y número' },
-                { key: 'value',   label: 'Valor estimado', icon: 'currency-dollar', type: 'text', mode: 'numeric', placeholder: '0' },
-              ].map(f => (
-                <div key={f.key} style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 10, fontWeight: 500, color: 'var(--kiuvo-blue)', letterSpacing: 0.3, marginBottom: 4 }}>{f.label.toUpperCase()}</div>
-                  <div style={{ position: 'relative' }}>
-                    <Icon name={f.icon} size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--fg-tertiary)', pointerEvents: 'none' }} />
-                    <input
-                      type={f.type}
-                      inputMode={f.mode}
-                      value={editData[f.key]}
-                      onChange={e => setEditData(d => ({ ...d, [f.key]: e.target.value }))}
-                      placeholder={f.placeholder}
-                      style={{
-                        width: '100%', boxSizing: 'border-box',
-                        padding: '9px 10px 9px 30px',
-                        background: 'var(--bg)', border: '0.5px solid var(--border)',
-                        borderRadius: 'var(--r-md)', fontSize: 13, color: 'var(--fg)',
-                        outline: 'none', fontFamily: 'inherit',
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-              <button
-                onClick={handleSaveEdit}
-                disabled={savingEdit}
-                style={{
-                  marginTop: 4, width: '100%', padding: '10px',
-                  background: savingEdit ? 'var(--bg-secondary)' : 'var(--kiuvo-blue)',
-                  color: savingEdit ? 'var(--fg-tertiary)' : '#fff',
-                  borderRadius: 'var(--r-md)', fontSize: 13, fontWeight: 500,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                  opacity: savingEdit ? 0.7 : 1,
-                }}
-              >
-                <Icon
-                  name={savingEdit ? 'loader' : 'device-floppy'}
-                  size={14}
-                  style={savingEdit ? { animation: 'spin 0.7s linear infinite' } : {}}
-                />
-                {savingEdit ? 'Guardando…' : 'Guardar cambios'}
-              </button>
-            </div>
-          )}
-
-          {/* ── Cotizaciones ── */}
-          <div style={{ marginBottom: 20 }}>
-            <div style={{
-              fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', letterSpacing: 0.5,
-              marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            }}>
-              COTIZACIONES
-              <button
-                onClick={() => { onClose(); onNewProposal(prospect) }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 4,
-                  padding: '4px 9px', borderRadius: 'var(--r-md)',
-                  background: 'var(--kiuvo-blue-soft)', color: 'var(--kiuvo-blue)',
-                  fontSize: 11, fontWeight: 500,
-                }}
-              >
-                <Icon name="plus" size={12} />
-                Nueva propuesta
-              </button>
-            </div>
-
-            {loadingQuotes ? (
-              <div style={{ fontSize: 12, color: 'var(--fg-tertiary)', padding: '8px 0' }}>Cargando…</div>
-            ) : quotes.length === 0 ? (
-              <div style={{
-                padding: '14px 12px',
-                border: '1px dashed var(--border-strong)', borderRadius: 'var(--r-md)',
-                background: 'var(--bg-secondary)',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-                color: 'var(--fg-tertiary)',
-              }}>
-                <Icon name="file-invoice" size={20} />
-                <span style={{ fontSize: 12 }}>Sin cotizaciones aún</span>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {quotes.map(q => {
-                  const sColor = QUOTE_STATUS_COLOR[q.status] || 'var(--fg-tertiary)'
-                  const sBg    = QUOTE_STATUS_BG[q.status]    || 'var(--bg-secondary)'
-                  const sLabel = QUOTE_STATUS_LABEL[q.status] || q.status
-                  const isUpdating = updatingQuote === q.id
-                  return (
-                    <div key={q.id} style={{
-                      padding: '10px 12px', borderRadius: 'var(--r-md)',
-                      border: '0.5px solid var(--border)', background: 'var(--surface)',
-                      display: 'flex', flexDirection: 'column', gap: 8,
-                    }}>
-                      {/* Top row: status + total */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{
-                          fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 'var(--r-full)',
-                          background: sBg, color: sColor,
-                        }}>
-                          {sLabel}
-                        </span>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)' }}>
-                            {'$' + (q.total ?? 0).toLocaleString('es-MX')}
-                          </span>
-                          <button
-                            onClick={() => handleDownloadQuote(q)}
-                            disabled={downloadingQuote === q.shortId}
-                            style={{
-                              width: 26, height: 26, borderRadius: 'var(--r-sm)',
-                              background: 'var(--kiuvo-blue-soft)',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              color: 'var(--kiuvo-blue)', opacity: downloadingQuote === q.shortId ? 0.6 : 1,
-                            }}
-                          >
-                            <Icon
-                              name={downloadingQuote === q.shortId ? 'loader' : 'download'}
-                              size={13}
-                              style={downloadingQuote === q.shortId ? { animation: 'spin 0.7s linear infinite' } : {}}
-                            />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Date + number */}
-                      <div style={{ fontSize: 11, color: 'var(--fg-tertiary)' }}>
-                        {q.dateStr} · {q.quoteNumber ? `Cotización #${q.quoteNumber}` : `#${q.shortId}`}
-                      </div>
-
-                      {/* Accept / Reject for sent quotes */}
-                      {q.status === 'sent' && (
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <button
-                            onClick={() => handleQuoteStatus(q.id, 'rejected')}
-                            disabled={isUpdating}
-                            style={{
-                              flex: 1, padding: '7px 0', borderRadius: 'var(--r-md)',
-                              border: '0.5px solid var(--danger-border)',
-                              background: 'var(--danger-bg)', color: 'var(--danger-fg)',
-                              fontSize: 12, fontWeight: 500,
-                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-                              opacity: isUpdating ? 0.6 : 1,
-                            }}
-                          >
-                            <Icon name="x" size={13} />
-                            Rechazar
-                          </button>
-                          <button
-                            onClick={() => handleQuoteStatus(q.id, 'approved')}
-                            disabled={isUpdating}
-                            style={{
-                              flex: 1, padding: '7px 0', borderRadius: 'var(--r-md)',
-                              background: '#1D9E75', color: '#fff',
-                              fontSize: 12, fontWeight: 500,
-                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-                              opacity: isUpdating ? 0.6 : 1,
-                            }}
-                          >
-                            {isUpdating
-                              ? <Icon name="loader" size={13} style={{ animation: 'spin 0.7s linear infinite' }} />
-                              : <Icon name="check" size={13} />
-                            }
-                            Aceptar
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Approved badge */}
-                      {q.status === 'approved' && (
-                        <div style={{
-                          display: 'flex', alignItems: 'center', gap: 5,
-                          padding: '6px 10px', borderRadius: 'var(--r-md)',
-                          background: '#E1F5EE', color: '#1D9E75', fontSize: 12, fontWeight: 500,
-                        }}>
-                          <Icon name="circle-check" size={13} color="#1D9E75" />
-                          Cotización final — usada para producción
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* ── Fotos ── */}
-          <div style={{ marginBottom: 20 }}>
-            <div style={{
-              fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', letterSpacing: 0.5,
-              marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            }}>
-              FOTOS
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 4,
-                  padding: '4px 9px', borderRadius: 'var(--r-md)',
-                  background: 'var(--kiuvo-blue-soft)', color: 'var(--kiuvo-blue)',
-                  fontSize: 11, fontWeight: 500, opacity: uploading ? 0.6 : 1,
-                }}
-              >
-                <Icon name={uploading ? 'loader' : 'photo'} size={12}
-                  style={uploading ? { animation: 'spin 0.7s linear infinite' } : {}} />
-                {uploading ? 'Subiendo…' : 'Añadir foto'}
-              </button>
-            </div>
-
-            {loadingImages ? (
-              <div style={{ fontSize: 12, color: 'var(--fg-tertiary)', padding: '8px 0' }}>Cargando…</div>
-            ) : images.length === 0 ? (
-              <button
-                onClick={() => cameraInputRef.current?.click()}
-                style={{
-                  width: '100%', padding: '18px 0',
-                  border: '1px dashed var(--border-strong)', borderRadius: 'var(--r-md)',
-                  background: 'var(--bg-secondary)',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-                  color: 'var(--fg-tertiary)',
-                }}
-              >
-                <Icon name="camera" size={22} />
-                <span style={{ fontSize: 12 }}>Toca para abrir la cámara</span>
-              </button>
-            ) : (
-              <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
-                {images.map(img => (
-                  <div key={img.id} style={{ position: 'relative', flexShrink: 0 }}>
-                    <img
-                      src={img.url} alt=""
-                      style={{ width: 84, height: 84, objectFit: 'cover', borderRadius: 'var(--r-md)', border: '0.5px solid var(--border)', display: 'block' }}
-                    />
-                    <button
-                      onClick={() => handleDeleteImage(img)}
-                      style={{
-                        position: 'absolute', top: 4, right: 4,
-                        width: 20, height: 20, borderRadius: '50%',
-                        background: 'rgba(0,0,0,0.6)', border: 'none',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
-                      }}
-                    >
-                      <Icon name="x" size={10} />
-                    </button>
-                  </div>
-                ))}
-                {/* Add more — galería */}
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  style={{
-                    width: 84, height: 84, flexShrink: 0,
-                    border: '1px dashed var(--border-strong)', borderRadius: 'var(--r-md)',
-                    background: 'var(--bg-secondary)',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    gap: 4, color: 'var(--fg-tertiary)',
-                  }}
-                >
-                  <Icon name="plus" size={18} />
-                  <span style={{ fontSize: 10 }}>Galería</span>
-                </button>
-              </div>
-            )}
-
-            {/* Galería — sin capture */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleUpload}
-              style={{ display: 'none' }}
-            />
-            {/* Cámara trasera */}
-            <input
-              ref={cameraInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={handleUpload}
-              style={{ display: 'none' }}
-            />
-          </div>
-
-          {/* ── Notes ── */}
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', letterSpacing: 0.5, marginBottom: 8 }}>
-              NOTAS
-            </div>
-            <textarea
-              value={localNotes}
-              onChange={e => { setLocalNotes(e.target.value); setNotesDirty(true) }}
-              placeholder="Agrega observaciones, acuerdos, contexto del cliente…"
-              rows={3}
-              style={textareaStyle}
-            />
-            {notesDirty && (
-              <button
-                onClick={saveNotes}
-                disabled={savingNotes}
-                style={{
-                  marginTop: 8, width: '100%', padding: '9px',
-                  background: 'var(--kiuvo-blue)', color: '#fff',
-                  borderRadius: 'var(--r-md)', fontSize: 13, fontWeight: 500,
-                  opacity: savingNotes ? 0.7 : 1,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                }}
-              >
-                <Icon name={savingNotes ? 'loader' : 'device-floppy'} size={14}
-                  style={savingNotes ? { animation: 'spin 0.7s linear infinite' } : {}} />
-                {savingNotes ? 'Guardando…' : 'Guardar nota'}
-              </button>
-            )}
-          </div>
-
-          {/* ── Move stage ── */}
-          <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', letterSpacing: 0.5, marginBottom: 8 }}>
-            MOVER A ETAPA
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 18 }}>
-            {allStages.filter(s => s.id !== prospect.stage_id && s.id !== 'repositorio').map(s => (
-              <button
-                key={s.id}
-                onClick={() => { onMoveStage(prospect.id, s.id); onClose() }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '12px 14px', borderRadius: 'var(--r-md)',
-                  border: '0.5px solid var(--border)', background: 'var(--surface)',
-                  textAlign: 'left',
-                }}
-              >
-                <span style={{ width: 10, height: 10, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
-                <span style={{ fontSize: 14, color: 'var(--fg)' }}>{s.label}</span>
-              </button>
-            ))}
-            {/* Repositorio — archive option */}
-            {prospect.stage_id !== 'repositorio' && (
-              <button
-                onClick={() => { onMoveStage(prospect.id, 'repositorio'); onClose() }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '12px 14px', borderRadius: 'var(--r-md)',
-                  border: '0.5px solid var(--border)', background: 'var(--bg-secondary)',
-                  textAlign: 'left',
-                }}
-              >
-                <Icon name="archive" size={14} color="#6B7280" />
-                <span style={{ fontSize: 14, color: 'var(--fg-secondary)' }}>Archivar en Repositorio</span>
-              </button>
-            )}
-            {/* Reactivate from repositorio */}
-            {prospect.stage_id === 'repositorio' && (
-              <button
-                onClick={() => { onMoveStage(prospect.id, 'prospeccion'); onClose() }}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '12px 14px', borderRadius: 'var(--r-md)',
-                  border: '0.5px solid var(--kiuvo-blue)', background: 'var(--kiuvo-blue-soft)',
-                  textAlign: 'left',
-                }}
-              >
-                <Icon name="arrow-up-right" size={14} color="var(--kiuvo-blue)" />
-                <span style={{ fontSize: 14, color: 'var(--kiuvo-blue)', fontWeight: 500 }}>Reactivar prospecto</span>
-              </button>
-            )}
-          </div>
-
-          {/* ── Delete (admin only) ── */}
-          {isAdmin && confirming ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ fontSize: 13, color: 'var(--fg-secondary)', textAlign: 'center', padding: '2px 0 6px' }}>
-                ¿Eliminar <b style={{ color: 'var(--fg)' }}>{prospect.name}</b>? Esta acción no se puede deshacer.
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => setConfirming(false)} style={{
-                  flex: 1, padding: '12px', borderRadius: 'var(--r-md)',
-                  border: '0.5px solid var(--border)', background: 'var(--surface)',
-                  color: 'var(--fg)', fontSize: 14,
-                }}>Cancelar</button>
-                <button onClick={() => { onDelete(prospect.id); onClose() }} style={{
-                  flex: 1, padding: '12px', borderRadius: 'var(--r-md)',
-                  background: 'var(--danger)', color: '#fff', fontSize: 14, fontWeight: 500,
-                }}>Eliminar</button>
-              </div>
-            </div>
-          ) : isAdmin ? (
-            <button onClick={() => setConfirming(true)} style={{
-              width: '100%', padding: '12px',
-              border: '0.5px solid var(--danger-border)', background: 'var(--danger-bg)',
-              color: 'var(--danger-fg)', borderRadius: 'var(--r-md)',
-              fontSize: 14, fontWeight: 500,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            }}>
-              <Icon name="trash" size={15} color="var(--danger-fg)" />
-              Eliminar prospecto
-            </button>
-          ) : null}
-        </div>
+        {/* Galería — sin capture */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleUpload}
+          style={{ display: 'none' }}
+        />
+        {/* Cámara trasera */}
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={handleUpload}
+          style={{ display: 'none' }}
+        />
       </div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-    </>
+
+      {/* ── Notes ── */}
+      <div style={{ marginBottom: 24 }}>
+        <Label>Notas</Label>
+        <textarea
+          className="k-input"
+          value={localNotes}
+          onChange={e => { setLocalNotes(e.target.value); setNotesDirty(true) }}
+          placeholder="Agrega observaciones, acuerdos, contexto del cliente…"
+          rows={3}
+        />
+        {notesDirty && (
+          <Button block icon="check" loading={savingNotes} onClick={saveNotes} style={{ marginTop: 10 }}>
+            {savingNotes ? 'Guardando…' : 'Guardar nota'}
+          </Button>
+        )}
+      </div>
+
+      {/* ── Move stage ── */}
+      <Label>Mover a etapa</Label>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 24 }}>
+        {allStages.filter(s => s.id !== prospect.stage_id && s.id !== 'repositorio').map(s => (
+          <Chip key={s.id} tall onClick={() => { onMoveStage(prospect.id, s.id); onClose() }} style={{ fontSize: 16 }}>
+            <StageDot color={s.color} />
+            {s.label}
+          </Chip>
+        ))}
+        {/* Repositorio — archive option */}
+        {prospect.stage_id !== 'repositorio' && (
+          <Chip tall icon="archive" onClick={() => { onMoveStage(prospect.id, 'repositorio'); onClose() }}
+            style={{ fontSize: 16, background: 'var(--bg-secondary)', color: 'var(--fg-secondary)' }}>
+            Archivar en Repositorio
+          </Chip>
+        )}
+        {/* Reactivate from repositorio */}
+        {prospect.stage_id === 'repositorio' && (
+          <Button block icon="arrow-up-right" onClick={() => { onMoveStage(prospect.id, 'prospeccion'); onClose() }}>
+            Reactivar prospecto
+          </Button>
+        )}
+      </div>
+
+      {/* ── Delete (admin only) ── */}
+      {isAdmin && confirming ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ fontSize: 15, color: 'var(--fg-secondary)', textAlign: 'center', padding: '2px 0 4px', lineHeight: 1.4 }}>
+            ¿Eliminar <b style={{ color: 'var(--fg)' }}>{prospect.name}</b>? Esta acción no se puede deshacer.
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <Button variant="soft" onClick={() => setConfirming(false)} style={{ flex: 1 }}>Cancelar</Button>
+            <Button variant="danger" icon="trash" onClick={() => { onDelete(prospect.id); onClose() }} style={{ flex: 1 }}>Eliminar</Button>
+          </div>
+        </div>
+      ) : isAdmin ? (
+        <Button variant="danger" block icon="trash" onClick={() => setConfirming(true)}>
+          Eliminar prospecto
+        </Button>
+      ) : null}
+    </Sheet>
   )
 }
 
@@ -888,149 +660,83 @@ function LinkQuoteModal({ quote, prospects, onClose, onCreate, onLink }) {
     if (ok) onClose()
   }
 
-  const inputStyle = {
-    width: '100%', boxSizing: 'border-box', padding: '10px 12px',
-    background: 'var(--bg-secondary)', border: '0.5px solid var(--border)',
-    borderRadius: 'var(--r-md)', fontSize: 14, color: 'var(--fg)',
-    outline: 'none', fontFamily: 'inherit',
-  }
-
   return (
-    <>
-      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100 }} />
-      <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 101,
-        background: 'var(--bg)', borderRadius: '20px 20px 0 0',
-        maxHeight: '90%', display: 'flex', flexDirection: 'column', overflow: 'hidden',
-      }}>
-        {/* Handle */}
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 2px' }}>
-          <div style={{ width: 40, height: 4, borderRadius: 2, background: 'var(--border-strong)' }} />
-        </div>
-
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px 12px' }}>
-          <div>
-            <div style={{ fontSize: 17, fontWeight: 500, color: 'var(--fg)' }}>Vincular cotización</div>
-            <div style={{ fontSize: 12, color: 'var(--fg-secondary)', marginTop: 2 }}>
-              #{quote.quoteNumber ?? quote.shortId} · {fmt(quote.total)}
-            </div>
-          </div>
-          <button onClick={onClose} style={{
-            width: 32, height: 32, borderRadius: '50%', background: 'var(--bg-secondary)',
-            border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-secondary)',
-          }}>
-            <Icon name="x" size={16} />
-          </button>
-        </div>
-
-        {/* Tabs */}
-        <div style={{ display: 'flex', gap: 6, padding: '0 16px 12px' }}>
-          {[['new', 'Crear prospecto'], ['existing', 'Vincular a existente']].map(([m, label]) => (
-            <button key={m} onClick={() => setMode(m)} style={{
-              flex: 1, padding: '8px', borderRadius: 'var(--r-md)', fontSize: 13, fontWeight: 500,
-              border: `0.5px solid ${mode === m ? 'var(--kiuvo-blue)' : 'var(--border)'}`,
-              background: mode === m ? 'var(--kiuvo-blue-soft)' : 'var(--surface)',
-              color: mode === m ? 'var(--kiuvo-blue-deep)' : 'var(--fg-secondary)',
-            }}>{label}</button>
-          ))}
-        </div>
-
-        <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px 20px' }}>
-          {mode === 'new' ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <label style={{ fontSize: 11, color: 'var(--fg-secondary)', fontWeight: 500 }}>Nombre del cliente *</label>
-                <input value={name} onChange={e => setName(e.target.value)} autoFocus
-                  placeholder="Nombre o empresa"
-                  style={{ ...inputStyle, borderColor: 'var(--kiuvo-blue)' }} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <label style={{ fontSize: 11, color: 'var(--fg-secondary)', fontWeight: 500 }}>Contacto</label>
-                <input value={contact} onChange={e => setContact(e.target.value)}
-                  placeholder="Ej. Juan Pérez" style={inputStyle} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <label style={{ fontSize: 11, color: 'var(--fg-secondary)', fontWeight: 500 }}>Teléfono</label>
-                <input value={phone} onChange={e => setPhone(e.target.value)} inputMode="tel"
-                  placeholder="449-000-00-00" style={inputStyle} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label style={{ fontSize: 11, color: 'var(--fg-secondary)', fontWeight: 500 }}>Etapa inicial</label>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {selectable.map(s => {
-                    const on = s.id === stageId
-                    return (
-                      <button key={s.id} onClick={() => setStageId(s.id)} style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 5,
-                        padding: '6px 11px', borderRadius: 'var(--r-full)', fontSize: 12, fontWeight: 500,
-                        border: `0.5px solid ${on ? s.color : 'var(--border)'}`,
-                        background: on ? s.color : 'var(--surface)',
-                        color: on ? '#fff' : 'var(--fg)',
-                      }}>
-                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: on ? '#fff' : s.color }} />
-                        {s.label}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-              <div style={{
-                padding: '9px 12px', background: 'var(--kiuvo-blue-soft)',
-                borderRadius: 'var(--r-md)', fontSize: 12, color: 'var(--kiuvo-blue-deep)',
-                display: 'flex', alignItems: 'center', gap: 6,
-              }}>
-                <Icon name="info-circle" size={13} color="var(--kiuvo-blue)" />
-                El valor del prospecto será {fmt(quote.total)} (total de la cotización).
-              </div>
-              <button
-                onClick={handleCreate}
-                disabled={!name.trim() || saving}
-                style={{
-                  width: '100%', padding: '13px', borderRadius: 'var(--r-md)',
-                  background: name.trim() ? 'var(--kiuvo-blue)' : 'var(--bg-tertiary)',
-                  color: name.trim() ? '#fff' : 'var(--fg-tertiary)',
-                  fontSize: 15, fontWeight: 500, opacity: saving ? 0.7 : 1,
-                }}>
-                {saving ? 'Creando…' : 'Crear y vincular'}
-              </button>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <input
-                value={search} onChange={e => setSearch(e.target.value)} autoFocus
-                placeholder="Buscar prospecto…" style={inputStyle} />
-              {matches.length === 0 ? (
-                <div style={{ padding: '28px 0', textAlign: 'center', fontSize: 13, color: 'var(--fg-tertiary)' }}>
-                  Sin prospectos que coincidan
-                </div>
-              ) : matches.map(p => {
-                const st = stageById[p.stage] ?? STAGE_BY_ID[p.stage]
-                return (
-                  <button key={p.id} onClick={() => handleLink(p.id)} disabled={saving}
-                    style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-                      padding: '11px 12px', background: 'var(--surface)',
-                      border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)',
-                      textAlign: 'left', opacity: saving ? 0.6 : 1,
-                    }}>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {p.name}
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginTop: 1 }}>
-                        {st?.label ?? p.stage} · {fmt(p.value)}
-                      </div>
-                    </div>
-                    <Icon name="arrow-up-right" size={14} color="var(--fg-tertiary)" />
-                  </button>
-                )
-              })}
-            </div>
-          )}
-        </div>
+    <Sheet title="Vincular cotización" onClose={onClose}>
+      <div style={{ fontSize: 15, color: 'var(--fg-secondary)', marginBottom: 16 }}>
+        #{quote.quoteNumber ?? quote.shortId} · <b style={{ color: 'var(--fg)' }}>{fmt(quote.total)}</b>
       </div>
-    </>
+
+      <Segmented
+        size="lg"
+        value={mode}
+        onChange={setMode}
+        options={[{ id: 'new', label: 'Crear prospecto' }, { id: 'existing', label: 'Vincular a existente' }]}
+        style={{ marginBottom: 20 }}
+      />
+
+      {mode === 'new' ? (
+        <div>
+          <Field label="Nombre del cliente *">
+            <input className="k-input" value={name} onChange={e => setName(e.target.value)} autoFocus placeholder="Nombre o empresa" />
+          </Field>
+          <Field label="Contacto">
+            <input className="k-input" value={contact} onChange={e => setContact(e.target.value)} placeholder="Ej. Juan Pérez" />
+          </Field>
+          <Field label="Teléfono">
+            <input className="k-input" value={phone} onChange={e => setPhone(e.target.value)} inputMode="tel" placeholder="449-000-00-00" />
+          </Field>
+
+          <Label>Etapa inicial</Label>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
+            {selectable.map(s => (
+              <Chip key={s.id} selected={s.id === stageId} onClick={() => setStageId(s.id)}>
+                <StageDot color={s.color} size={8} />
+                {s.label}
+              </Chip>
+            ))}
+          </div>
+
+          <div style={{
+            padding: '12px 14px', background: 'var(--bg-secondary)', borderRadius: 'var(--r-md)',
+            fontSize: 14, color: 'var(--fg-secondary)', lineHeight: 1.35,
+            display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18,
+          }}>
+            <Icon name="info-circle" size={18} />
+            El valor del prospecto será {fmt(quote.total)} (total de la cotización).
+          </div>
+
+          <Button block size="lg" loading={saving} disabled={!name.trim()} onClick={handleCreate}>
+            {saving ? 'Creando…' : 'Crear y vincular'}
+          </Button>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <SearchInput value={search} onChange={setSearch} autoFocus placeholder="Buscar prospecto…" style={{ marginBottom: 4 }} />
+          {matches.length === 0 ? (
+            <div style={{ padding: '28px 0', textAlign: 'center', fontSize: 15, color: 'var(--fg-tertiary)' }}>
+              Sin prospectos que coincidan
+            </div>
+          ) : matches.map(p => {
+            const st = stageById[p.stage] ?? STAGE_BY_ID[p.stage]
+            return (
+              <button key={p.id} type="button" className="k-card" onClick={() => handleLink(p.id)} disabled={saving}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                  minHeight: 60, padding: '10px 14px', textAlign: 'left', opacity: saving ? 0.6 : 1,
+                }}>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: 16, fontWeight: 600, ...ellipsis }}>{p.name}</div>
+                  <div style={{ fontSize: 13, color: 'var(--fg-secondary)', marginTop: 2 }}>
+                    {st?.label ?? p.stage} · {fmt(p.value)}
+                  </div>
+                </div>
+                <Icon name="arrow-up-right" size={20} color="var(--fg-tertiary)" />
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </Sheet>
   )
 }
 
@@ -1045,91 +751,45 @@ function QuoteResultCard({ q, onOpenProspect, onLinkQuote }) {
     setDownloading(false)
   }
 
+  const actionStyle = { flex: 1, padding: '0 12px', fontSize: 14 }
+
   return (
-    <div style={{
-      background: 'var(--surface)', border: '0.5px solid var(--border)',
-      borderRadius: 'var(--r-md)', padding: '11px 12px',
-      display: 'flex', flexDirection: 'column', gap: 8,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
-          <Icon name="receipt" size={14} color="#854F0B" />
+    <Card style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
+          <Icon name="receipt" size={22} color="var(--fg-tertiary)" />
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {q.clientName}
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginTop: 1 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, ...ellipsis }}>{q.clientName}</div>
+            <div style={{ fontSize: 13, color: 'var(--fg-secondary)', marginTop: 2 }}>
               #{q.quoteNumber ?? q.shortId} · {q.dateStr}
             </div>
           </div>
         </div>
-        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
-          {fmt(q.total)}
-        </div>
+        <div className="k-num" style={{ fontSize: 18, flexShrink: 0, paddingTop: 2 }}>{fmt(q.total)}</div>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-        <span style={{
-          fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 99,
-          background: QUOTE_STATUS_BG[q.status], color: QUOTE_STATUS_COLOR[q.status],
-        }}>
-          {QUOTE_STATUS_LABEL[q.status] ?? q.status}
-        </span>
-        {q.orphan && (
-          <span style={{
-            fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 99,
-            background: 'var(--warning-bg)', color: 'var(--warning-fg)',
-            display: 'inline-flex', alignItems: 'center', gap: 3,
-          }}>
-            <Icon name="alert-triangle" size={9} color="var(--warning-fg)" />
-            Sin prospecto en el embudo
-          </span>
-        )}
+        <Pill tone={QUOTE_STATUS_TONE[q.status]}>{QUOTE_STATUS_LABEL[q.status] ?? q.status}</Pill>
+        {q.orphan && <Pill tone="warning" icon="alert-triangle">Sin prospecto en el embudo</Pill>}
       </div>
 
-      <div style={{ display: 'flex', gap: 6 }}>
+      <div style={{ display: 'flex', gap: 8 }}>
         {q.pdfPath && (
-          <button
-            onClick={handleDownload}
-            disabled={downloading}
-            style={{
-              flex: 1, padding: '7px', borderRadius: 'var(--r-md)',
-              background: 'var(--bg-secondary)', border: '0.5px solid var(--border)',
-              color: 'var(--fg-secondary)', fontSize: 12,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-              opacity: downloading ? 0.6 : 1,
-            }}>
-            <Icon name="download" size={12} />
+          <Button variant="soft" icon="download" disabled={downloading} onClick={handleDownload} style={actionStyle}>
             {downloading ? 'Abriendo…' : 'Descargar PDF'}
-          </button>
+          </Button>
         )}
         {q.prospectId ? (
-          <button
-            onClick={() => onOpenProspect(q.prospectId)}
-            style={{
-              flex: 1, padding: '7px', borderRadius: 'var(--r-md)',
-              background: 'var(--kiuvo-blue-soft)', border: '0.5px solid var(--kiuvo-blue)',
-              color: 'var(--kiuvo-blue-deep)', fontSize: 12, fontWeight: 500,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-            }}>
-            <Icon name="arrow-up-right" size={12} />
+          <Button variant="soft" icon="arrow-up-right" onClick={() => onOpenProspect(q.prospectId)} style={actionStyle}>
             Ver prospecto
-          </button>
+          </Button>
         ) : (
-          <button
-            onClick={() => onLinkQuote(q)}
-            style={{
-              flex: 1, padding: '7px', borderRadius: 'var(--r-md)',
-              background: 'var(--kiuvo-blue)', border: '0.5px solid var(--kiuvo-blue)',
-              color: '#fff', fontSize: 12, fontWeight: 500,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-            }}>
-            <Icon name="plus" size={12} />
+          <Button icon="plus" onClick={() => onLinkQuote(q)} style={actionStyle}>
             Añadir al embudo
-          </button>
+          </Button>
         )}
       </div>
-    </div>
+    </Card>
   )
 }
 
@@ -1139,132 +799,91 @@ function ProspectCard({ p, onAction, onAdvance, onODP, showStage = false }) {
   const stage     = ctxStageById[p.stage] ?? STAGES[0]
   // Don't show "advance" button for repositorio or cierre
   const nextStage = (!stage.isRepository && p.stage !== 'cierre') ? (ctxStages[stageIdx + 1] ?? null) : null
-  const visitPct  = Math.min(1, p.visits / Math.max(stage.min, 1))
-  const hc        = healthColor[p.health] || 'var(--fg-tertiary)'
-
-  const cardBg     = p.health === 'red'   ? 'var(--danger-bg)'
-                   : p.health === 'amber'  ? 'var(--warning-bg)'
-                   : 'var(--surface)'
-  const cardBorder = p.health === 'red'   ? 'var(--danger-border)'
-                   : p.health === 'amber'  ? 'var(--warning-border)'
-                   : 'var(--border)'
+  const health = HEALTH_PILL[p.health]
+  const hasPills = health || showStage
+  const stepStyle = { minHeight: 44, padding: '0 14px', fontSize: 14, maxWidth: '100%' }
 
   return (
-    <div style={{
-      background: cardBg, border: `0.5px solid ${cardBorder}`,
-      borderRadius: 'var(--r-md)', padding: '11px 12px',
-      display: 'flex', flexDirection: 'column', gap: 8,
-      opacity: p._optimistic ? 0.55 : 1,
-      transition: 'background 0.2s, border-color 0.2s, opacity 0.25s',
+    <Card style={{
+      display: 'flex', flexDirection: 'column', gap: 12,
+      opacity: p._optimistic ? 0.55 : 1, transition: 'opacity 0.25s',
     }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: hc, flexShrink: 0 }} />
-          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {p.name}
-          </div>
-          {showStage && (
-            <span style={{
-              flexShrink: 0, fontSize: 10, fontWeight: 600, padding: '1px 6px',
-              borderRadius: 99, background: stage.color + '1F', color: stage.color,
-              display: 'inline-flex', alignItems: 'center', gap: 3,
-            }}>
-              {stage.isRepository && <Icon name="archive" size={9} color={stage.color} />}
-              {stage.label}
-            </span>
-          )}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 17, fontWeight: 600, lineHeight: 1.25, ...ellipsis }}>{p.name}</div>
+          <div className="k-num" style={{ fontSize: 20, marginTop: 6 }}>{fmt(p.value)}</div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)', fontVariantNumeric: 'tabular-nums' }}>
-            {fmt(p.value)}
-          </div>
-          {!p._optimistic && (
-            <button
-              onClick={() => onAction(p)}
-              style={{
-                width: 24, height: 24, borderRadius: 'var(--r-sm)',
-                background: 'var(--bg-secondary)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: 'var(--fg-tertiary)',
-              }}
-            >
-              <Icon name="dots" size={14} />
-            </button>
-          )}
-        </div>
+        {!p._optimistic && (
+          <IconButton icon="dots" label="Abrir ficha del prospecto" variant="soft" onClick={() => onAction(p)} />
+        )}
       </div>
 
+      {hasPills && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {health && <Pill tone={health.tone} icon="alert-triangle">{health.label}</Pill>}
+          {showStage && (
+            <Pill icon={stage.isRepository ? 'archive' : undefined}>
+              {!stage.isRepository && <StageDot color={stage.color} size={8} />}
+              {stage.label}
+            </Pill>
+          )}
+        </div>
+      )}
+
       <div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--fg-secondary)' }}>
-            <Icon name="map-pin" size={11} />
-            <span><b style={{ fontWeight: 500, color: 'var(--fg)' }}>{p.visits}</b>/{stage.min} visitas</span>
-          </div>
-          <span style={{ fontSize: 11, color: 'var(--fg-tertiary)' }}>{p.days} días en etapa</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6, fontSize: 13, color: 'var(--fg-secondary)' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <Icon name="map-pin" size={15} />
+            <span><b style={{ fontWeight: 600, color: 'var(--fg)' }}>{p.visits}</b>/{stage.min} visitas</span>
+          </span>
+          <span>{p.days} días en etapa</span>
         </div>
-        <div style={{ height: 4, borderRadius: 2, background: 'var(--bg-tertiary)', overflow: 'hidden' }}>
-          <div style={{ width: `${visitPct * 100}%`, height: '100%', background: stage.color, borderRadius: 2 }} />
-        </div>
+        <ProgressBar value={p.visits} max={Math.max(stage.min, 1)} color={stage.color} height={6} />
       </div>
 
       {p.notes ? (
         <div style={{
-          fontSize: 11, color: 'var(--fg-tertiary)', lineHeight: 1.35,
+          fontSize: 14, color: 'var(--fg-secondary)', lineHeight: 1.35,
           overflow: 'hidden', display: '-webkit-box',
           WebkitLineClamp: 1, WebkitBoxOrient: 'vertical',
         }}>
-          <Icon name="file-text" size={10} style={{ marginRight: 4, verticalAlign: 'middle' }} />
           {p.notes}
         </div>
       ) : null}
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ fontSize: 11, color: 'var(--fg-tertiary)' }}>{p.last}</div>
-        <div style={{ display: 'flex', gap: 4 }}>
-          <button
-            onClick={() => p.phone && window.open(`https://wa.me/52${p.phone.replace(/\D/g, '')}`, '_blank')}
-            style={{ width: 24, height: 24, borderRadius: 'var(--r-sm)', background: 'var(--bg-secondary)', color: 'var(--fg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="brand-whatsapp" size={13} />
-          </button>
-          <button
-            onClick={() => p.phone && (window.location.href = `tel:${p.phone}`)}
-            style={{ width: 24, height: 24, borderRadius: 'var(--r-sm)', background: 'var(--bg-secondary)', color: 'var(--fg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name="phone" size={13} />
-          </button>
-          {nextStage && !p._optimistic ? (
-            <button
-              onClick={() => onAdvance(p.id, nextStage.id)}
-              title={`Avanzar a ${nextStage.label}`}
-              style={{
-                height: 24, padding: '0 7px', borderRadius: 'var(--r-sm)',
-                background: nextStage.color + '18',
-                border: `0.5px solid ${nextStage.color}55`,
-                color: nextStage.color,
-                display: 'flex', alignItems: 'center', gap: 3,
-                fontSize: 10, fontWeight: 600,
-              }}>
-              <Icon name="arrow-right" size={12} color={nextStage.color} />
-              {nextStage.label}
-            </button>
-          ) : !nextStage && !p._optimistic && p.stage !== 'repositorio' ? (
-            <button
-              onClick={() => onODP(p)}
-              title="Generar orden de producción"
-              style={{
-                height: 24, padding: '0 7px', borderRadius: 'var(--r-sm)',
-                background: '#E1F5EE',
-                border: '0.5px solid #1D9E7566',
-                color: '#1D9E75',
-                display: 'flex', alignItems: 'center', gap: 3,
-                fontSize: 10, fontWeight: 700,
-              }}>
-              <Icon name="clipboard-list" size={12} color="#1D9E75" />
-              ODP
-            </button>
-          ) : null}
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <IconButton
+          icon="brand-whatsapp" label="WhatsApp" variant="soft"
+          onClick={() => p.phone && window.open(`https://wa.me/52${p.phone.replace(/\D/g, '')}`, '_blank')}
+        />
+        <IconButton
+          icon="phone" label="Llamar" variant="soft"
+          onClick={() => p.phone && (window.location.href = `tel:${p.phone}`)}
+        />
+        <div style={{ flex: 1, minWidth: 0, fontSize: 13, color: 'var(--fg-tertiary)', ...ellipsis }}>{p.last}</div>
+        {nextStage && !p._optimistic ? (
+          <Button
+            variant="soft"
+            onClick={() => onAdvance(p.id, nextStage.id)}
+            title={`Avanzar a ${nextStage.label}`}
+            style={stepStyle}
+          >
+            <StageDot color={nextStage.color} size={8} />
+            {nextStage.label}
+            <Icon name="arrow-right" size={16} />
+          </Button>
+        ) : !nextStage && !p._optimistic && p.stage !== 'repositorio' ? (
+          <Button
+            variant="soft" icon="clipboard-list"
+            onClick={() => onODP(p)}
+            title="Generar orden de producción"
+            style={stepStyle}
+          >
+            ODP
+          </Button>
+        ) : null}
       </div>
-    </div>
+    </Card>
   )
 }
 
@@ -1275,7 +894,7 @@ export default function Kanban({ jumpTo, onCheckIn, onOpenNotifications, unreadC
   const { stages: contextStages, stageById: contextStageById } = useStages()
   const isAdmin = profile?.role === 'admin'
 
-  const [activeStage,      setActiveStage]      = useState('presentacion')
+  const [activeStage,      setActiveStage]      = useState('prospeccion')
   const [prospects,        setProspects]        = useState([])
   const [loading,          setLoading]          = useState(true)
   const [loadError,        setLoadError]        = useState(false)
@@ -1651,100 +1270,81 @@ export default function Kanban({ jumpTo, onCheckIn, onOpenNotifications, unreadC
   }
 
   // ── Render ────────────────────────────────────────────────────────
+  const addLabel = activeStage === 'cotizacion' ? 'Cotizar' : 'Añadir'
+  const addIcon  = activeStage === 'cotizacion' ? 'receipt' : 'plus'
+  const openAdd  = () => activeStage === 'cotizacion' ? setShowQuote(true) : setShowAdd(true)
+
   return (
-    <div style={{ background: 'var(--bg)', minHeight: '100%', paddingBottom: 92, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ background: 'var(--bg)', minHeight: '100%', paddingBottom: 170, display: 'flex', flexDirection: 'column' }}>
 
       {/* Header */}
-      <div style={{ padding: '8px 16px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--fg)', letterSpacing: -0.015 }}>Mi embudo</div>
-          <div style={{ fontSize: 12, color: 'var(--fg-secondary)', marginTop: 2 }}>
+      <div className="k-screenhead" style={{ gap: 8 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="k-screenhead__title">Mi embudo</div>
+          <div style={{ fontSize: 13, color: 'var(--fg-secondary)', marginTop: 2 }}>
             {loading ? '…' : `${totalAll} prospectos · ${fmt(totalPot)} potencial`}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <button
-            onClick={() => {
-              setShowSearch(s => {
-                if (s) setSearchQuery('')   // al cerrar, limpiar
-                return !s
-              })
-            }}
-            style={{ width: 36, height: 36, borderRadius: 'var(--r-md)', border: `0.5px solid ${showSearch ? 'var(--kiuvo-blue)' : 'var(--border)'}`, background: showSearch ? 'var(--kiuvo-blue-soft)' : 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name={showSearch ? 'x' : 'search'} size={17} color={showSearch ? 'var(--kiuvo-blue)' : 'var(--fg-secondary)'} />
-          </button>
-          <button
-            onClick={onOpenNotifications}
-            style={{ width: 36, height: 36, borderRadius: 'var(--r-md)', border: '0.5px solid var(--border)', background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-            <Icon name="bell" size={17} color="var(--fg-secondary)" />
-            {unreadCount > 0 && (
-              <span style={{ position: 'absolute', top: 4, right: 4, width: 7, height: 7, borderRadius: '50%', background: '#E24B4A', border: '1.5px solid var(--surface)' }} />
-            )}
-          </button>
-          <button
-            onClick={() => setSortMode(m => m === 'value' ? 'risk' : 'value')}
-            style={{ width: 36, height: 36, borderRadius: 'var(--r-md)', border: `0.5px solid ${sortMode === 'risk' ? 'var(--warning)' : 'var(--border)'}`, background: sortMode === 'risk' ? 'var(--warning-bg)' : 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name={sortMode === 'risk' ? 'alert-triangle' : 'arrows-sort'} size={17} color={sortMode === 'risk' ? 'var(--warning)' : 'var(--fg-secondary)'} />
-          </button>
+        <IconButton
+          icon={showSearch ? 'x' : 'search'}
+          label={showSearch ? 'Cerrar búsqueda' : 'Buscar'}
+          variant={showSearch ? 'ink' : undefined}
+          onClick={() => {
+            setShowSearch(s => {
+              if (s) setSearchQuery('')   // al cerrar, limpiar
+              return !s
+            })
+          }}
+        />
+        <div style={{ position: 'relative' }}>
+          <IconButton icon="bell" label="Notificaciones" onClick={onOpenNotifications} />
+          {unreadCount > 0 && (
+            <span style={{
+              position: 'absolute', top: 8, right: 8, width: 11, height: 11, borderRadius: '50%',
+              background: 'var(--coral)', border: '2px solid var(--surface)',
+            }} />
+          )}
         </div>
+        <IconButton
+          icon={sortMode === 'risk' ? 'alert-triangle' : 'arrows-sort'}
+          label={sortMode === 'risk' ? 'Ordenado por días en etapa' : 'Ordenado por valor'}
+          variant={sortMode === 'risk' ? 'ink' : undefined}
+          onClick={() => setSortMode(m => m === 'value' ? 'risk' : 'value')}
+        />
       </div>
 
       {/* Search bar */}
       {showSearch && (
-        <div style={{ padding: '0 16px 12px', position: 'relative' }}>
-          <span style={{ position: 'absolute', left: 27, top: '50%', transform: 'translateY(-50%)', marginTop: -6, pointerEvents: 'none', display: 'flex' }}>
-            <Icon name="search" size={15} color="var(--fg-tertiary)" />
-          </span>
-          <input
+        <div style={{ padding: '0 14px 12px' }}>
+          <SearchInput
+            type="search"
             value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
+            onChange={setSearchQuery}
             placeholder="Buscar prospecto o cotización…"
             autoFocus
-            style={{
-              width: '100%', boxSizing: 'border-box', padding: '10px 34px 10px 36px',
-              background: 'var(--surface)', border: '0.5px solid var(--kiuvo-blue)',
-              borderRadius: 'var(--r-md)', fontSize: 14, color: 'var(--fg)',
-              outline: 'none', fontFamily: 'inherit',
-            }}
           />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              style={{
-                position: 'absolute', right: 26, top: '50%', transform: 'translateY(-50%)', marginTop: -6,
-                width: 20, height: 20, borderRadius: '50%', background: 'var(--bg-tertiary)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', padding: 0,
-              }}>
-              <Icon name="x" size={11} color="var(--fg-secondary)" />
-            </button>
-          )}
         </div>
       )}
 
       {/* Stage pills */}
-      <div style={{ display: 'flex', gap: 6, padding: '0 16px 12px', overflowX: 'auto', scrollSnapType: 'x mandatory' }}>
+      <div style={{ display: 'flex', gap: 8, padding: '0 14px 14px', overflowX: 'auto', scrollSnapType: 'x mandatory' }}>
         {contextStages.map(s => {
           const on = s.id === activeStage && !searching
           return (
-            <button key={s.id} onClick={() => { setActiveStage(s.id); setSearchQuery('') }} style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '6px 12px', borderRadius: 'var(--r-full)',
-              border: '0.5px solid', borderColor: on ? s.color : 'var(--border)',
-              background: on ? s.color : 'var(--surface)',
-              color: on ? '#fff' : 'var(--fg)',
-              fontSize: 12, fontWeight: 500, flexShrink: 0, scrollSnapAlign: 'start',
+            <button key={s.id} type="button" aria-pressed={on} onClick={() => { setActiveStage(s.id); setSearchQuery('') }} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              minHeight: 44, padding: '0 14px', borderRadius: 'var(--r-full)',
+              background: on ? 'var(--primary-bg)' : 'var(--surface)',
+              color: on ? 'var(--primary-fg)' : 'var(--fg)',
+              fontSize: 14, fontWeight: on ? 600 : 500, flexShrink: 0, scrollSnapAlign: 'start',
               opacity: searching ? 0.55 : 1, transition: 'opacity 0.15s',
             }}>
               {s.isRepository
-                ? <Icon name="archive" size={11} color={on ? '#fff' : s.color} />
-                : <span style={{ width: 6, height: 6, borderRadius: '50%', background: on ? '#fff' : s.color }} />
+                ? <Icon name="archive" size={16} />
+                : <StageDot color={s.color} size={8} />
               }
               {s.label}
-              <span style={{
-                fontSize: 11, fontWeight: 500, padding: '0 5px', borderRadius: 'var(--r-full)',
-                background: on ? 'rgba(255,255,255,0.22)' : 'var(--bg-secondary)',
-                color: on ? '#fff' : 'var(--fg-secondary)',
-              }}>
+              <span style={{ fontSize: 13, fontWeight: 600, opacity: 0.65 }}>
                 {loading ? '·' : (counts[s.id] ?? 0)}
               </span>
             </button>
@@ -1753,15 +1353,18 @@ export default function Kanban({ jumpTo, onCheckIn, onOpenNotifications, unreadC
       </div>
 
       {/* Column summary */}
-      <div style={{ margin: '0 16px 10px', padding: '10px 12px', background: searching ? 'var(--kiuvo-blue-soft)' : stage.color + '14', borderRadius: 'var(--r-md)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <div style={{ fontSize: 12, fontWeight: 500, color: searching ? 'var(--kiuvo-blue-deep)' : stage.color, display: 'flex', alignItems: 'center', gap: 5 }}>
+      <div style={{ margin: '0 18px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 48 }}>
+        <div style={{ minWidth: 0 }}>
+          <div className="k-h2" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {searching
-              ? <><Icon name="search" size={12} color="var(--kiuvo-blue-deep)" />Resultados de búsqueda</>
-              : <>{stage.isRepository && <Icon name="archive" size={12} color={stage.color} />}{stage.label}</>
+              ? 'Resultados'
+              : <>
+                  {stage.isRepository ? <Icon name="archive" size={18} /> : <StageDot color={stage.color} />}
+                  {stage.label}
+                </>
             }
           </div>
-          <div style={{ fontSize: 11, color: 'var(--fg-secondary)', marginTop: 2 }}>
+          <div style={{ fontSize: 13, color: 'var(--fg-secondary)', marginTop: 3 }}>
             {searching
               ? [
                   `${list.length} prospecto${list.length !== 1 ? 's' : ''}`,
@@ -1774,72 +1377,43 @@ export default function Kanban({ jumpTo, onCheckIn, onOpenNotifications, unreadC
           </div>
         </div>
         {!stage.isRepository && !searching && (
-          <button
-            onClick={() => activeStage === 'cotizacion' ? setShowQuote(true) : setShowAdd(true)}
-            style={{
-              padding: '6px 10px', borderRadius: 'var(--r-md)',
-              background: stage.color, color: '#fff', fontSize: 12, fontWeight: 500,
-              display: 'flex', alignItems: 'center', gap: 4,
-            }}>
-            <Icon name={activeStage === 'cotizacion' ? 'receipt' : 'plus'} size={13} />
-            {activeStage === 'cotizacion' ? 'Cotizar' : 'Añadir'}
-          </button>
+          <Button icon={addIcon} onClick={openAdd} style={{ flexShrink: 0 }}>{addLabel}</Button>
         )}
       </div>
 
       {/* Cards */}
-      <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ padding: '0 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
         {loading ? (
           [1, 2, 3].map(i => <SkeletonCard key={i} />)
         ) : loadError ? (
-          <div style={{ padding: '32px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-            <Icon name="wifi-off" size={28} color="var(--fg-tertiary)" />
-            <div style={{ fontSize: 13, color: 'var(--fg-tertiary)' }}>No se pudo cargar</div>
-            <button onClick={loadProspects} style={{
-              padding: '8px 16px', borderRadius: 'var(--r-md)',
-              background: 'var(--kiuvo-blue)', color: '#fff', fontSize: 13,
-            }}>Reintentar</button>
-          </div>
+          <Card>
+            <Empty icon="wifi-off">
+              No se pudo cargar
+              <div style={{ marginTop: 14 }}>
+                <Button icon="refresh" onClick={loadProspects}>Reintentar</Button>
+              </div>
+            </Empty>
+          </Card>
         ) : (list.length === 0 && quoteHits.length === 0) ? (
-          <div style={{
-            padding: '40px 0', textAlign: 'center', color: 'var(--fg-tertiary)',
-            border: '0.5px dashed var(--border-strong)', borderRadius: 'var(--r-lg)',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
-          }}>
-            <Icon name={searching ? 'search' : 'layout-kanban'} size={28} />
-            <div style={{ fontSize: 13 }}>
+          <Card>
+            <Empty icon={searching ? 'search' : 'layout-kanban'}>
               {searching ? `Sin resultados para "${searchQuery}"` : 'Sin prospectos en esta etapa'}
-            </div>
-            {searching ? (
-              <button
-                onClick={() => setSearchQuery('')}
-                style={{
-                  padding: '8px 16px', borderRadius: 'var(--r-md)',
-                  background: 'var(--bg-secondary)', border: '0.5px solid var(--border)',
-                  color: 'var(--fg-secondary)', fontSize: 12, marginTop: 4,
-                }}>
-                Limpiar búsqueda
-              </button>
-            ) : (
-              <button
-                onClick={() => activeStage === 'cotizacion' ? setShowQuote(true) : setShowAdd(true)}
-                style={{
-                  padding: '8px 16px', borderRadius: 'var(--r-md)',
-                  background: stage.color, color: '#fff', fontSize: 12, fontWeight: 500,
-                  display: 'flex', alignItems: 'center', gap: 6, marginTop: 4,
-                }}>
-                <Icon name={activeStage === 'cotizacion' ? 'receipt' : 'plus'} size={13} />
-                {activeStage === 'cotizacion' ? 'Nueva cotización' : 'Añadir el primero'}
-              </button>
-            )}
-          </div>
+              <div style={{ marginTop: 14 }}>
+                {searching ? (
+                  <Button variant="soft" onClick={() => setSearchQuery('')}>Limpiar búsqueda</Button>
+                ) : (
+                  <Button icon={addIcon} onClick={openAdd}>
+                    {activeStage === 'cotizacion' ? 'Nueva cotización' : 'Añadir el primero'}
+                  </Button>
+                )}
+              </div>
+            </Empty>
+          </Card>
         ) : (
           <>
             {/* Prospectos */}
             {searching && list.length > 0 && (
-              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--fg-tertiary)', letterSpacing: 0.5, marginTop: 2 }}>
-                PROSPECTOS ({list.length})
-              </div>
+              <Label style={{ margin: '4px 4px 0' }}>Prospectos ({list.length})</Label>
             )}
             {list.map(p => (
               <ProspectCard
@@ -1852,9 +1426,7 @@ export default function Kanban({ jumpTo, onCheckIn, onOpenNotifications, unreadC
             {/* Cotizaciones */}
             {quoteHits.length > 0 && (
               <>
-                <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--fg-tertiary)', letterSpacing: 0.5, marginTop: 8 }}>
-                  COTIZACIONES ({quoteHits.length})
-                </div>
+                <Label style={{ margin: '10px 4px 0' }}>Cotizaciones ({quoteHits.length})</Label>
                 {quoteHits.map(qt => (
                   <QuoteResultCard
                     key={qt.id} q={qt}
@@ -1870,13 +1442,6 @@ export default function Kanban({ jumpTo, onCheckIn, onOpenNotifications, unreadC
           </>
         )}
       </div>
-
-      {!loading && !loadError && !searching && (
-        <div style={{ marginTop: 16, textAlign: 'center', display: 'flex', justifyContent: 'center', gap: 4, alignItems: 'center', color: 'var(--fg-tertiary)' }}>
-          <Icon name="arrows-horizontal" size={12} />
-          <span style={{ fontSize: 11 }}>Desliza pills para cambiar etapa</span>
-        </div>
-      )}
 
       {linkQuote && (
         <LinkQuoteModal

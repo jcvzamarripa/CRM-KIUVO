@@ -32,6 +32,7 @@ export function useProducts() {
     const cached = getCachedProducts()
     if (cached?.length) { setProducts(cached); setLoading(false) }
 
+    if (!supabase) { setLoading(false); return }
     try {
       const { data, error: err } = await supabase
         .from('products')
@@ -58,6 +59,7 @@ export function useProducts() {
 
   useEffect(() => {
     load()
+    if (!supabase) return
 
     // Realtime: cualquier cambio en la tabla recarga la lista y actualiza caché
     const channel = supabase

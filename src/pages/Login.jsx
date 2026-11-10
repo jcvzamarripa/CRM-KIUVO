@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { Button, Card, Field } from '../components/ui'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -12,17 +13,7 @@ function validate(email, password) {
   return errors
 }
 
-function Spinner() {
-  return (
-    <svg
-      width="16" height="16" viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
-      style={{ animation: 'kiuvo-spin 0.7s linear infinite', flexShrink: 0 }}
-    >
-      <path d="M12 2a10 10 0 0 1 10 10" />
-    </svg>
-  )
-}
+const errorRing = on => (on ? { boxShadow: 'inset 0 0 0 2px var(--coral)' } : null)
 
 export default function Login() {
   const [email, setEmail]           = useState('')
@@ -56,119 +47,65 @@ export default function Login() {
     if (error) setServerError(error.message)
   }
 
-  const inputBase = {
-    width: '100%', padding: '11px 14px',
-    borderRadius: 'var(--r-md)',
-    background: 'var(--surface)', color: 'var(--fg)',
-    fontSize: 14, outline: 'none',
-    fontFamily: 'var(--font-sans)',
-    transition: 'border-color 0.15s',
-    opacity: loading ? 0.6 : 1,
-  }
-
   return (
-    <>
-      <style>{`@keyframes kiuvo-spin { to { transform: rotate(360deg) } }`}</style>
+    <div className="kiuvo login-page" style={{ background: 'var(--bg)', minHeight: '100vh', padding: '24px 16px' }}>
+      <div style={{ width: '100%', maxWidth: 400 }}>
 
-      <div className="kiuvo login-page" style={{ background: 'var(--bg)', minHeight: '100vh' }}>
-        <div style={{ width: '100%', maxWidth: 380, padding: '0 24px' }}>
+        {/* Logo */}
+        <div style={{ textAlign: 'center', marginBottom: 28 }}>
+          <div style={{
+            width: 64, height: 64, borderRadius: 'var(--r-lg)', background: 'var(--brand)',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--on-ink)', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 30, marginBottom: 16,
+          }}>K</div>
+          <div className="k-display" style={{ fontSize: 30, fontWeight: 700, lineHeight: 1.1 }}>KIUVO CRM</div>
+          <div style={{ fontSize: 15, color: 'var(--fg-secondary)', marginTop: 6 }}>Gestión de ventas en campo</div>
+        </div>
 
-          {/* Logo */}
-          <div style={{ textAlign: 'center', marginBottom: 40 }}>
-            <div style={{
-              width: 52, height: 52, borderRadius: 14, background: 'var(--kiuvo-blue)',
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              color: '#fff', fontWeight: 700, fontSize: 22, letterSpacing: 0.5, marginBottom: 16,
-            }}>K</div>
-            <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--fg)', letterSpacing: -0.3 }}>KIUVO CRM</div>
-            <div style={{ fontSize: 13, color: 'var(--fg-secondary)', marginTop: 4 }}>Gestión de ventas en campo</div>
-          </div>
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-            {/* Email */}
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--fg-secondary)', display: 'block', marginBottom: 6 }}>
-                Correo electrónico
-              </label>
+        <Card style={{ borderRadius: 'var(--r-xl)', padding: 22 }}>
+          <form onSubmit={handleSubmit} noValidate>
+            <Field label="Correo electrónico" error={fieldErrors.email}>
               <input
+                className="k-input"
                 type="email"
                 value={email}
                 onChange={handleEmailChange}
                 placeholder="tu@empresa.mx"
                 autoComplete="email"
                 disabled={loading}
-                style={{
-                  ...inputBase,
-                  border: `0.5px solid ${fieldErrors.email ? 'var(--danger)' : 'var(--border-strong)'}`,
-                }}
+                style={{ background: 'var(--bg-secondary)', opacity: loading ? 0.6 : 1, ...errorRing(fieldErrors.email) }}
               />
-              {fieldErrors.email && (
-                <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 5 }}>
-                  {fieldErrors.email}
-                </div>
-              )}
-            </div>
+            </Field>
 
-            {/* Password */}
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--fg-secondary)', display: 'block', marginBottom: 6 }}>
-                Contraseña
-              </label>
+            <Field label="Contraseña" error={fieldErrors.password}>
               <input
+                className="k-input"
                 type="password"
                 value={password}
                 onChange={handlePasswordChange}
                 placeholder="••••••••"
                 autoComplete="current-password"
                 disabled={loading}
-                style={{
-                  ...inputBase,
-                  border: `0.5px solid ${fieldErrors.password ? 'var(--danger)' : 'var(--border-strong)'}`,
-                }}
+                style={{ background: 'var(--bg-secondary)', opacity: loading ? 0.6 : 1, ...errorRing(fieldErrors.password) }}
               />
-              {fieldErrors.password && (
-                <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 5 }}>
-                  {fieldErrors.password}
-                </div>
-              )}
-            </div>
+            </Field>
 
-            {/* Server error */}
             {serverError && (
-              <div style={{
-                padding: '10px 14px',
-                background: 'var(--danger-bg)', border: '0.5px solid var(--danger-border)',
-                borderRadius: 'var(--r-md)', fontSize: 13, color: 'var(--danger-fg)',
+              <div role="alert" style={{
+                padding: '12px 16px', marginBottom: 16,
+                background: 'var(--coral-soft)', color: 'var(--coral-fg)',
+                borderRadius: 'var(--r-md)', fontSize: 14,
               }}>
                 {serverError}
               </div>
             )}
 
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                padding: '12px',
-                background: loading ? 'var(--kiuvo-blue)' : 'var(--kiuvo-blue)',
-                color: '#fff', borderRadius: 'var(--r-md)',
-                fontSize: 14, fontWeight: 500,
-                cursor: loading ? 'not-allowed' : 'pointer',
-                fontFamily: 'var(--font-sans)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                opacity: loading ? 0.75 : 1,
-                transition: 'opacity 0.15s',
-              }}
-            >
-              {loading && <Spinner />}
+            <Button type="submit" block size="lg" loading={loading} style={{ marginTop: 4 }}>
               {loading ? 'Iniciando sesión…' : 'Iniciar sesión'}
-            </button>
-
+            </Button>
           </form>
-        </div>
+        </Card>
       </div>
-    </>
+    </div>
   )
 }

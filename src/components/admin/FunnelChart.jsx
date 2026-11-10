@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase, isSupabaseConfigured } from '../../lib/supabase'
 import { STAGES, STAGE_BY_ID } from '../../constants/stages'
+import { Card, Empty, Bone } from '../ui'
 
 // ── hook ─────────────────────────────────────────────────────────────────────
 function useAdminFunnel() {
@@ -42,57 +43,60 @@ function useAdminFunnel() {
   return { data, loading }
 }
 
+function CardHead({ title, sub, children }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
+      <div style={{ minWidth: 0 }}>
+        <div className="k-h2">{title}</div>
+        {sub && <div className="k-muted" style={{ fontSize: 13, marginTop: 2 }}>{sub}</div>}
+      </div>
+      {children}
+    </div>
+  )
+}
+
 // ── component ─────────────────────────────────────────────────────────────────
 export default function FunnelChart() {
   const { data, loading } = useAdminFunnel()
   const hasData = data.some(d => d.count > 0)
-  const max     = data[0]?.count || 1
+  const max     = Math.max(...data.map(d => d.count), 1)
 
   return (
-    <div className="card" style={{ padding: 20, gridColumn: 'span 4', background: 'var(--surface)' }}>
-      <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg)' }}>Embudo de ventas</div>
-        <div style={{ fontSize: 11, color: 'var(--fg-secondary)' }}>Distribución actual del pipeline</div>
-      </div>
+    <Card style={{ padding: 20, height: '100%' }}>
+      <CardHead title="Embudo de ventas" sub="Prospectos por etapa" />
 
       {loading ? (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, color: 'var(--fg-tertiary)', fontSize: 13 }}>
-          Cargando…
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {[0, 1, 2, 3, 4].map(i => <Bone key={i} h={32} r="var(--r-full)" />)}
         </div>
       ) : !hasData ? (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 120, gap: 6, color: 'var(--fg-tertiary)', fontSize: 13 }}>
-          <div style={{ fontSize: 24, opacity: 0.4 }}>🎯</div>
-          <div>Sin prospectos aún</div>
-        </div>
+        <Empty icon="target">Sin prospectos aún</Empty>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
           {data.map((row, i) => {
             const stage = STAGE_BY_ID[row.id]
-            const width = max > 0 ? (row.count / max) * 100 : 0
+            const width = (row.count / max) * 100
             const prev  = i > 0 ? data[i - 1].count : null
             const conv  = prev && prev > 0 ? Math.round((row.count / prev) * 100) : null
             return (
               <div key={row.id}>
                 {conv !== null && (
-                  <div style={{ fontSize: 10, color: 'var(--fg-tertiary)', textAlign: 'center', padding: '1px 0' }}>
-                    ↓ {conv}% conversión
+                  <div className="k-dim" style={{ fontSize: 12, padding: '2px 0 2px 100px' }}>
+                    {conv}% respecto a la etapa anterior
                   </div>
                 )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 90, fontSize: 12, color: 'var(--fg)', fontWeight: 500 }}>{row.label}</div>
-                  <div style={{ flex: 1, position: 'relative', height: 30 }}>
+                  <div style={{ width: 90, fontSize: 14, fontWeight: 500, flexShrink: 0 }}>{row.label}</div>
+                  <div style={{ flex: 1, height: 32, borderRadius: 'var(--r-full)', background: 'var(--bg-secondary)', overflow: 'hidden' }}>
                     <div style={{
-                      position: 'absolute', left: 0, top: 0, bottom: 0,
-                      width: width > 0 ? `${width}%` : '4px',
-                      background: stage.color + '24',
-                      borderLeft: `3px solid ${stage.color}`,
-                      borderRadius: '0 4px 4px 0',
-                      display: 'flex', alignItems: 'center', paddingLeft: 8,
+                      width: `max(${width}%, 44px)`, height: '100%',
+                      background: stage.color, borderRadius: 'var(--r-full)',
+                      display: 'flex', alignItems: 'center', paddingLeft: 14,
                     }}>
-                      <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)', fontVariantNumeric: 'tabular-nums' }}>{row.count}</span>
+                      <span className="k-num" style={{ fontSize: 15, color: '#fff' }}>{row.count}</span>
                     </div>
                   </div>
-                  <div style={{ width: 60, textAlign: 'right', fontSize: 11, color: 'var(--fg-secondary)', fontVariantNumeric: 'tabular-nums' }}>
+                  <div className="k-muted" style={{ width: 52, textAlign: 'right', fontSize: 13, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
                     {row.value >= 1000 ? '$' + (row.value / 1000).toFixed(0) + 'k' : row.value > 0 ? '$' + row.value : '—'}
                   </div>
                 </div>
@@ -101,6 +105,6 @@ export default function FunnelChart() {
           })}
         </div>
       )}
-    </div>
+    </Card>
   )
 }

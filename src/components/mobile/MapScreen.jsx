@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { STAGE_BY_ID } from '../../constants/stages'
 import Icon from '../shared/Icon'
+import { Card, Pill, Empty, Bone } from '../ui'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 
@@ -62,7 +63,7 @@ function MapView({ prospects, routeProspects }) {
     if (routeProspects?.length > 1) {
       const line = Lf.polyline(
         routeProspects.map(p => [p.lat, p.lng]),
-        { color: '#185FA5', weight: 2.5, opacity: 0.65, dashArray: '6 4' }
+        { color: '#0E0E0E', weight: 3, opacity: 0.7, dashArray: '6 6' }
       ).addTo(map)
       layersRef.current.push(line)
     }
@@ -76,20 +77,26 @@ function MapView({ prospects, routeProspects }) {
         iconSize: [30, 30], iconAnchor: [15, 30], popupAnchor: [0, -32],
       })
       const marker = Lf.marker([pin.lat, pin.lng], { icon }).addTo(map)
-      marker.bindPopup(`
-        <div style="font-family:Inter,sans-serif;min-width:160px">
-          <div style="font-size:13px;font-weight:600;color:#111;margin-bottom:4px">${pin.name}</div>
-          <div style="font-size:11px;color:#666;margin-bottom:6px">${pin.address || ''}</div>
-          <span style="font-size:11px;font-weight:500;color:${s.color};background:${s.color}22;padding:2px 8px;border-radius:99px">${s.label}</span>
-        </div>
-      `, { maxWidth: 220 })
+      const popup = document.createElement('div')
+      popup.style.cssText = 'font-family:Inter,sans-serif;min-width:170px'
+      const pName = document.createElement('div')
+      pName.textContent = pin.name
+      pName.style.cssText = 'font-size:15px;font-weight:600;color:#0E0E0E;margin-bottom:4px'
+      const pAddr = document.createElement('div')
+      pAddr.textContent = pin.address || ''
+      pAddr.style.cssText = 'font-size:13px;color:#4A4A47;margin-bottom:8px'
+      const pStage = document.createElement('span')
+      pStage.textContent = s.label
+      pStage.style.cssText = `font-size:12px;font-weight:600;color:#0E0E0E;background:${s.color}33;padding:4px 10px;border-radius:99px`
+      popup.append(pName, pAddr, pStage)
+      marker.bindPopup(popup, { maxWidth: 240 })
       layersRef.current.push(marker)
     })
 
     // Route order numbers on top
     routeProspects?.forEach((pin, order) => {
       const cm = Lf.circleMarker([pin.lat, pin.lng], {
-        radius: 7, fillColor: '#fff', color: '#185FA5', weight: 2, fillOpacity: 1,
+        radius: 9, fillColor: '#D9F25A', color: '#0E0E0E', weight: 2, fillOpacity: 1,
       }).addTo(map)
         .bindTooltip(`${order + 1}`, { permanent: true, direction: 'center', className: 'leaflet-order-tooltip' })
       layersRef.current.push(cm)
@@ -108,12 +115,12 @@ function MapView({ prospects, routeProspects }) {
 
 function SkeletonRoute() {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '6px 0' }}>
       {[1, 2, 3].map(i => (
-        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--bg-secondary)', flexShrink: 0 }} />
-          <div style={{ flex: 1, height: 12, borderRadius: 4, background: 'var(--bg-secondary)' }} />
-          <div style={{ width: 48, height: 18, borderRadius: 10, background: 'var(--bg-secondary)' }} />
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Bone w={32} h={32} r="50%" style={{ flexShrink: 0 }} />
+          <Bone h={16} style={{ flex: 1 }} />
+          <Bone w={72} h={24} r={99} />
         </div>
       ))}
     </div>
@@ -143,6 +150,7 @@ export default function MapScreen() {
 
   // Realtime — redraw when any prospect changes for this user
   useEffect(() => {
+    if (!supabase) return
     const ch = supabase
       .channel(`map-${user.id}`)
       .on('postgres_changes', {
@@ -163,60 +171,59 @@ export default function MapScreen() {
     : null
 
   return (
-    <div style={{ background: 'var(--bg)', minHeight: '100%', display: 'flex', flexDirection: 'column', paddingBottom: 92 }}>
+    <div style={{ background: 'var(--bg)', minHeight: '100%', display: 'flex', flexDirection: 'column', paddingBottom: 170 }}>
 
       {/* Header */}
-      <div style={{ padding: '8px 16px 12px' }}>
-        <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--fg)' }}>Mapa de prospectos</div>
-        <div style={{ fontSize: 12, color: 'var(--fg-secondary)', marginTop: 2 }}>
+      <div className="k-screenhead" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
+        <div className="k-screenhead__title">Mapa de prospectos</div>
+        <div style={{ fontSize: 14, color: 'var(--fg-secondary)' }}>
           {loading
             ? 'Cargando…'
             : prospects.length === 0
               ? 'Sin prospectos con ubicación aún'
-              : `${prospects.length} prospecto${prospects.length !== 1 ? 's' : ''} con ubicación · OpenStreetMap`
+              : `${prospects.length} prospecto${prospects.length !== 1 ? 's' : ''} con ubicación`
           }
         </div>
       </div>
 
       {/* Map */}
-      <div style={{ margin: '0 16px', height: 400, borderRadius: 'var(--r-lg)', overflow: 'hidden', border: '0.5px solid var(--border)', position: 'relative', zIndex: 0 }}>
+      <div style={{ margin: '0 14px', height: 400, borderRadius: 'var(--r-xl)', overflow: 'hidden', position: 'relative', zIndex: 0, background: 'var(--surface)' }}>
         <MapView prospects={prospects} routeProspects={routeProspects} />
         {prospects.length === 0 && !loading && (
-          <div style={{
-            position: 'absolute', inset: 0, background: 'rgba(var(--bg-rgb, 255,255,255), 0.92)',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            gap: 10, backdropFilter: 'blur(2px)', zIndex: 10,
-          }}>
-            <Icon name="map-off" size={36} color="var(--fg-tertiary)" />
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg-secondary)' }}>Sin ubicaciones registradas</div>
-              <div style={{ fontSize: 12, color: 'var(--fg-tertiary)', marginTop: 4 }}>Agrega la dirección al crear un prospecto para verlo aquí</div>
-            </div>
+          <div style={{ position: 'absolute', inset: 0, zIndex: 1000, background: 'var(--surface)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Empty icon="map-2">
+              <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--fg)' }}>Sin ubicaciones registradas</div>
+              <div style={{ fontSize: 14, marginTop: 4 }}>Agrega la dirección al crear un prospecto para verlo aquí</div>
+            </Empty>
           </div>
         )}
       </div>
 
+      {/* Legend */}
+      <div style={{ margin: '12px 14px 0', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {['prospeccion','presentacion','cotizacion','negociacion','cierre'].map(id => {
+          const s = STAGE_BY_ID[id]
+          return (
+            <Pill key={id} style={{ background: 'var(--surface)' }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: s.color }} />
+              {s.label}
+            </Pill>
+          )
+        })}
+      </div>
+
       {/* Route card */}
-      <div style={{ margin: '12px 16px 0', padding: '12px 14px', background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 'var(--r-lg)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>Ruta sugerida</div>
-            <div style={{ fontSize: 11, color: 'var(--fg-secondary)', marginTop: 1 }}>
+      <Card style={{ margin: '14px 14px 0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8 }}>
+          <div style={{ minWidth: 0 }}>
+            <div className="k-h2">Ruta sugerida</div>
+            <div style={{ fontSize: 13, color: 'var(--fg-secondary)', marginTop: 2 }}>
               {loading ? '…' : `${routeProspects.length} parada${routeProspects.length !== 1 ? 's' : ''} · por prioridad de etapa`}
             </div>
           </div>
           {mapsUrl && (
-            <a
-              href={mapsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                padding: '8px 14px', background: 'var(--kiuvo-blue)', color: '#fff',
-                borderRadius: 'var(--r-md)', fontSize: 12, fontWeight: 500,
-                textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6,
-              }}
-            >
-              <Icon name="navigation" size={14} color="#fff" />
+            <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="k-btn k-btn--primary" style={{ flexShrink: 0 }}>
+              <Icon name="navigation" size={18} />
               Abrir en Maps
             </a>
           )}
@@ -225,60 +232,46 @@ export default function MapScreen() {
         {loading ? (
           <SkeletonRoute />
         ) : routeProspects.length === 0 ? (
-          <div style={{ padding: '10px 0', fontSize: 12, color: 'var(--fg-tertiary)', textAlign: 'center' }}>
+          <div style={{ padding: '12px 0', fontSize: 15, color: 'var(--fg-secondary)' }}>
             Agrega prospectos con dirección para ver la ruta
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div>
             {routeProspects.map((pin, order) => {
               const s = STAGE_BY_ID[pin.stage_id] ?? STAGE_BY_ID['prospeccion']
               return (
-                <div key={pin.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{
-                    width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
-                    background: 'var(--kiuvo-blue-soft)', color: 'var(--kiuvo-blue)',
+                <div key={pin.id} style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 56, padding: '8px 0', borderTop: order ? '1px solid var(--border)' : 'none' }}>
+                  <div className="k-display" style={{
+                    width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+                    background: 'var(--primary-bg)', color: 'var(--primary-fg)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 10, fontWeight: 600,
+                    fontSize: 15, fontWeight: 700,
                   }}>{order + 1}</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <div style={{ fontSize: 16, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {pin.name}
                     </div>
                     {pin.address && (
-                      <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <div style={{ fontSize: 13, color: 'var(--fg-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {pin.address}
                       </div>
                     )}
                   </div>
-                  <span style={{ fontSize: 10, fontWeight: 500, color: s.color, background: s.color + '18', padding: '2px 6px', borderRadius: 99, flexShrink: 0 }}>
+                  <Pill style={{ flexShrink: 0 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: s.color }} />
                     {s.label}
-                  </span>
+                  </Pill>
                 </div>
               )
             })}
           </div>
         )}
-      </div>
-
-      {/* Legend */}
-      <div style={{ margin: '10px 16px 0', display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-        {['prospeccion','presentacion','cotizacion','negociacion','cierre'].map(id => {
-          const s = STAGE_BY_ID[id]
-          return (
-            <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: s.color }} />
-              <span style={{ fontSize: 11, color: 'var(--fg-secondary)' }}>{s.label}</span>
-            </div>
-          )
-        })}
-      </div>
+      </Card>
 
       {/* Note */}
-      <div style={{ margin: '10px 16px 0', padding: '10px 12px', background: 'var(--bg-secondary)', borderRadius: 'var(--r-md)', display: 'flex', alignItems: 'center', gap: 8 }}>
-        <Icon name="map-2" size={15} color="var(--fg-tertiary)" />
-        <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', lineHeight: 1.5 }}>
-          Mapa gratuito con <strong>OpenStreetMap</strong> + Leaflet. La dirección se geocodifica automáticamente al crear un prospecto.
-        </div>
+      <div style={{ margin: '12px 18px 0', display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, color: 'var(--fg-tertiary)', lineHeight: 1.5 }}>
+        <Icon name="info-circle" size={16} style={{ marginTop: 2 }} />
+        <div>La ubicación se toma de la dirección del prospecto o de su primer check-in con GPS.</div>
       </div>
     </div>
   )

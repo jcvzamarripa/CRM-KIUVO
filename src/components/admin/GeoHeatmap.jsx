@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import Icon from '../shared/Icon'
+import { Card, Button, Empty, Bone } from '../ui'
 import { supabase, isSupabaseConfigured } from '../../lib/supabase'
 
 // ── hook ─────────────────────────────────────────────────────────────────────
@@ -26,10 +26,10 @@ function useProspectGeo() {
 }
 
 const HEALTH_HEX = {
-  green: '#1D9E75',
-  amber: '#EF9F27',
-  red:   '#D85A30',
-  black: '#888780',
+  green: '#0E0E0E',
+  amber: '#B4A5F5',
+  red:   '#F26B5E',
+  black: '#185FA5',
 }
 
 // ── Mini Leaflet map ──────────────────────────────────────────────────────────
@@ -63,12 +63,12 @@ function MiniMap({ points }) {
         const icon = Lf.divIcon({
           className: '',
           html: `<div style="
-            width:10px;height:10px;border-radius:50%;
+            width:12px;height:12px;border-radius:50%;
             background:${color};border:2px solid #fff;
             box-shadow:0 1px 3px rgba(0,0,0,0.35);
           "></div>`,
-          iconSize:   [10, 10],
-          iconAnchor: [5, 5],
+          iconSize:   [12, 12],
+          iconAnchor: [6, 6],
         })
         const marker = Lf.marker([p.lat, p.lng], { icon })
         marker.bindPopup(`<b>${p.name}</b>`)
@@ -105,57 +105,45 @@ export default function GeoHeatmap({ onOpenMap }) {
   const { points, loading } = useProspectGeo()
 
   return (
-    <div className="card" style={{ padding: 20, gridColumn: 'span 6', background: 'var(--surface)' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg)' }}>Actividad geográfica</div>
-          <div style={{ fontSize: 11, color: 'var(--fg-secondary)' }}>
+    <Card style={{ padding: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
+        <div style={{ minWidth: 0 }}>
+          <div className="k-h2">Prospectos en el mapa</div>
+          <div className="k-muted" style={{ fontSize: 13, marginTop: 2 }}>
             {loading
               ? 'Cargando…'
               : `${points.length} prospecto${points.length !== 1 ? 's' : ''} con ubicación registrada`}
           </div>
         </div>
-        <button
-          onClick={onOpenMap}
-          style={{ fontSize: 12, color: 'var(--kiuvo-blue)', fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer' }}
-        >
-          Abrir mapa →
-        </button>
+        <Button variant="soft" size="sm" icon="map-2" onClick={onOpenMap}>Abrir mapa</Button>
       </div>
 
-      {/* Map area */}
-      <div style={{ height: 200, borderRadius: 'var(--r-md)', overflow: 'hidden', position: 'relative', background: 'var(--bg-secondary)' }}>
+      <div style={{ height: 240, borderRadius: 'var(--r-md)', overflow: 'hidden', position: 'relative', background: 'var(--bg-secondary)', zIndex: 0 }}>
         {loading ? (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--fg-tertiary)', fontSize: 13 }}>
-            Cargando…
-          </div>
+          <Bone h="100%" r={0} />
         ) : points.length === 0 ? (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, color: 'var(--fg-tertiary)' }}>
-            <Icon name="map-pin" size={28} color="var(--fg-tertiary)" />
-            <div style={{ fontSize: 13 }}>Sin ubicaciones registradas</div>
-            <div style={{ fontSize: 11 }}>Agrega lat/lng a los prospectos para ver el mapa.</div>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', justifyContent: 'center' }}>
+            <Empty icon="map-pin">Sin ubicaciones registradas.<br />Se llenan solas con el primer check-in de cada prospecto.</Empty>
           </div>
         ) : (
           <MiniMap points={points} />
         )}
       </div>
 
-      {/* Leyenda */}
       {!loading && points.length > 0 && (
-        <div style={{ display: 'flex', gap: 14, marginTop: 10, flexWrap: 'wrap' }}>
+        <div className="k-muted" style={{ display: 'flex', gap: 16, marginTop: 12, flexWrap: 'wrap', fontSize: 13 }}>
           {[
             { color: HEALTH_HEX.green, label: 'Al día' },
             { color: HEALTH_HEX.amber, label: 'En riesgo' },
             { color: HEALTH_HEX.red,   label: 'Urgente' },
           ].map(({ color, label }) => (
-            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--fg-secondary)' }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, display: 'inline-block' }} />
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 10, height: 10, borderRadius: '50%', background: color, display: 'inline-block' }} />
               {label}
             </div>
           ))}
         </div>
       )}
-    </div>
+    </Card>
   )
 }

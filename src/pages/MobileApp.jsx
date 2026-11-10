@@ -13,6 +13,7 @@ import ReactivadorModal from '../components/mobile/ReactivadorModal'
 import ProfileScreen from '../components/mobile/ProfileScreen'
 import MapScreen from '../components/mobile/MapScreen'
 import Icon from '../components/shared/Icon'
+import { Card, Empty } from '../components/ui'
 import { useAuth } from '../contexts/AuthContext'
 
 // Carga lazy: react-pdf (~1.4 MB) solo cuando el usuario abre el módulo de cotizaciones
@@ -21,17 +22,25 @@ const SellerQuotesScreen = lazy(() => import('../components/mobile/SellerQuotesS
 
 function PlaceholderScreen({ title, icon }) {
   return (
-    <div style={{ background: 'var(--bg)', minHeight: '100%', padding: '16px 16px 92px' }}>
-      <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--fg)', marginBottom: 12 }}>{title}</div>
-      <div style={{
-        height: 400, border: '0.5px dashed var(--border-strong)', borderRadius: 'var(--r-lg)',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        color: 'var(--fg-tertiary)', gap: 8,
-      }}>
-        <Icon name={icon} size={32} />
-        <div style={{ fontSize: 12 }}>Próximamente</div>
-      </div>
+    <div style={{ background: 'var(--bg)', minHeight: '100%', padding: '14px 14px 120px' }}>
+      <div className="k-h1" style={{ margin: '4px 4px 16px' }}>{title}</div>
+      <Card><Empty icon={icon}>Próximamente</Empty></Card>
     </div>
+  )
+}
+
+function MenuRow({ icon, title, sub, onClick, danger }) {
+  return (
+    <button onClick={onClick} className="k-row" style={{ minHeight: 72, color: danger ? 'var(--coral-fg)' : 'var(--fg)' }}>
+      <span className="k-iconbtn k-iconbtn--soft" style={danger ? { background: 'var(--coral-soft)', color: 'var(--coral-fg)' } : undefined}>
+        <Icon name={icon} size={22} />
+      </span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: 'block', fontSize: 16, fontWeight: 600 }}>{title}</span>
+        <span style={{ display: 'block', fontSize: 13, marginTop: 2, color: danger ? 'inherit' : 'var(--fg-secondary)' }}>{sub}</span>
+      </span>
+      {!danger && <Icon name="chevron-right" size={20} color="var(--fg-tertiary)" />}
+    </button>
   )
 }
 
@@ -98,59 +107,15 @@ export default function MobileApp({ dark, onToggleDark }) {
     content = <Suspense fallback={null}><SellerQuotesScreen onBack={() => setMasSubScreen(null)} /></Suspense>
   else
     content = (
-      <div style={{ background: 'var(--bg)', minHeight: '100%', padding: '16px 16px 92px' }}>
-        <div style={{ fontSize: 22, fontWeight: 500, color: 'var(--fg)', marginBottom: 16 }}>Más opciones</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {/* Mis cotizaciones */}
-          <button onClick={() => setMasSubScreen('cotizaciones')} style={{
-            width: '100%', padding: '14px',
-            display: 'flex', alignItems: 'center', gap: 14,
-            background: 'var(--surface)', border: '0.5px solid var(--border)',
-            borderRadius: 'var(--r-md)', color: 'var(--fg)', fontSize: 14,
-          }}>
-            <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#FEF3E2', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Icon name="file-invoice" size={20} color="#854F0B" />
-            </div>
-            <div style={{ flex: 1, textAlign: 'left' }}>
-              <div style={{ fontWeight: 500 }}>Mis cotizaciones</div>
-              <div style={{ fontSize: 12, color: 'var(--fg-tertiary)', marginTop: 1 }}>Historial y descarga de PDFs</div>
-            </div>
-            <Icon name="chevron-right" size={18} color="var(--fg-tertiary)" />
-          </button>
-
-          {/* Perfil */}
-          <button onClick={() => setMasSubScreen('perfil')} style={{
-            width: '100%', padding: '14px',
-            display: 'flex', alignItems: 'center', gap: 14,
-            background: 'var(--surface)', border: '0.5px solid var(--border)',
-            borderRadius: 'var(--r-md)', color: 'var(--fg)', fontSize: 14,
-          }}>
-            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--kiuvo-blue-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Icon name="user-circle" size={20} color="var(--kiuvo-blue)" />
-            </div>
-            <div style={{ flex: 1, textAlign: 'left' }}>
-              <div style={{ fontWeight: 500 }}>Perfil</div>
-              <div style={{ fontSize: 12, color: 'var(--fg-tertiary)', marginTop: 1 }}>Foto, nombre y preferencias</div>
-            </div>
-            <Icon name="chevron-right" size={18} color="var(--fg-tertiary)" />
-          </button>
-
-          {/* Cerrar sesión */}
-          <button onClick={signOut} style={{
-            width: '100%', padding: '14px',
-            display: 'flex', alignItems: 'center', gap: 14,
-            background: 'var(--surface)', border: '0.5px solid var(--border)',
-            borderRadius: 'var(--r-md)', color: 'var(--danger)', fontSize: 14,
-          }}>
-            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--danger-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Icon name="logout" size={20} color="var(--danger)" />
-            </div>
-            <div style={{ flex: 1, textAlign: 'left' }}>
-              <div style={{ fontWeight: 500 }}>Cerrar sesión</div>
-              <div style={{ fontSize: 12, color: 'var(--fg-tertiary)', marginTop: 1 }}>Salir de la cuenta</div>
-            </div>
-          </button>
-        </div>
+      <div style={{ background: 'var(--bg)', minHeight: '100%', padding: '14px 14px 120px' }}>
+        <div className="k-h1" style={{ margin: '4px 4px 16px' }}>Más opciones</div>
+        <Card flush>
+          <MenuRow icon="file-invoice" title="Mis cotizaciones" sub="Historial y descarga de PDFs" onClick={() => setMasSubScreen('cotizaciones')} />
+          <MenuRow icon="user-circle" title="Perfil" sub="Foto, nombre y preferencias" onClick={() => setMasSubScreen('perfil')} />
+        </Card>
+        <Card flush style={{ marginTop: 12 }}>
+          <MenuRow danger icon="logout" title="Cerrar sesión" sub="Salir de la cuenta" onClick={signOut} />
+        </Card>
       </div>
     )
 

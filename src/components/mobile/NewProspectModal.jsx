@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import Icon from '../shared/Icon'
+import { Sheet, Button, Chip, Label } from '../ui'
 import { compressImage } from '../../lib/photo'
 import { supabase, isSupabaseConfigured } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -9,52 +10,20 @@ import useOnlineStatus from '../../hooks/useOnlineStatus'
 
 const EMPLOYEE_RANGES = ['1–10', '11–50', '51–200', '201–500', '500+']
 
-function CameraIcon({ size = 22, color = 'currentColor' }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3L14.5 4z" />
-      <circle cx="12" cy="13" r="3" />
-    </svg>
-  )
-}
+const ICON_INPUT = { paddingLeft: 46 }
+const ICON_POS = { position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: 'var(--fg-tertiary)', pointerEvents: 'none' }
+const HINT = { display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 13 }
+const errorRing = on => (on ? { boxShadow: 'inset 0 0 0 2px var(--coral)' } : null)
 
-function GpsPinIcon({ size = 18, color = 'currentColor' }) {
+function IconField({ icon, label, children, error }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 2a7 7 0 0 1 7 7c0 4.5-7 13-7 13S5 13.5 5 9a7 7 0 0 1 7-7z" />
-      <circle cx="12" cy="9" r="2.5" />
-      <line x1="12" y1="2" x2="12" y2="0.5" />
-      <line x1="12" y1="21.5" x2="12" y2="23" />
-      <line x1="2" y1="9" x2="0.5" y2="9" />
-      <line x1="21.5" y1="9" x2="23" y2="9" />
-    </svg>
-  )
-}
-
-const inputStyle = {
-  width: '100%', boxSizing: 'border-box',
-  padding: '10px 12px 10px 32px',
-  background: 'var(--bg-secondary)', border: '0.5px solid var(--border)',
-  borderRadius: 'var(--r-md)', fontSize: 13, color: 'var(--fg)',
-  outline: 'none', fontFamily: 'inherit',
-}
-
-function Field({ icon, label, children, error }) {
-  return (
-    <div style={{ marginBottom: 14 }}>
-      <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', letterSpacing: 0.5, marginBottom: 6 }}>
-        {label}
-      </div>
+    <div style={{ marginBottom: 18 }}>
+      <Label>{label}</Label>
       <div style={{ position: 'relative' }}>
-        <Icon
-          name={icon} size={15}
-          style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--fg-tertiary)', pointerEvents: 'none' }}
-        />
+        <Icon name={icon} size={18} style={ICON_POS} />
         {children}
       </div>
-      {error && <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4 }}>{error}</div>}
+      {error && <div style={{ fontSize: 13, color: 'var(--coral-fg)', marginTop: 6 }}>{error}</div>}
     </div>
   )
 }
@@ -122,73 +91,70 @@ function LocationField({ value, onChange, onCoords }) {
   }
 
   const isGpsErr = gpsState === 'error' || gpsState === 'denied'
-  const gpsColor = gpsState === 'done' ? 'var(--success)' : isGpsErr ? 'var(--danger)' : 'var(--kiuvo-blue)'
-  const gpsIcon  = gpsState === 'loading' ? 'loader' : gpsState === 'done' ? 'check' : isGpsErr ? 'alert-circle' : null
+  const gpsIcon  = gpsState === 'loading' ? 'loader' : gpsState === 'done' ? 'check' : isGpsErr ? 'alert-circle' : 'current-location'
+  const gpsBg    = gpsState === 'done' ? 'var(--success-bg)' : isGpsErr ? 'var(--coral-soft)' : 'var(--primary-bg)'
+  const gpsFg    = gpsState === 'done' ? 'var(--success-fg)' : isGpsErr ? 'var(--coral-fg)' : 'var(--primary-fg)'
+  const gpsTitle = isGpsErr ? 'No se pudo obtener ubicación' : 'Usar mi ubicación actual'
 
   return (
-    <div style={{ marginBottom: 14 }}>
-      <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', letterSpacing: 0.5, marginBottom: 6 }}>
-        UBICACIÓN
-      </div>
-      <div style={{ display: 'flex', gap: 6 }}>
-        {/* Text input */}
+    <div style={{ marginBottom: 18 }}>
+      <Label>Ubicación</Label>
+      <div style={{ display: 'flex', gap: 8 }}>
         <div style={{ flex: 1, position: 'relative' }}>
-          <Icon name="map-pin" size={15} style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--fg-tertiary)', pointerEvents: 'none' }} />
+          <Icon name="map-pin" size={18} style={ICON_POS} />
           <input
+            className="k-input"
             value={value}
             onChange={handleChange}
             onBlur={handleBlur}
-            placeholder="Dirección o usa el GPS →"
-            style={inputStyle}
+            placeholder="Dirección o usa el GPS"
+            style={ICON_INPUT}
           />
         </div>
 
-        {/* GPS button */}
         <button
+          type="button"
+          className="k-iconbtn"
           onClick={handleGPS}
           disabled={gpsState === 'loading'}
-          title={isGpsErr ? 'No se pudo obtener ubicación' : 'Usar mi ubicación actual'}
-          style={{
-            flexShrink: 0, width: 42, height: 42,
-            borderRadius: 'var(--r-md)',
-            border: `0.5px solid ${isGpsErr ? 'var(--danger-border)' : gpsState === 'done' ? 'var(--success)' : 'var(--border)'}`,
-            background: gpsState === 'done' ? 'var(--success-bg)' : isGpsErr ? 'var(--danger-bg)' : 'var(--surface)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: gpsColor,
-          }}
+          aria-label={gpsTitle}
+          title={gpsTitle}
+          style={{ background: gpsBg, color: gpsFg }}
         >
-          {gpsIcon
-            ? <Icon name={gpsIcon} size={18} style={gpsState === 'loading' ? { animation: 'spin 1s linear infinite' } : {}} />
-            : <GpsPinIcon size={18} color={gpsColor} />
-          }
+          <span className={gpsState === 'loading' ? 'k-spin' : undefined} style={{ display: 'inline-flex' }}>
+            <Icon name={gpsIcon} size={22} />
+          </span>
         </button>
       </div>
 
-      {/* Geocoding status */}
       {geocoding && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 5, fontSize: 11, color: 'var(--fg-tertiary)' }}>
-          <Icon name="loader" size={12} style={{ animation: 'spin 0.8s linear infinite' }} />
+        <div style={{ ...HINT, color: 'var(--fg-tertiary)' }}>
+          <span className="k-spin" style={{ display: 'inline-flex' }}><Icon name="loader" size={14} /></span>
           Buscando coordenadas…
         </div>
       )}
       {!geocoding && geocoded && gpsState !== 'done' && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 5, fontSize: 11, color: 'var(--success)' }}>
-          <Icon name="map-pin" size={12} color="var(--success)" />
-          Ubicación geocodificada
+        <div style={{ ...HINT, color: 'var(--success-fg)' }}>
+          <Icon name="map-pin" size={14} />
+          Ubicación encontrada
+        </div>
+      )}
+      {gpsState === 'done' && (
+        <div style={{ ...HINT, color: 'var(--success-fg)' }}>
+          <Icon name="map-pin-check" size={14} />
+          Ubicación tomada del GPS
         </div>
       )}
       {gpsState === 'denied' && (
-        <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4 }}>
+        <div style={{ ...HINT, color: 'var(--coral-fg)' }}>
           Permiso de ubicación denegado. Actívalo en Ajustes → Privacidad → Ubicación.
         </div>
       )}
       {gpsState === 'error' && (
-        <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4 }}>
+        <div style={{ ...HINT, color: 'var(--coral-fg)' }}>
           No se pudo obtener la ubicación. Intenta de nuevo o escríbela manualmente.
         </div>
       )}
-
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   )
 }
@@ -236,64 +202,41 @@ function PhotoField({ photo, onPhoto }) {
   }
 
   const handleRemove = () => onPhoto(null)
+  const overlayBtn = {
+    position: 'absolute', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+    minHeight: 44, borderRadius: 'var(--r-full)', background: 'rgba(0,0,0,0.6)', color: 'var(--on-ink)',
+    fontSize: 14, fontWeight: 600,
+  }
 
   return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', letterSpacing: 0.5, marginBottom: 8 }}>
-        FOTO DE FACHADA <span style={{ fontWeight: 400, opacity: 0.7 }}>(opcional)</span>
-      </div>
+    <div style={{ marginBottom: 18 }}>
+      <Label>Foto de fachada (opcional)</Label>
 
       {photo ? (
-        <div style={{ position: 'relative', borderRadius: 'var(--r-md)', overflow: 'hidden', border: '0.5px solid var(--border)' }}>
-          <img src={photo} alt="Fachada" style={{ width: '100%', height: 160, objectFit: 'cover', display: 'block' }} />
-          <button
-            onClick={handleRemove}
-            style={{
-              position: 'absolute', top: 8, right: 8,
-              width: 28, height: 28, borderRadius: '50%',
-              background: 'rgba(0,0,0,0.55)', border: 'none',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#fff',
-            }}
-          >
-            <Icon name="x" size={14} />
+        <div style={{ position: 'relative', borderRadius: 'var(--r-lg)', overflow: 'hidden' }}>
+          <img src={photo} alt="Fachada" style={{ width: '100%', height: 180, objectFit: 'cover', display: 'block' }} />
+          <button type="button" onClick={handleRemove} aria-label="Quitar foto" style={{ ...overlayBtn, top: 8, right: 8, width: 44 }}>
+            <Icon name="x" size={18} />
           </button>
-          <button
-            onClick={openPicker}
-            style={{
-              position: 'absolute', bottom: 8, right: 8,
-              padding: '5px 10px', borderRadius: 'var(--r-md)',
-              background: 'rgba(0,0,0,0.55)', border: 'none',
-              color: '#fff', fontSize: 11, fontWeight: 500,
-              display: 'flex', alignItems: 'center', gap: 4,
-            }}
-          >
-            <CameraIcon size={12} color="#fff" />
+          <button type="button" onClick={openPicker} style={{ ...overlayBtn, bottom: 8, right: 8, padding: '0 16px' }}>
+            <Icon name="camera" size={16} />
             Cambiar
           </button>
         </div>
       ) : (
         <button
+          type="button"
           onClick={openPicker}
           style={{
-            width: '100%', padding: '20px 0',
-            border: '1px dashed var(--border-strong)',
-            borderRadius: 'var(--r-md)',
-            background: 'var(--bg-secondary)',
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
-            color: 'var(--fg-tertiary)',
+            width: '100%', minHeight: 128, padding: 16,
+            borderRadius: 'var(--r-lg)', background: 'var(--surface)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10,
           }}
         >
-          <div style={{
-            width: 44, height: 44, borderRadius: 'var(--r-md)',
-            background: 'var(--kiuvo-blue-soft)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <CameraIcon size={22} color="var(--kiuvo-blue)" />
-          </div>
+          <span className="k-iconbtn k-iconbtn--soft"><Icon name="camera" size={22} /></span>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg-secondary)' }}>Tomar foto o elegir imagen</div>
-            <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginTop: 2 }}>Fachada del negocio</div>
+            <div style={{ fontSize: 15, fontWeight: 600 }}>Tomar foto o elegir imagen</div>
+            <div style={{ fontSize: 13, color: 'var(--fg-secondary)', marginTop: 2 }}>Fachada del negocio</div>
           </div>
         </button>
       )}
@@ -417,199 +360,131 @@ export default function NewProspectModal({ onClose, onCreated }) {
     }
   }
 
+  if (step === 'success') {
+    return (
+      <Sheet title={savedOffline ? 'Guardado' : 'Listo'} onClose={onClose}>
+        <SuccessView name={form.businessName || form.clientName} hasPhoto={photoSaved} offline={savedOffline} />
+      </Sheet>
+    )
+  }
+
   return (
-    <>
-      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100 }} />
-
-      <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 101,
-        background: 'var(--bg)', borderRadius: '20px 20px 0 0',
-        maxHeight: '92%', display: 'flex', flexDirection: 'column',
-        overflow: 'hidden',
-      }}>
-        {step === 'success' ? (
-          <SuccessView name={form.businessName || form.clientName} hasPhoto={photoSaved} offline={savedOffline} />
-        ) : (
-          <>
-            {/* Handle */}
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 2px' }}>
-              <div style={{ width: 40, height: 4, borderRadius: 2, background: 'var(--border-strong)' }} />
+    <Sheet
+      full
+      title="Nuevo prospecto"
+      onClose={onClose}
+      footer={
+        <>
+          {serverError && (
+            <div style={{ marginBottom: 10, padding: '12px 16px', background: 'var(--coral-soft)', color: 'var(--coral-fg)', borderRadius: 'var(--r-md)', fontSize: 14 }}>
+              {serverError}
             </div>
+          )}
+          <Button block size="lg" icon="user-plus" loading={loading} onClick={handleSubmit}>
+            {loading ? 'Guardando…' : 'Guardar prospecto'}
+          </Button>
+        </>
+      }
+    >
+      <IconField label="Nombre del cliente" icon="user-circle" error={errors.clientName}>
+        <input
+          className="k-input"
+          value={form.clientName}
+          onChange={set('clientName')}
+          placeholder="Ej. Juan García"
+          style={{ ...ICON_INPUT, ...errorRing(errors.clientName) }}
+        />
+      </IconField>
 
-            {/* Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px 8px' }}>
-              <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--fg)' }}>Nuevo prospecto</div>
-              <button onClick={onClose} style={{
-                width: 32, height: 32, borderRadius: '50%',
-                background: 'var(--bg-secondary)', border: 'none',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: 'var(--fg-secondary)',
-              }}>
-                <Icon name="x" size={16} />
-              </button>
-            </div>
+      <IconField label="Nombre del negocio" icon="building-store" error={errors.businessName}>
+        <input
+          className="k-input"
+          value={form.businessName}
+          onChange={set('businessName')}
+          placeholder="Ej. Ferretería García"
+          style={{ ...ICON_INPUT, ...errorRing(errors.businessName) }}
+        />
+      </IconField>
 
-            {/* Body */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '8px 16px 0' }}>
+      <IconField label="Teléfono" icon="phone" error={errors.phone}>
+        <input
+          className="k-input"
+          value={form.phone}
+          onChange={set('phone')}
+          placeholder="Ej. 442 123 4567"
+          type="tel"
+          inputMode="tel"
+          style={{ ...ICON_INPUT, ...errorRing(errors.phone) }}
+        />
+      </IconField>
 
-              <Field label="NOMBRE DEL CLIENTE" icon="user" error={errors.clientName}>
-                <input
-                  value={form.clientName}
-                  onChange={set('clientName')}
-                  placeholder="Ej. Juan García"
-                  style={{ ...inputStyle, borderColor: errors.clientName ? 'var(--danger)' : 'var(--border)' }}
-                />
-              </Field>
+      <IconField label="Correo electrónico" icon="mail" error={errors.email}>
+        <input
+          className="k-input"
+          value={form.email}
+          onChange={set('email')}
+          placeholder="Ej. contacto@negocio.com"
+          type="email"
+          inputMode="email"
+          style={{ ...ICON_INPUT, ...errorRing(errors.email) }}
+        />
+      </IconField>
 
-              <Field label="NOMBRE DEL NEGOCIO" icon="building-store" error={errors.businessName}>
-                <input
-                  value={form.businessName}
-                  onChange={set('businessName')}
-                  placeholder="Ej. Ferretería García"
-                  style={{ ...inputStyle, borderColor: errors.businessName ? 'var(--danger)' : 'var(--border)' }}
-                />
-              </Field>
+      <LocationField
+        value={form.location}
+        onChange={loc => setForm(f => ({ ...f, location: loc }))}
+        onCoords={setLocCoords}
+      />
 
-              <Field label="TELÉFONO" icon="phone" error={errors.phone}>
-                <input
-                  value={form.phone}
-                  onChange={set('phone')}
-                  placeholder="Ej. 442 123 4567"
-                  type="tel"
-                  inputMode="tel"
-                  style={{ ...inputStyle, borderColor: errors.phone ? 'var(--danger)' : 'var(--border)' }}
-                />
-              </Field>
-
-              <Field label="CORREO ELECTRÓNICO" icon="mail" error={errors.email}>
-                <input
-                  value={form.email}
-                  onChange={set('email')}
-                  placeholder="Ej. contacto@negocio.com"
-                  type="email"
-                  inputMode="email"
-                  style={{ ...inputStyle, borderColor: errors.email ? 'var(--danger)' : 'var(--border)' }}
-                />
-              </Field>
-
-              <LocationField
-                value={form.location}
-                onChange={loc => setForm(f => ({ ...f, location: loc }))}
-                onCoords={setLocCoords}
-              />
-
-              {/* Employees */}
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', letterSpacing: 0.5, marginBottom: 8 }}>
-                  NÚMERO DE EMPLEADOS
-                </div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {EMPLOYEE_RANGES.map(r => {
-                    const on = form.employees === r
-                    return (
-                      <button
-                        key={r}
-                        onClick={() => setForm(f => ({ ...f, employees: on ? '' : r }))}
-                        style={{
-                          padding: '7px 14px', borderRadius: 'var(--r-full)',
-                          border: `0.5px solid ${on ? 'var(--kiuvo-blue)' : 'var(--border)'}`,
-                          background: on ? 'var(--kiuvo-blue-soft)' : 'var(--surface)',
-                          color: on ? 'var(--kiuvo-blue-deep)' : 'var(--fg)',
-                          fontSize: 13, fontWeight: on ? 500 : 400,
-                        }}
-                      >
-                        {r}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* Notes */}
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', letterSpacing: 0.5, marginBottom: 6 }}>
-                  NOTAS <span style={{ fontWeight: 400, opacity: 0.7 }}>(opcional)</span>
-                </div>
-                <div style={{ position: 'relative' }}>
-                  <Icon
-                    name="file-text" size={15}
-                    style={{ position: 'absolute', left: 11, top: 11, color: 'var(--fg-tertiary)', pointerEvents: 'none' }}
-                  />
-                  <textarea
-                    value={form.notes}
-                    onChange={set('notes')}
-                    placeholder="Observaciones, interés del cliente, contexto…"
-                    rows={3}
-                    style={{
-                      ...inputStyle,
-                      paddingTop: 10, paddingBottom: 10,
-                      resize: 'none', verticalAlign: 'top', lineHeight: 1.45,
-                    }}
-                  />
-                </div>
-              </div>
-
-              <PhotoField photo={photo} onPhoto={(url, file) => { setPhoto(url); setPhotoFile(file || null) }} />
-
-              <div style={{ height: 8 }} />
-            </div>
-
-            {/* Footer */}
-            <div style={{ padding: '12px 16px 20px', borderTop: '0.5px solid var(--border)' }}>
-              {serverError && (
-                <div style={{
-                  marginBottom: 10, padding: '10px 14px',
-                  background: 'var(--danger-bg)', border: '0.5px solid var(--danger-border)',
-                  borderRadius: 'var(--r-md)', fontSize: 13, color: 'var(--danger-fg)',
-                }}>
-                  {serverError}
-                </div>
-              )}
-              <button
-                onClick={handleSubmit}
-                disabled={loading}
-                style={{
-                  width: '100%', padding: '14px',
-                  background: 'var(--kiuvo-blue)', color: '#fff',
-                  borderRadius: 'var(--r-md)', fontSize: 15, fontWeight: 500,
-                  opacity: loading ? 0.75 : 1,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                }}
-              >
-                {loading && (
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
-                    style={{ animation: 'spin 0.7s linear infinite', flexShrink: 0 }}>
-                    <path d="M12 2a10 10 0 0 1 10 10" />
-                  </svg>
-                )}
-                {loading ? 'Guardando…' : 'Guardar prospecto'}
-              </button>
-            </div>
-          </>
-        )}
+      <div style={{ marginBottom: 18 }}>
+        <Label>Número de empleados</Label>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {EMPLOYEE_RANGES.map(r => {
+            const on = form.employees === r
+            return (
+              <Chip key={r} selected={on} onClick={() => setForm(f => ({ ...f, employees: on ? '' : r }))}>
+                {r}
+              </Chip>
+            )
+          })}
+        </div>
       </div>
-    </>
+
+      <div style={{ marginBottom: 18 }}>
+        <Label>Notas (opcional)</Label>
+        <textarea
+          className="k-input"
+          value={form.notes}
+          onChange={set('notes')}
+          placeholder="Observaciones, interés del cliente, contexto…"
+          rows={3}
+        />
+      </div>
+
+      <PhotoField photo={photo} onPhoto={(url, file) => { setPhoto(url); setPhotoFile(file || null) }} />
+    </Sheet>
   )
 }
 
 function SuccessView({ name, hasPhoto, offline }) {
   return (
-    <div style={{ padding: '40px 24px 56px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
+    <div style={{ padding: '12px 0 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, textAlign: 'center' }}>
       <div style={{
-        width: 64, height: 64, borderRadius: '50%',
-        background: offline ? '#FFF3E0' : '#EAF3DE',
+        width: 84, height: 84, borderRadius: '50%',
+        background: offline ? 'var(--warning-bg)' : 'var(--accent)',
+        color: offline ? 'var(--warning-fg)' : 'var(--accent-fg)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        <Icon name={offline ? 'cloud-off' : 'user-plus'} size={30} color={offline ? '#EF9F27' : '#3B6D11'} />
+        <Icon name={offline ? 'cloud-off' : 'user-plus'} size={38} />
       </div>
-      <div style={{ fontSize: 18, fontWeight: 500, color: 'var(--fg)', textAlign: 'center' }}>
+      <div className="k-display" style={{ fontSize: 24, fontWeight: 700 }}>
         {offline ? 'Guardado sin conexión' : '¡Prospecto guardado!'}
       </div>
-      <div style={{ fontSize: 13, color: 'var(--fg-secondary)', textAlign: 'center', lineHeight: 1.5 }}>
+      <div style={{ fontSize: 15, color: 'var(--fg-secondary)', lineHeight: 1.5 }}>
         {offline ? (
           <>
             <b style={{ color: 'var(--fg)' }}>{name}</b> está en cola.{' '}
-            <span style={{ color: '#EF9F27' }}>Se sincronizará con el servidor al reconectar.</span>
+            <span style={{ color: 'var(--warning-fg)' }}>Se sincronizará con el servidor al reconectar.</span>
           </>
         ) : (
           <>

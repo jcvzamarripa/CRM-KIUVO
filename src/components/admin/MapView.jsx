@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import Icon from '../shared/Icon'
+import { Pill, Segmented, Avatar, Empty } from '../ui'
 import { useAdminProspects } from '../../hooks/useAdminProspects'
 import { useSellers } from '../../hooks/useSellers'
 import { STAGE_BY_ID } from '../../constants/stages'
@@ -10,6 +10,27 @@ const HEALTH_HEX   = { green: '#1D9E75', amber: '#EF9F27', red: '#D85A30', black
 const HEALTH_LABEL = { green: 'Al día',  amber: 'En riesgo', red: 'Urgente' }
 
 const fmt = n => '$' + (n || 0).toLocaleString('es-MX')
+
+const LAYOUT_CSS = `
+  .mv-toolbar { padding: 14px 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; flex-shrink: 0; }
+  .mv-body { flex: 1; display: flex; gap: 16px; padding: 0 20px 20px; min-height: 0; overflow: hidden; }
+  .mv-map { flex: 1; position: relative; min-width: 0; border-radius: var(--r-lg); overflow: hidden; background: var(--surface); }
+  .mv-side { width: 300px; flex-shrink: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--surface); border-radius: var(--r-lg); }
+  .mv-legend {
+    position: absolute; bottom: 16px; left: 16px; right: 16px; z-index: 1000; width: fit-content; max-width: calc(100% - 32px);
+    display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center;
+    padding: 8px 14px; border-radius: var(--r-md);
+    background: var(--surface); color: var(--fg-secondary); font-size: 12px;
+    box-shadow: var(--shadow-float);
+  }
+  @media (max-width: 900px) {
+    .mv-toolbar { padding: 12px; }
+    .mv-body { flex-direction: column; padding: 0 12px 12px; overflow-y: auto; }
+    .mv-map { flex: none; height: 56vh; min-height: 300px; }
+    .mv-side { width: 100%; flex: none; max-height: none; overflow: visible; }
+    .mv-side__list { overflow: visible !important; }
+  }
+`
 
 // ─── Map canvas (vanilla Leaflet, compatible with React 18) ───────────────────
 function MapCanvas({ prospects, colorBy, selected, setSelected, setHovered, sellerColor, sellerName }) {
@@ -74,22 +95,23 @@ function MapCanvas({ prospects, colorBy, selected, setSelected, setHovered, sell
         radius:      isSel ? 14 : 9,
         fillColor:   color,
         fillOpacity: 1,
-        color:       '#ffffff',
+        color:       isSel ? '#0E0E0E' : '#ffffff',
         weight:      isSel ? 3 : 2,
       }).addTo(map)
 
+      const esc = v => String(v ?? '').replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`)
       circle.bindPopup(`
-        <div style="font-family:system-ui,sans-serif;min-width:190px;padding:2px 0">
-          <div style="font-weight:700;font-size:13px;color:#111;margin-bottom:3px">${p.name}</div>
-          <div style="font-size:11px;color:#666;margin-bottom:8px">${p.contact} · ${p.city}</div>
-          <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">
-            <span style="font-size:10px;font-weight:600;color:${stage?.color};background:${stage?.color}22;padding:2px 8px;border-radius:99px">${stage?.label}</span>
-            <span style="font-size:10px;font-weight:600;color:${HEALTH_HEX[p.health]};background:${HEALTH_HEX[p.health]}22;padding:2px 8px;border-radius:99px">${HEALTH_LABEL[p.health]}</span>
+        <div style="font-family:Inter,system-ui,sans-serif;min-width:200px;padding:2px 0;color:#0E0E0E">
+          <div style="font-weight:700;font-size:15px;margin-bottom:3px">${esc(p.name)}</div>
+          <div style="font-size:12px;color:#4A4A47;margin-bottom:10px">${esc(p.contact)} · ${esc(p.city)}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+            <span style="font-size:12px;font-weight:600;color:${stage?.color};background:${stage?.color}22;padding:3px 10px;border-radius:99px">${esc(stage?.label)}</span>
+            <span style="font-size:12px;font-weight:600;color:${HEALTH_HEX[p.health]};background:${HEALTH_HEX[p.health]}22;padding:3px 10px;border-radius:99px">${HEALTH_LABEL[p.health]}</span>
           </div>
-          <div style="font-size:16px;font-weight:700;color:#185FA5">${fmt(p.value)}</div>
-          <div style="font-size:11px;color:#999;margin-top:2px">${sellerName(p.owner)} · ${p.last}</div>
+          <div style="font-family:Urbanist,Inter,sans-serif;font-size:20px;font-weight:700;letter-spacing:-0.02em">${fmt(p.value)}</div>
+          <div style="font-size:12px;color:#6B6B67;margin-top:2px">${esc(sellerName(p.owner))} · ${esc(p.last)}</div>
         </div>
-      `, { maxWidth: 240 })
+      `, { maxWidth: 260 })
 
       circle.on('click',     () => setSelected(isSel ? null : p))
       circle.on('mouseover', e  => { setHovered(p.id); circle.openPopup() })
@@ -105,77 +127,65 @@ function MapCanvas({ prospects, colorBy, selected, setSelected, setHovered, sell
   }, [mapReady, prospects, colorBy, selected])
 
   return (
-    <div ref={containerRef} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }} />
+    <div ref={containerRef} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }} />
   )
 }
 
 // ─── Sidebar prospect list ─────────────────────────────────────────────────────
 function SidebarList({ prospects, selected, setSelected, setHovered, sellerColor }) {
   return (
-    <div style={{
-      width: 272, flexShrink: 0,
-      borderLeft: '0.5px solid var(--border)',
-      display: 'flex', flexDirection: 'column',
-      background: 'var(--surface)',
-      overflow: 'hidden',
-    }}>
-      <div style={{ padding: '14px 16px 12px', borderBottom: '0.5px solid var(--border)' }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)', marginBottom: 2 }}>
-          Prospectos en mapa
-        </div>
-        <div style={{ fontSize: 11, color: 'var(--fg-secondary)' }}>
+    <div className="mv-side">
+      <div style={{ padding: '16px 16px 12px' }}>
+        <div className="k-h2">Prospectos en mapa</div>
+        <div className="k-muted" style={{ fontSize: 13, marginTop: 2 }}>
           {prospects.length} mostrados · ordenados por valor
         </div>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto' }}>
+      <div className="mv-side__list" style={{ flex: 1, overflowY: 'auto', borderTop: '1px solid var(--border)' }}>
+        {prospects.length === 0 && <Empty icon="map-pin">Sin prospectos con ubicación</Empty>}
         {[...prospects].sort((a, b) => b.value - a.value).map(p => {
           const isSel = selected?.id === p.id
           const stage = STAGE_BY_ID[p.stage]
-          const color = sellerColor(p.owner)
           return (
-            <div
+            <button
               key={p.id}
+              type="button"
+              className="k-row"
+              aria-pressed={isSel}
               onMouseEnter={() => setHovered(p.id)}
               onMouseLeave={() => setHovered(null)}
               onClick={() => setSelected(isSel ? null : p)}
               style={{
-                padding: '10px 16px', borderBottom: '0.5px solid var(--border)',
-                cursor: 'pointer',
-                background: isSel ? 'var(--kiuvo-blue-soft)' : 'transparent',
+                background: isSel ? 'var(--primary-bg)' : 'transparent',
+                color: isSel ? 'var(--primary-fg)' : 'var(--fg)',
                 transition: 'background 0.1s',
-                display: 'flex', alignItems: 'center', gap: 10,
               }}
             >
-              <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: HEALTH_HEX[p.health] }} />
+              <span style={{ width: 10, height: 10, borderRadius: '50%', flexShrink: 0, background: HEALTH_HEX[p.health] }} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--fg)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
-                <div style={{ fontSize: 10, color: 'var(--fg-tertiary)', marginTop: 1 }}>{p.city} · {stage?.label}</div>
+                <div style={{ fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                <div style={{ fontSize: 12, opacity: 0.7, marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.city} · {stage?.label}</div>
               </div>
-              <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg)' }}>{fmt(p.value)}</div>
-                <div style={{
-                  display: 'inline-block', marginTop: 2,
-                  width: 18, height: 18, borderRadius: '50%',
-                  background: color + '22', color,
-                  fontSize: 8, fontWeight: 700, lineHeight: '18px', textAlign: 'center',
-                }}>{p.owner}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 }}>
+                <span className="k-num" style={{ fontSize: 15 }}>{fmt(p.value)}</span>
+                <Avatar size="sm" initials={p.owner} color={sellerColor(p.owner)} style={{ width: 22, height: 22, fontSize: 9 }} />
               </div>
-            </div>
+            </button>
           )
         })}
       </div>
 
-      <div style={{ borderTop: '0.5px solid var(--border)', padding: '12px 16px' }}>
-        <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-tertiary)', marginBottom: 8, letterSpacing: 0.5 }}>POR CIUDAD</div>
+      <div style={{ borderTop: '1px solid var(--border)', padding: '14px 16px' }}>
+        <div className="k-label" style={{ marginBottom: 8 }}>Por ciudad</div>
         {Object.entries(
           prospects.reduce((acc, p) => { acc[p.city] = (acc[p.city] || 0) + 1; return acc }, {})
         ).sort((a, b) => b[1] - a[1]).map(([city, count]) => (
-          <div key={city} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-            <div style={{ fontSize: 11, color: 'var(--fg-secondary)' }}>{city}</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ height: 4, borderRadius: 2, width: Math.round((count / prospects.length) * 80), background: 'var(--kiuvo-blue)', opacity: 0.6 }} />
-              <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg)', minWidth: 14, textAlign: 'right' }}>{count}</span>
+          <div key={city} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
+            <div className="k-muted" style={{ fontSize: 13, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{city}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+              <div style={{ height: 6, borderRadius: 3, width: Math.round((count / prospects.length) * 80), background: 'var(--accent-2)' }} />
+              <span className="k-num" style={{ fontSize: 14, minWidth: 18, textAlign: 'right' }}>{count}</span>
             </div>
           </div>
         ))}
@@ -214,116 +224,51 @@ export default function MapView() {
   const noCoords    = allProspects.filter(p => p.lat == null || p.lng == null).length
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg)' }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg)', minWidth: 0 }}>
+      <style>{LAYOUT_CSS}</style>
 
       {/* ── Toolbar ── */}
-      <div style={{
-        padding: '10px 20px', borderBottom: '0.5px solid var(--border)',
-        display: 'flex', alignItems: 'center', gap: 12,
-        background: 'var(--surface)', flexShrink: 0,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 'var(--r-full)', background: 'var(--kiuvo-blue-soft)', color: 'var(--kiuvo-blue)', fontSize: 12, fontWeight: 500 }}>
-          <Icon name="map-pin" size={13} />
-          {prospects.length} prospectos
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 'var(--r-full)', background: 'var(--surface)', border: '0.5px solid var(--border)', fontSize: 12, color: 'var(--fg-secondary)' }}>
-          <Icon name="target" size={13} />
-          {fmt(totalValue)} potencial
-        </div>
-        {atRisk > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 'var(--r-full)', background: 'var(--warning-bg)', color: 'var(--warning-fg)', fontSize: 12, fontWeight: 500 }}>
-            <Icon name="alert-triangle" size={13} />
-            {atRisk} en riesgo
-          </div>
-        )}
-        {noCoords > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px', borderRadius: 'var(--r-full)', background: 'var(--bg-secondary)', color: 'var(--fg-tertiary)', fontSize: 12 }}>
-            <Icon name="map-pin-off" size={13} />
-            {noCoords} sin ubicación
-          </div>
-        )}
+      <div className="mv-toolbar">
+        <Pill icon="map-pin" style={{ background: 'var(--surface)', color: 'var(--fg)' }}>{prospects.length} prospectos</Pill>
+        <Pill icon="target" style={{ background: 'var(--surface)', color: 'var(--fg)' }}>{fmt(totalValue)} potencial</Pill>
+        {atRisk > 0 && <Pill tone="warning" icon="alert-triangle">{atRisk} en riesgo</Pill>}
+        {noCoords > 0 && <Pill icon="map-pin">{noCoords} sin ubicación</Pill>}
 
         <div style={{ flex: 1 }} />
 
         {/* Color by */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 11, color: 'var(--fg-tertiary)' }}>Color por</span>
-          <div style={{ display: 'inline-flex', background: 'var(--bg)', border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)', padding: 2, gap: 1 }}>
-            {[['health','Salud'],['stage','Etapa'],['seller','Vendedor']].map(([v, l]) => (
-              <button key={v} onClick={() => setColorBy(v)} style={{
-                padding: '4px 10px', fontSize: 11,
-                fontWeight: colorBy === v ? 500 : 400,
-                color: colorBy === v ? 'var(--fg)' : 'var(--fg-secondary)',
-                background: colorBy === v ? 'var(--surface)' : 'transparent',
-                borderRadius: 'var(--r-sm)',
-                border: colorBy === v ? '0.5px solid var(--border)' : 'none',
-                transition: 'all 0.12s',
-              }}>{l}</button>
-            ))}
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, maxWidth: '100%' }}>
+          <span className="k-dim" style={{ fontSize: 13, flexShrink: 0 }}>Color por</span>
+          <Segmented
+            surface
+            value={colorBy}
+            onChange={setColorBy}
+            options={[{ id: 'health', label: 'Salud' }, { id: 'stage', label: 'Etapa' }, { id: 'seller', label: 'Vendedor' }]}
+          />
         </div>
 
         {/* Health filter */}
-        <div style={{ display: 'inline-flex', background: 'var(--bg)', border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)', padding: 2, gap: 1 }}>
-          {['Todos','Al día','En riesgo','Urgente'].map(f => (
-            <button key={f} onClick={() => setHealthFilter(f)} style={{
-              padding: '4px 10px', fontSize: 11,
-              fontWeight: healthFilter === f ? 500 : 400,
-              color: healthFilter === f ? 'var(--fg)' : 'var(--fg-secondary)',
-              background: healthFilter === f ? 'var(--surface)' : 'transparent',
-              borderRadius: 'var(--r-sm)',
-              border: healthFilter === f ? '0.5px solid var(--border)' : 'none',
-              transition: 'all 0.12s',
-            }}>{f}</button>
-          ))}
-        </div>
+        <Segmented
+          surface
+          value={healthFilter}
+          onChange={setHealthFilter}
+          options={['Todos', 'Al día', 'En riesgo', 'Urgente'].map(f => ({ id: f, label: f }))}
+        />
 
         {/* Seller filter */}
         <select
+          className="k-input k-input--sm k-input--pill"
           value={sellerFilter}
           onChange={e => setSellerFilter(e.target.value)}
-          style={{ padding: '6px 10px', fontSize: 12, border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)', background: 'var(--surface)', color: 'var(--fg)' }}
+          style={{ width: 'auto', maxWidth: '100%' }}
         >
           {sellers.map(s => <option key={s} value={s}>{s === 'Todos' ? 'Todos los vendedores' : sellerName(s)}</option>)}
         </select>
       </div>
 
       {/* ── Map + Sidebar ── */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
-
-        {/* Legend — absolute over the map */}
-        <div style={{
-          position: 'absolute', bottom: 20, left: 20, zIndex: 1000,
-          background: 'white', border: '1px solid #ddd',
-          borderRadius: 8, padding: '7px 12px',
-          display: 'flex', gap: 14, alignItems: 'center',
-          boxShadow: '0 2px 10px rgba(0,0,0,0.12)',
-          fontSize: 11,
-        }}>
-          {colorBy === 'health' && ['green','amber','red'].map(h => (
-            <div key={h} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <div style={{ width: 10, height: 10, borderRadius: '50%', background: HEALTH_HEX[h] }} />
-              <span style={{ color: '#555' }}>{HEALTH_LABEL[h]}</span>
-            </div>
-          ))}
-          {colorBy === 'stage' && ['prospeccion','presentacion','cotizacion','negociacion','cierre','repositorio'].map(id => (
-            <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <div style={{ width: 10, height: 10, borderRadius: '50%', background: STAGE_BY_ID[id].color }} />
-              <span style={{ color: '#555' }}>{STAGE_BY_ID[id].label}</span>
-            </div>
-          ))}
-          {colorBy === 'seller' && sellerList.map(s => (
-            <div key={s.init} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <div style={{ width: 10, height: 10, borderRadius: '50%', background: s.color }} />
-              <span style={{ color: '#555' }}>{s.name.split(' ')[0]}</span>
-            </div>
-          ))}
-          <div style={{ width: 1, height: 14, background: '#ddd' }} />
-          <span style={{ color: '#999' }}>Clic en un punto para detalles</span>
-        </div>
-
-        {/* Map container — fills remaining space next to sidebar */}
-        <div style={{ flex: 1, position: 'relative', minWidth: 0 }}>
+      <div className="mv-body">
+        <div className="mv-map">
           <MapCanvas
             prospects={prospects}
             colorBy={colorBy}
@@ -333,6 +278,29 @@ export default function MapView() {
             sellerColor={sellerColor}
             sellerName={sellerName}
           />
+
+          {/* Legend — over the map */}
+          <div className="mv-legend">
+            {colorBy === 'health' && ['green','amber','red'].map(h => (
+              <div key={h} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ width: 10, height: 10, borderRadius: '50%', background: HEALTH_HEX[h] }} />
+                <span>{HEALTH_LABEL[h]}</span>
+              </div>
+            ))}
+            {colorBy === 'stage' && ['prospeccion','presentacion','cotizacion','negociacion','cierre','repositorio'].map(id => (
+              <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ width: 10, height: 10, borderRadius: '50%', background: STAGE_BY_ID[id].color }} />
+                <span>{STAGE_BY_ID[id].label}</span>
+              </div>
+            ))}
+            {colorBy === 'seller' && sellerList.map(s => (
+              <div key={s.init} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ width: 10, height: 10, borderRadius: '50%', background: s.color }} />
+                <span>{s.name.split(' ')[0]}</span>
+              </div>
+            ))}
+            <span className="k-dim">Clic en un punto para detalles</span>
+          </div>
         </div>
 
         <SidebarList

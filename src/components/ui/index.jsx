@@ -116,3 +116,79 @@ export function ProgressBar({ value = 0, max = 1, color = 'var(--primary-bg)', t
     </div>
   )
 }
+
+export function Avatar({ name = '', initials, src, color, size, className, style }) {
+  const text = initials || name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase() || '?'
+  return (
+    <span className={cx('k-avatar', size && `k-avatar--${size}`, className)} style={{ ...(color && { background: color }), ...style }}>
+      {src ? <img src={src} alt="" /> : text}
+    </span>
+  )
+}
+
+/** options: [{ id, label, icon?, count? }] */
+export function Segmented({ options, value, onChange, size, surface, className, style }) {
+  return (
+    <div className={cx('k-seg', size && `k-seg--${size}`, surface && 'k-seg--surface', className)} style={style} role="group">
+      {options.map(o => (
+        <button key={o.id} type="button" className="k-seg__item" aria-pressed={value === o.id} onClick={() => onChange(o.id)}>
+          {o.icon && <Icon name={o.icon} size={16} />}
+          {o.label}
+          {o.count != null && <span style={{ opacity: 0.7 }}>{o.count}</span>}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+export function SearchInput({ value, onChange, placeholder = 'Buscar…', small, style, ...rest }) {
+  return (
+    <label className="k-search" style={style}>
+      <Icon name="search" size={18} />
+      <input
+        className={cx('k-input', small && 'k-input--sm')}
+        value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} {...rest}
+      />
+    </label>
+  )
+}
+
+export function Field({ label, error, children, style }) {
+  return (
+    <label className="k-field" style={style}>
+      {label && <span className="k-field__label">{label}</span>}
+      {children}
+      {error && <span className="k-field__error">{error}</span>}
+    </label>
+  )
+}
+
+/** Diálogo centrado para el panel admin. En móvil usa <Sheet>. */
+export function Modal({ title, onClose, wide, footer, children }) {
+  return (
+    <>
+      <div className="k-sheet__backdrop" onClick={onClose} />
+      <div className={cx('k-modal', wide && 'k-modal--wide')} role="dialog" aria-modal="true" aria-label={title}>
+        <div className="k-sheet__head">
+          <div className="k-sheet__title">{title}</div>
+          <IconButton icon="x" label="Cerrar" variant="soft" onClick={onClose} />
+        </div>
+        <div className="k-sheet__body">{children}</div>
+        {footer && <div className="k-sheet__foot">{footer}</div>}
+      </div>
+    </>
+  )
+}
+
+export function Empty({ icon = 'circle-dashed', children }) {
+  return (
+    <div className="k-empty">
+      <Icon name={icon} size={36} />
+      <div>{children}</div>
+    </div>
+  )
+}
+
+export function Bone({ w = '100%', h = 14, r, style }) {
+  return <div className="k-bone" style={{ width: w, height: h, ...(r != null && { borderRadius: r }), ...style }} />
+}

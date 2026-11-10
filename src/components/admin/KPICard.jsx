@@ -1,4 +1,5 @@
 import Icon from '../shared/Icon'
+import { Card, Pill } from '../ui'
 
 function Sparkline({ data, color, width = 200, height = 36 }) {
   if (!data?.length) return null
@@ -11,34 +12,31 @@ function Sparkline({ data, color, width = 200, height = 36 }) {
   const areaPath = path + ` L${width},${height} L0,${height} Z`
   return (
     <svg width="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ display: 'block' }}>
-      <path d={areaPath} fill={color} opacity="0.10" />
-      <path d={path} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+      <path d={areaPath} fill={color} opacity="0.12" />
+      <path d={path} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
     </svg>
   )
 }
 
 export default function KPICard({ label, value, sub, delta, deltaKind, accent, sparkline }) {
-  const deltaColor = deltaKind === 'good' ? 'var(--success)' : deltaKind === 'bad' ? 'var(--danger)' : 'var(--fg-secondary)'
+  const deltaTone = deltaKind === 'good' ? 'success' : deltaKind === 'bad' ? 'coral' : undefined
   return (
-    <div style={{
-      background: 'var(--surface)', border: '0.5px solid var(--border)',
-      borderRadius: 'var(--r-lg)', padding: '16px 18px',
-      display: 'flex', flexDirection: 'column', gap: 6,
-      position: 'relative', overflow: 'hidden',
-    }}>
-      {accent && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: accent }} />}
-      <div style={{ fontSize: 12, color: 'var(--fg-secondary)' }}>{label}</div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-        <div style={{ fontSize: 24, fontWeight: 500, color: 'var(--fg)', letterSpacing: -0.5, fontVariantNumeric: 'tabular-nums' }}>{value}</div>
+    <Card style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {accent && <span style={{ width: 8, height: 8, borderRadius: '50%', background: accent, flexShrink: 0 }} />}
+        <span className="k-muted" style={{ fontSize: 13, fontWeight: 500 }}>{label}</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+        <div className="k-num" style={{ fontSize: 32 }}>{value}</div>
         {delta && (
-          <div style={{ fontSize: 12, fontWeight: 500, color: deltaColor, display: 'inline-flex', alignItems: 'center', gap: 2 }}>
-            <Icon name={deltaKind === 'bad' ? 'arrow-down-right' : 'arrow-up-right'} size={12} />
+          <Pill tone={deltaTone}>
+            <Icon name={deltaKind === 'bad' ? 'arrow-down-right' : 'arrow-up-right'} size={13} />
             {delta}
-          </div>
+          </Pill>
         )}
       </div>
-      {sub && <div style={{ fontSize: 11, color: 'var(--fg-tertiary)' }}>{sub}</div>}
-      {sparkline && <div style={{ marginTop: 4 }}><Sparkline data={sparkline} color={accent || 'var(--kiuvo-blue)'} /></div>}
-    </div>
+      {sub && <div className="k-dim" style={{ fontSize: 13 }}>{sub}</div>}
+      {sparkline && <div style={{ marginTop: 2 }}><Sparkline data={sparkline} color={accent || 'var(--brand)'} /></div>}
+    </Card>
   )
 }

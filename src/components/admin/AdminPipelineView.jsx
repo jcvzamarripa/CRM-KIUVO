@@ -1,14 +1,38 @@
 import React, { useState, useRef, useEffect } from 'react'
 import Icon from '../shared/Icon'
+import { Button, IconButton, Card, Pill, Segmented, Avatar, ProgressBar } from '../ui'
 import { useStages } from '../../contexts/StagesContext'
 import { SYSTEM_STAGE_IDS } from '../../constants/stages'
 import { useAdminProspects } from '../../hooks/useAdminProspects'
+import { supabase } from '../../lib/supabase'
 import { useSellers } from '../../hooks/useSellers'
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
 const fmt       = n => '$' + (n || 0).toLocaleString('es-MX')
-const HEALTH    = { green: 'var(--success)', amber: 'var(--warning)', red: 'var(--danger)', black: 'var(--fg-tertiary)' }
 const HEALTH_LABEL = { green: 'Al día', amber: 'En riesgo', red: 'Urgente', black: 'Perdido' }
+
+const HEALTH_TONE = { green: 'success', amber: 'warning', red: 'coral', black: undefined }
+
+const LAYOUT_CSS = `
+  @keyframes pvSlideIn { from { transform: translateX(20px); opacity: 0 } to { transform: translateX(0); opacity: 1 } }
+  .pv-toolbar { padding: 14px 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; flex-shrink: 0; }
+  .pv-board { flex: 1; display: flex; gap: 12px; min-width: 0; overflow-x: auto; overflow-y: hidden; padding: 0 20px 20px; }
+  .pv-col { display: flex; flex-direction: column; flex: 1 0 260px; min-width: 260px; max-width: 360px; background: var(--bg-tertiary); border-radius: var(--r-lg); overflow: hidden; }
+  .pv-card { background: var(--surface); border-radius: var(--r-md); padding: 12px 14px; cursor: pointer; position: relative; user-select: none; transition: box-shadow 0.15s; }
+  .pv-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.10); }
+  .pv-card[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--fg); }
+  .pv-menu-item { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 36px; padding: 0 10px; border-radius: var(--r-sm); text-align: left; font-size: 14px; color: var(--fg); }
+  .pv-menu-item:hover { background: var(--bg-secondary); }
+  .pv-panel { width: 360px; flex-shrink: 0; margin: 0 20px 20px 0; display: flex; flex-direction: column; overflow: hidden; background: var(--surface); border-radius: var(--r-xl); animation: pvSlideIn 0.15s ease-out; }
+  .pv-panel--wide { width: 400px; }
+  .pv-stage-btn { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 14px; border-radius: var(--r-md); text-align: left; background: var(--bg-secondary); color: var(--fg); font-size: 14px; }
+  .pv-stage-btn:hover { background: var(--bg-tertiary); }
+  @media (max-width: 900px) {
+    .pv-toolbar { padding: 12px; }
+    .pv-board { padding: 0 12px 12px; }
+    .pv-panel, .pv-panel--wide { position: fixed; z-index: 200; inset: 8px; width: auto; margin: 0; box-shadow: var(--shadow-float); }
+  }
+`
 
 // ─── Move stage dropdown ──────────────────────────────────────────────────────
 function MoveDropdown({ currentStage, onMove, onClose }) {
@@ -23,57 +47,30 @@ function MoveDropdown({ currentStage, onMove, onClose }) {
   return (
     <div ref={ref} style={{
       position: 'absolute', top: '100%', right: 0, zIndex: 50,
-      background: 'var(--surface)', border: '0.5px solid var(--border)',
-      borderRadius: 'var(--r-md)', boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-      padding: 6, minWidth: 170, marginTop: 4,
+      background: 'var(--surface)', borderRadius: 'var(--r-md)', boxShadow: 'var(--shadow-float)',
+      padding: 8, minWidth: 210, marginTop: 4,
     }}>
-      <div style={{ fontSize: 10, fontWeight: 500, color: 'var(--fg-tertiary)', padding: '2px 8px 6px', letterSpacing: 0.5 }}>
-        MOVER A ETAPA
-      </div>
+      <div className="k-label" style={{ padding: '4px 10px 6px', marginBottom: 0 }}>Mover a etapa</div>
       {stages.filter(s => s.id !== currentStage && !s.isRepository).map(s => (
-        <button key={s.id} onClick={() => { onMove(s.id); onClose() }} style={{
-          display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-          padding: '7px 8px', borderRadius: 'var(--r-sm)', textAlign: 'left',
-          color: 'var(--fg)', fontSize: 12,
-          transition: 'background 0.1s',
-        }}
-          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-secondary)'}
-          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-        >
-          <span style={{ width: 8, height: 8, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+        <button key={s.id} className="pv-menu-item" onClick={() => { onMove(s.id); onClose() }}>
+          <span style={{ width: 10, height: 10, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
           {s.label}
         </button>
       ))}
       {currentStage !== 'repositorio' && (
         <>
-          <div style={{ borderTop: '0.5px solid var(--border)', margin: '4px 2px' }} />
-          <button onClick={() => { onMove('repositorio'); onClose() }} style={{
-            display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-            padding: '7px 8px', borderRadius: 'var(--r-sm)', textAlign: 'left',
-            color: 'var(--fg-secondary)', fontSize: 12,
-            transition: 'background 0.1s',
-          }}
-            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-secondary)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-          >
-            <Icon name="archive" size={12} color="#6B7280" />
+          <div style={{ borderTop: '1px solid var(--border)', margin: '6px 4px' }} />
+          <button className="pv-menu-item" style={{ color: 'var(--fg-secondary)' }} onClick={() => { onMove('repositorio'); onClose() }}>
+            <Icon name="archive" size={16} />
             Archivar en Repositorio
           </button>
         </>
       )}
       {currentStage === 'repositorio' && (
         <>
-          <div style={{ borderTop: '0.5px solid var(--border)', margin: '4px 2px' }} />
-          <button onClick={() => { onMove('prospeccion'); onClose() }} style={{
-            display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-            padding: '7px 8px', borderRadius: 'var(--r-sm)', textAlign: 'left',
-            color: 'var(--kiuvo-blue)', fontSize: 12, fontWeight: 500,
-            transition: 'background 0.1s',
-          }}
-            onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-secondary)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-          >
-            <Icon name="arrow-up-right" size={12} color="var(--kiuvo-blue)" />
+          <div style={{ borderTop: '1px solid var(--border)', margin: '6px 4px' }} />
+          <button className="pv-menu-item" style={{ fontWeight: 600 }} onClick={() => { onMove('prospeccion'); onClose() }}>
+            <Icon name="arrow-up-right" size={16} />
             Reactivar prospecto
           </button>
         </>
@@ -89,87 +86,68 @@ function KanbanCard({ p, isSelected, onClick, onMove, sellerByInit }) {
   const [showMove,   setShowMove]   = useState(false)
   const seller  = sellerByInit?.(p.owner)
   const stage   = stageById[p.stage]
-  const hColor  = HEALTH[p.health] || 'var(--fg-tertiary)'
   const visitPct = Math.min(1, p.visits / Math.max(stage?.min || 1, 1))
 
   return (
     <div
+      className="pv-card"
+      aria-pressed={isSelected}
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => { setHovered(false); }}
-      style={{
-        background: isSelected ? 'var(--kiuvo-blue-soft)' : 'var(--surface)',
-        border: `0.5px solid ${isSelected ? 'var(--kiuvo-blue)' : 'var(--border)'}`,
-        borderRadius: 'var(--r-md)', padding: '10px 12px',
-        cursor: 'pointer', position: 'relative',
-        boxShadow: hovered && !isSelected ? '0 2px 8px rgba(0,0,0,0.07)' : 'none',
-        transition: 'box-shadow 0.15s, border-color 0.15s, background 0.15s',
-        userSelect: 'none',
-      }}
     >
-      {/* Row 1: health + name + value */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: 7 }}>
-        <span style={{
-          width: 7, height: 7, borderRadius: '50%', background: hColor,
-          flexShrink: 0, marginTop: 4,
-        }} />
+      {/* Row 1: name + value */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {p.name}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div className="k-dim" style={{ fontSize: 12, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {p.contact}
           </div>
         </div>
-        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--fg)', fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+        <div className="k-num" style={{ fontSize: 15, flexShrink: 0, paddingTop: 2 }}>
           {fmt(p.value)}
         </div>
       </div>
 
-      {/* Visit progress */}
-      <div style={{ marginBottom: 8 }}>
-        <div style={{ height: 3, borderRadius: 2, background: 'var(--bg-tertiary)', overflow: 'hidden' }}>
-          <div style={{
-            width: `${visitPct * 100}%`, height: '100%',
-            background: visitPct >= 1 ? 'var(--success)' : stage?.color,
-            borderRadius: 2, transition: 'width 0.3s',
-          }} />
+      {p.health !== 'green' && (
+        <div style={{ marginBottom: 8 }}>
+          <Pill tone={HEALTH_TONE[p.health]} icon={p.health === 'black' ? 'archive' : 'alert-triangle'}>
+            {HEALTH_LABEL[p.health] || 'En riesgo'}
+          </Pill>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 3, fontSize: 10, color: 'var(--fg-tertiary)' }}>
+      )}
+
+      {/* Visit progress */}
+      <div style={{ marginBottom: 10 }}>
+        <ProgressBar value={visitPct} max={1} height={5} color={visitPct >= 1 ? 'var(--success)' : stage?.color} />
+        <div className="k-dim" style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5, fontSize: 12 }}>
           <span>{p.visits}/{stage?.min} visitas</span>
           <span>{p.days}d en etapa</span>
         </div>
       </div>
 
       {/* Row 3: seller + last contact + move btn */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        {/* Seller avatar */}
-        <div style={{
-          width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
-          background: (seller?.color || '#888') + '22', color: seller?.color || '#888',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 9, fontWeight: 600,
-        }}>
-          {p.owner}
-        </div>
-        <div style={{ flex: 1, fontSize: 10, color: 'var(--fg-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Avatar size="sm" initials={p.owner} color={seller?.color} style={{ width: 24, height: 24, fontSize: 10 }} />
+        <div className="k-dim" style={{ flex: 1, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {p.last}
         </div>
 
-        {/* Move button (visible on hover) */}
         <div style={{ position: 'relative', flexShrink: 0 }}>
           <button
             onClick={e => { e.stopPropagation(); setShowMove(v => !v) }}
-            style={{
-              width: 22, height: 22, borderRadius: 'var(--r-sm)',
-              background: hovered || showMove ? 'var(--bg-secondary)' : 'transparent',
-              color: 'var(--fg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              opacity: hovered || showMove ? 1 : 0,
-              transition: 'opacity 0.15s, background 0.1s',
-            }}
+            aria-label="Mover etapa"
             title="Mover etapa"
+            style={{
+              width: 36, height: 36, borderRadius: '50%',
+              background: hovered || showMove ? 'var(--bg-secondary)' : 'transparent',
+              color: 'var(--fg-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'background 0.1s',
+            }}
           >
-            <Icon name="arrows-horizontal" size={12} />
+            <Icon name="arrows-horizontal" size={16} />
           </button>
           {showMove && (
             <MoveDropdown
@@ -190,53 +168,32 @@ function KanbanColumn({ stage, cards, selectedId, onSelect, onMove, sellerByInit
   const atRisk     = cards.filter(p => p.health !== 'green').length
 
   return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', minWidth: 220, flex: 1,
-      borderRight: '0.5px solid var(--border)',
-    }}>
+    <div className="pv-col">
       {/* Column header */}
-      <div style={{
-        padding: '12px 14px 10px',
-        borderBottom: '0.5px solid var(--border)',
-        borderTop: `3px solid ${stage.color}`,
-        background: 'var(--bg)',
-        flexShrink: 0,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: stage.color }} />
-            <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>{stage.label}</span>
-          </div>
-          <span style={{
-            fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 'var(--r-full)',
-            background: stage.color + '20', color: stage.color,
-          }}>{cards.length}</span>
+      <div style={{ padding: '14px 14px 8px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          <span style={{ width: 10, height: 10, borderRadius: '50%', background: stage.color, flexShrink: 0 }} />
+          <span className="k-h3" style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stage.label}</span>
+          <Pill style={{ background: 'var(--surface)', color: 'var(--fg)' }}>{cards.length}</Pill>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, color: 'var(--fg-secondary)' }}>
-          <span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmt(totalValue)}</span>
-          {atRisk > 0 && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 3, color: 'var(--warning)', fontWeight: 500 }}>
-              <Icon name="alert-triangle" size={10} color="var(--warning)" />
-              {atRisk} en riesgo
-            </span>
-          )}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <span className="k-num" style={{ fontSize: 16 }}>{fmt(totalValue)}</span>
+          {atRisk > 0 && <Pill tone="warning" icon="alert-triangle">{atRisk} en riesgo</Pill>}
         </div>
-        {/* Min visits note */}
-        <div style={{ fontSize: 10, color: 'var(--fg-tertiary)', marginTop: 4 }}>
+        <div className="k-dim" style={{ fontSize: 12, marginTop: 6 }}>
           Mín. {stage.min} visita{stage.min > 1 ? 's' : ''}
         </div>
       </div>
 
       {/* Cards list */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '10px 10px', display: 'flex', flexDirection: 'column', gap: 7 }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '6px 10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {cards.length === 0 ? (
-          <div style={{
-            flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-            justifyContent: 'center', gap: 8, color: 'var(--fg-tertiary)', padding: '24px 0',
-            border: '0.5px dashed var(--border)', borderRadius: 'var(--r-md)',
+          <div className="k-dim" style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            gap: 8, padding: '28px 0', fontSize: 13,
           }}>
-            <Icon name="layout-kanban" size={20} color="var(--border)" />
-            <span style={{ fontSize: 11 }}>Sin prospectos</span>
+            <Icon name="layout-kanban" size={22} />
+            <span>Sin prospectos</span>
           </div>
         ) : cards.map(p => (
           <KanbanCard
@@ -258,90 +215,68 @@ function DetailPanel({ p, onClose, onMove, sellerByInit }) {
   const { stages, stageById } = useStages()
   const stage  = stageById[p.stage]
   const seller = sellerByInit?.(p.owner)
-  const hColor = HEALTH[p.health]
   const visitPct = Math.min(1, p.visits / Math.max(stage?.min || 1, 1))
 
   return (
-    <div style={{
-      width: 300, flexShrink: 0, borderLeft: '0.5px solid var(--border)',
-      background: 'var(--surface)', display: 'flex', flexDirection: 'column',
-      animation: 'slideIn 0.15s ease-out',
-    }}>
-      <style>{`@keyframes slideIn { from { transform: translateX(20px); opacity: 0 } to { transform: translateX(0); opacity: 1 } }`}</style>
-
+    <div className="pv-panel">
       {/* Header */}
-      <div style={{ padding: '14px 16px', borderBottom: '0.5px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 5,
-          padding: '3px 10px', borderRadius: 'var(--r-full)', fontSize: 11, fontWeight: 500,
-          background: stage?.color + '20', color: stage?.color,
-        }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: stage?.color }} />
+      <div style={{ padding: '16px 16px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+        <Pill>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: stage?.color }} />
           {stage?.label}
-        </span>
-        <button onClick={onClose} style={{ color: 'var(--fg-tertiary)', padding: 4 }}>
-          <Icon name="x" size={16} />
-        </button>
+        </Pill>
+        <IconButton icon="x" label="Cerrar" variant="soft" onClick={onClose} style={{ width: 40, height: 40 }} />
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '4px 16px 16px' }}>
         {/* Name & contact */}
         <div style={{ marginBottom: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: hColor, flexShrink: 0 }} />
-            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--fg)' }}>{p.name}</div>
+          <div className="k-h2">{p.name}</div>
+          <div className="k-muted" style={{ fontSize: 14, marginTop: 2 }}>{p.contact}</div>
+          <div style={{ marginTop: 10 }}>
+            <Pill tone={HEALTH_TONE[p.health] || 'success'}>{HEALTH_LABEL[p.health] || 'Al día'}</Pill>
           </div>
-          <div style={{ fontSize: 12, color: 'var(--fg-secondary)', paddingLeft: 15 }}>{p.contact}</div>
         </div>
 
         {/* Value highlight */}
-        <div style={{
-          padding: '12px 14px', marginBottom: 16,
-          background: 'var(--bg)', borderRadius: 'var(--r-md)',
-          border: '0.5px solid var(--border)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        }}>
-          <div style={{ fontSize: 11, color: 'var(--fg-secondary)' }}>Valor estimado</div>
-          <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--fg)', fontVariantNumeric: 'tabular-nums' }}>
-            {fmt(p.value)}
-          </div>
-        </div>
+        <Card tone="lilac" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>Valor estimado</div>
+          <div className="k-num" style={{ fontSize: 26 }}>{fmt(p.value)}</div>
+        </Card>
 
         {/* Visits */}
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
-            <span style={{ color: 'var(--fg-secondary)' }}>Visitas realizadas</span>
-            <span style={{ fontWeight: 500, color: visitPct >= 1 ? 'var(--success)' : 'var(--fg)', fontVariantNumeric: 'tabular-nums' }}>
+        <div style={{ marginBottom: 18 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, marginBottom: 8 }}>
+            <span className="k-muted">Visitas realizadas</span>
+            <span style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
               {p.visits} / {stage?.min} mín.
             </span>
           </div>
-          <div style={{ height: 6, background: 'var(--bg-tertiary)', borderRadius: 3, overflow: 'hidden' }}>
-            <div style={{ width: `${visitPct * 100}%`, height: '100%', background: visitPct >= 1 ? 'var(--success)' : stage?.color, borderRadius: 3 }} />
-          </div>
+          <ProgressBar value={visitPct} max={1} color={visitPct >= 1 ? 'var(--success)' : stage?.color} />
           {visitPct >= 1 && (
-            <div style={{ fontSize: 10, color: 'var(--success)', marginTop: 4, fontWeight: 500 }}>✓ Listo para avanzar</div>
+            <div style={{ marginTop: 8 }}><Pill tone="success" icon="check">Listo para avanzar</Pill></div>
           )}
         </div>
 
         {/* Info rows */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 18 }}>
           {[
             { label: 'Teléfono',        value: p.phone,    icon: 'phone' },
             { label: 'Último contacto', value: p.last,     icon: 'clock' },
             { label: 'Días en etapa',   value: `${p.days} días`, icon: 'calendar' },
           ].map(row => (
-            <div key={row.label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div key={row.label} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <div style={{
-                width: 28, height: 28, borderRadius: 'var(--r-md)', flexShrink: 0,
-                background: 'var(--bg)', border: '0.5px solid var(--border)',
+                width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+                background: 'var(--bg-secondary)', color: 'var(--fg-secondary)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <Icon name={row.icon} size={13} color="var(--fg-secondary)" />
+                <Icon name={row.icon} size={16} />
               </div>
-              <div>
-                <div style={{ fontSize: 10, color: 'var(--fg-tertiary)' }}>{row.label}</div>
-                <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--fg)', marginTop: 1 }}>{row.value || '—'}</div>
+              <div style={{ minWidth: 0 }}>
+                <div className="k-dim" style={{ fontSize: 12 }}>{row.label}</div>
+                <div style={{ fontSize: 14, fontWeight: 500, marginTop: 1 }}>{row.value || '—'}</div>
               </div>
             </div>
           ))}
@@ -349,52 +284,25 @@ function DetailPanel({ p, onClose, onMove, sellerByInit }) {
 
         {/* Seller */}
         <div style={{
-          padding: '10px 12px', background: 'var(--bg)',
-          borderRadius: 'var(--r-md)', border: '0.5px solid var(--border)',
-          display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16,
+          padding: '12px 14px', background: 'var(--bg-secondary)', borderRadius: 'var(--r-md)',
+          display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18,
         }}>
-          <div style={{
-            width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
-            background: (seller?.color || '#888') + '22', color: seller?.color || '#888',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 11, fontWeight: 600,
-          }}>
-            {p.owner}
+          <Avatar initials={p.owner} color={seller?.color} />
+          <div style={{ minWidth: 0 }}>
+            <div className="k-dim" style={{ fontSize: 12 }}>Vendedor asignado</div>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>{seller?.name || p.owner}</div>
           </div>
-          <div>
-            <div style={{ fontSize: 10, color: 'var(--fg-tertiary)' }}>Vendedor asignado</div>
-            <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--fg)' }}>{seller?.name || p.owner}</div>
-          </div>
-        </div>
-
-        {/* Health badge */}
-        <div style={{
-          display: 'inline-flex', alignItems: 'center', gap: 5,
-          padding: '4px 10px', borderRadius: 'var(--r-full)',
-          background: hColor + '18', color: hColor, marginBottom: 16,
-          fontSize: 11, fontWeight: 500,
-        }}>
-          <span style={{ width: 7, height: 7, borderRadius: '50%', background: hColor }} />
-          {HEALTH_LABEL[p.health] || 'Al día'}
         </div>
 
         {/* Move stage */}
-        <div style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', marginBottom: 8 }}>Cambiar etapa</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        <div>
+          <div className="k-label">Cambiar etapa</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {stages.filter(s => s.id !== p.stage).map(s => (
-              <button key={s.id} onClick={() => { onMove(p.id, s.id); onClose() }} style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '8px 12px', borderRadius: 'var(--r-md)', textAlign: 'left',
-                border: '0.5px solid var(--border)', background: 'var(--bg)',
-                color: 'var(--fg)', fontSize: 12, transition: 'background 0.1s',
-              }}
-                onMouseEnter={e => e.currentTarget.style.background = s.color + '12'}
-                onMouseLeave={e => e.currentTarget.style.background = 'var(--bg)'}
-              >
-                <span style={{ width: 8, height: 8, borderRadius: '50%', background: s.color }} />
+              <button key={s.id} className="pv-stage-btn" onClick={() => { onMove(p.id, s.id); onClose() }}>
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
                 <span style={{ flex: 1 }}>Mover a {s.label}</span>
-                <Icon name="arrow-right" size={12} color="var(--fg-tertiary)" />
+                <Icon name="arrow-right" size={16} color="var(--fg-tertiary)" />
               </button>
             ))}
           </div>
@@ -402,31 +310,18 @@ function DetailPanel({ p, onClose, onMove, sellerByInit }) {
       </div>
 
       {/* Actions */}
-      <div style={{ padding: '12px 16px', borderTop: '0.5px solid var(--border)', display: 'flex', gap: 8 }}>
+      <div style={{ padding: '12px 16px 16px', borderTop: '1px solid var(--border)', display: 'flex', gap: 8 }}>
         <a
+          className="k-btn k-btn--accent"
           href={`https://wa.me/52${(p.phone || '').replace(/\D/g, '')}`}
           target="_blank" rel="noreferrer"
-          style={{
-            flex: 1, padding: '9px 0', borderRadius: 'var(--r-md)',
-            background: '#25D366', color: '#fff', fontSize: 12, fontWeight: 500,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-            textDecoration: 'none',
-          }}
+          style={{ flex: 1 }}
         >
-          <Icon name="brand-whatsapp" size={13} color="#fff" />
+          <Icon name="brand-whatsapp" size={18} />
           WhatsApp
         </a>
-        <a
-          href={`tel:${p.phone}`}
-          style={{
-            flex: 1, padding: '9px 0', borderRadius: 'var(--r-md)',
-            border: '0.5px solid var(--border)', background: 'var(--bg)',
-            color: 'var(--fg)', fontSize: 12, fontWeight: 500,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-            textDecoration: 'none',
-          }}
-        >
-          <Icon name="phone" size={13} />
+        <a className="k-btn k-btn--soft" href={`tel:${p.phone}`} style={{ flex: 1 }}>
+          <Icon name="phone" size={18} />
           Llamar
         </a>
       </div>
@@ -466,58 +361,51 @@ function StageConfigPanel({ stages: initialStages, saving, onSave, onClose }) {
   function StageCard({ s }) {
     const isSystem = SYSTEM_STAGE_IDS.has(s.id)
     return (
-      <div key={s.id} style={{
-        background: 'var(--bg)', border: '0.5px solid var(--border)',
-        borderRadius: 'var(--r-md)', padding: '14px', borderTop: `3px solid ${s.color}`,
-      }}>
+      <div key={s.id} style={{ background: 'var(--bg-secondary)', borderRadius: 'var(--r-md)', padding: 14 }}>
         {/* Label input + delete */}
-        <div style={{ marginBottom: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
-            <div style={{ fontSize: 10, fontWeight: 500, color: 'var(--fg-tertiary)', letterSpacing: 0.3 }}>
-              NOMBRE DE ETAPA
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, minHeight: 28 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ width: 10, height: 10, borderRadius: '50%', background: s.color }} />
+              <span className="k-field__label">Nombre de etapa</span>
             </div>
             {!isSystem && (
               <button
                 onClick={() => removeStage(s.id)}
+                aria-label="Eliminar etapa"
                 title="Eliminar etapa"
-                style={{ color: 'var(--danger-fg)', padding: 2, display: 'flex', alignItems: 'center' }}
+                style={{ color: 'var(--coral-fg)', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%' }}
               >
-                <Icon name="trash" size={13} />
+                <Icon name="trash" size={16} />
               </button>
             )}
           </div>
           <input
+            className="k-input k-input--sm"
             value={s.label}
             onChange={e => setField(s.id, 'label', e.target.value)}
-            style={{
-              width: '100%', padding: '7px 10px', fontSize: 13,
-              background: 'var(--surface)', border: '0.5px solid var(--border)',
-              borderRadius: 'var(--r-md)', color: 'var(--fg)', outline: 'none',
-              boxSizing: 'border-box',
-            }}
           />
         </div>
 
         {/* Color picker */}
-        <div style={{ marginBottom: s.isRepository ? 0 : 10 }}>
-          <div style={{ fontSize: 10, fontWeight: 500, color: 'var(--fg-tertiary)', marginBottom: 5, letterSpacing: 0.3 }}>
-            COLOR
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+        <div style={{ marginBottom: s.isRepository ? 0 : 12 }}>
+          <div className="k-field__label" style={{ marginBottom: 6 }}>Color</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             {PRESET_COLORS.map(c => (
               <button
                 key={c}
                 onClick={() => setField(s.id, 'color', c)}
                 title={c}
+                aria-label={`Color ${c}`}
+                aria-pressed={s.color === c}
                 style={{
-                  width: 22, height: 22, borderRadius: 6, background: c, flexShrink: 0,
-                  border: s.color === c ? '2.5px solid var(--fg)' : '2px solid transparent',
-                  outline: s.color === c ? `2px solid ${c}40` : 'none',
-                  transition: 'border-color 0.12s',
+                  width: 28, height: 28, borderRadius: '50%', background: c, flexShrink: 0,
+                  boxShadow: s.color === c ? '0 0 0 2px var(--bg-secondary), 0 0 0 4px var(--fg)' : 'none',
+                  transition: 'box-shadow 0.12s',
                 }}
               />
             ))}
-            <div style={{ position: 'relative', marginLeft: 2 }}>
+            <div style={{ position: 'relative' }}>
               <input
                 type="color"
                 value={s.color}
@@ -525,12 +413,12 @@ function StageConfigPanel({ stages: initialStages, saving, onSave, onClose }) {
                 style={{ opacity: 0, position: 'absolute', inset: 0, width: '100%', height: '100%', cursor: 'pointer' }}
               />
               <div title="Color personalizado" style={{
-                width: 22, height: 22, borderRadius: 6,
-                background: `conic-gradient(#f43,#0cf,#3f0,#f43)`,
-                border: '0.5px solid var(--border)',
+                width: 28, height: 28, borderRadius: '50%',
+                background: 'var(--surface)', color: 'var(--fg-secondary)',
+                boxShadow: 'inset 0 0 0 1.5px var(--border-strong)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <Icon name="pencil" size={10} color="#fff" />
+                <Icon name="pencil" size={13} />
               </div>
             </div>
           </div>
@@ -539,37 +427,16 @@ function StageConfigPanel({ stages: initialStages, saving, onSave, onClose }) {
         {/* Min visits — hidden for repositorio */}
         {!s.isRepository && (
           <div>
-            <div style={{ fontSize: 10, fontWeight: 500, color: 'var(--fg-tertiary)', marginBottom: 5, letterSpacing: 0.3 }}>
-              VISITAS MÍNIMAS REQUERIDAS
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <button
-                onClick={() => setField(s.id, 'min', Math.max(1, s.min - 1))}
-                style={{
-                  width: 28, height: 28, borderRadius: 'var(--r-md)',
-                  background: 'var(--surface)', border: '0.5px solid var(--border)',
-                  color: 'var(--fg)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}
-              >
-                <Icon name="minus" size={13} />
-              </button>
-              <span style={{
-                minWidth: 28, textAlign: 'center', fontSize: 15, fontWeight: 600,
-                color: s.color, fontVariantNumeric: 'tabular-nums',
-              }}>
+            <div className="k-field__label" style={{ marginBottom: 6 }}>Visitas mínimas requeridas</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <IconButton icon="minus" label="Menos" iconSize={16} style={{ width: 36, height: 36 }}
+                onClick={() => setField(s.id, 'min', Math.max(1, s.min - 1))} />
+              <span className="k-num" style={{ minWidth: 28, textAlign: 'center', fontSize: 20 }}>
                 {s.min}
               </span>
-              <button
-                onClick={() => setField(s.id, 'min', Math.min(10, s.min + 1))}
-                style={{
-                  width: 28, height: 28, borderRadius: 'var(--r-md)',
-                  background: 'var(--surface)', border: '0.5px solid var(--border)',
-                  color: 'var(--fg)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}
-              >
-                <Icon name="plus" size={13} />
-              </button>
-              <span style={{ fontSize: 11, color: 'var(--fg-tertiary)' }}>
+              <IconButton icon="plus" label="Más" iconSize={16} style={{ width: 36, height: 36 }}
+                onClick={() => setField(s.id, 'min', Math.min(10, s.min + 1))} />
+              <span className="k-dim" style={{ fontSize: 13 }}>
                 visita{s.min !== 1 ? 's' : ''} antes de avanzar
               </span>
             </div>
@@ -578,8 +445,8 @@ function StageConfigPanel({ stages: initialStages, saving, onSave, onClose }) {
 
         {/* Repositorio description */}
         {s.isRepository && (
-          <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginTop: 10, display: 'flex', alignItems: 'center', gap: 5 }}>
-            <Icon name="archive" size={12} color="var(--fg-tertiary)" />
+          <div className="k-dim" style={{ fontSize: 13, marginTop: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Icon name="archive" size={15} />
             Etapa de archivo — los prospectos perdidos o vencidos caen aquí
           </div>
         )}
@@ -588,85 +455,38 @@ function StageConfigPanel({ stages: initialStages, saving, onSave, onClose }) {
   }
 
   return (
-    <div style={{
-      width: 360, flexShrink: 0, borderLeft: '0.5px solid var(--border)',
-      background: 'var(--surface)', display: 'flex', flexDirection: 'column',
-      animation: 'slideIn 0.15s ease-out',
-    }}>
+    <div className="pv-panel pv-panel--wide">
       {/* Header */}
-      <div style={{
-        padding: '14px 18px', borderBottom: '0.5px solid var(--border)',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0,
-      }}>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--fg)' }}>Configurar etapas</div>
-          <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginTop: 1 }}>Nombre · color · visitas mínimas</div>
+      <div style={{ padding: '16px 16px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexShrink: 0 }}>
+        <div style={{ minWidth: 0 }}>
+          <div className="k-h2">Configurar etapas</div>
+          <div className="k-dim" style={{ fontSize: 13, marginTop: 2 }}>Nombre · color · visitas mínimas</div>
         </div>
-        <button onClick={onClose} style={{ color: 'var(--fg-tertiary)', padding: 4 }}>
-          <Icon name="x" size={16} />
-        </button>
+        <IconButton icon="x" label="Cerrar" variant="soft" onClick={onClose} style={{ width: 40, height: 40 }} />
       </div>
 
       {/* Stage rows */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '6px 16px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
         {regularStages.map(s => <StageCard key={s.id} s={s} />)}
 
-        {/* Nueva etapa button */}
-        <button
-          onClick={addNewStage}
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            padding: '10px', borderRadius: 'var(--r-md)',
-            border: '1.5px dashed var(--border)', background: 'transparent',
-            color: 'var(--kiuvo-blue)', fontSize: 13, fontWeight: 500,
-            cursor: 'pointer',
-          }}
-        >
-          <Icon name="plus" size={15} color="var(--kiuvo-blue)" />
-          Nueva etapa
-        </button>
+        <Button variant="outline" block icon="plus" onClick={addNewStage}>Nueva etapa</Button>
 
         {/* Repositorio — always last, special */}
         {repoStage && (
           <>
-            <div style={{ borderTop: '0.5px solid var(--border)', margin: '4px 0' }} />
-            <div style={{ fontSize: 10, fontWeight: 500, color: 'var(--fg-tertiary)', letterSpacing: 0.5, padding: '0 2px' }}>
-              ETAPA DE ARCHIVO
-            </div>
+            <div style={{ borderTop: '1px solid var(--border)', margin: '6px 0 2px' }} />
+            <div className="k-label" style={{ marginBottom: 0 }}>Etapa de archivo</div>
             <StageCard s={repoStage} />
           </>
         )}
       </div>
 
       {/* Footer */}
-      <div style={{
-        padding: '12px 16px', borderTop: '0.5px solid var(--border)',
-        display: 'flex', gap: 8, flexShrink: 0,
-      }}>
-        <button
-          onClick={onClose}
-          style={{
-            flex: 1, padding: '9px 0', borderRadius: 'var(--r-md)',
-            border: '0.5px solid var(--border)', background: 'var(--bg)',
-            color: 'var(--fg)', fontSize: 13, fontWeight: 500,
-          }}
-        >
-          Cancelar
-        </button>
-        <button
-          onClick={() => onSave(draft)}
-          disabled={saving}
-          style={{
-            flex: 2, padding: '9px 0', borderRadius: 'var(--r-md)',
-            background: 'var(--kiuvo-blue)', color: '#fff',
-            fontSize: 13, fontWeight: 500,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            opacity: saving ? 0.6 : 1,
-          }}
-        >
-          <Icon name="check" size={15} color="#fff" />
+      <div style={{ padding: '12px 16px 16px', borderTop: '1px solid var(--border)', display: 'flex', gap: 8, flexShrink: 0 }}>
+        <Button variant="soft" onClick={onClose} style={{ flex: 1 }}>Cancelar</Button>
+        <Button icon="check" loading={saving} onClick={() => onSave(draft)} style={{ flex: 2 }}>
           {saving ? 'Guardando…' : 'Guardar cambios'}
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -692,9 +512,14 @@ export default function AdminPipelineView() {
     return okSeller && okHealth
   })
 
-  function handleMove(prospectId, newStageId) {
-    setProspects(prev => prev.map(p => p.id === prospectId ? { ...p, stage: newStageId } : p))
+  async function handleMove(prospectId, newStageId) {
     if (selected?.id === prospectId) setSelected(prev => ({ ...prev, stage: newStageId }))
+    if (!supabase) return
+    const { error } = await supabase.from('prospects')
+      .update({ stage_id: newStageId, stage_entered_at: new Date().toISOString() })
+      .eq('id', prospectId)
+    if (error) console.warn('[AdminPipeline] mover etapa:', error.message)
+    reload()
   }
 
   function handleSelect(p) {
@@ -708,87 +533,34 @@ export default function AdminPipelineView() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, width: '100%', minWidth: 0, overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, width: '100%', minWidth: 0, overflow: 'hidden', background: 'var(--bg)' }}>
+      <style>{LAYOUT_CSS}</style>
 
       {/* ── Toolbar ── */}
-      <div style={{
-        padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 10,
-        borderBottom: '0.5px solid var(--border)', background: 'var(--bg)', flexShrink: 0,
-      }}>
+      <div className="pv-toolbar">
         {/* Summary chips */}
-        <div style={{ display: 'flex', gap: 8, marginRight: 4 }}>
-          <div style={{
-            padding: '5px 12px', background: 'var(--surface)', border: '0.5px solid var(--border)',
-            borderRadius: 'var(--r-full)', fontSize: 12,
-            display: 'flex', alignItems: 'center', gap: 6,
-          }}>
-            <Icon name="users" size={13} color="var(--fg-secondary)" />
-            <span style={{ color: 'var(--fg)', fontWeight: 500 }}>{filtered.length}</span>
-            <span style={{ color: 'var(--fg-tertiary)' }}>prospectos</span>
-          </div>
-          <div style={{
-            padding: '5px 12px', background: 'var(--surface)', border: '0.5px solid var(--border)',
-            borderRadius: 'var(--r-full)', fontSize: 12,
-            display: 'flex', alignItems: 'center', gap: 6,
-          }}>
-            <Icon name="target" size={13} color="var(--fg-secondary)" />
-            <span style={{ color: 'var(--fg)', fontWeight: 500 }}>{fmt(filtered.filter(p => p.stage !== 'cierre' && p.stage !== 'repositorio').reduce((s, p) => s + p.value, 0))}</span>
-            <span style={{ color: 'var(--fg-tertiary)' }}>potencial</span>
-          </div>
-          {atRisk > 0 && (
-            <div style={{
-              padding: '5px 12px', background: 'var(--warning-bg)', border: '0.5px solid var(--warning-border)',
-              borderRadius: 'var(--r-full)', fontSize: 12,
-              display: 'flex', alignItems: 'center', gap: 5,
-              color: 'var(--warning-fg)',
-            }}>
-              <Icon name="alert-triangle" size={12} color="var(--warning-fg)" />
-              <span style={{ fontWeight: 500 }}>{atRisk} en riesgo</span>
-            </div>
-          )}
-        </div>
+        <Pill icon="users" style={{ background: 'var(--surface)', color: 'var(--fg)' }}>{filtered.length} prospectos</Pill>
+        <Pill icon="target" style={{ background: 'var(--surface)', color: 'var(--fg)' }}>
+          {fmt(filtered.filter(p => p.stage !== 'cierre' && p.stage !== 'repositorio').reduce((s, p) => s + p.value, 0))} potencial
+        </Pill>
+        {atRisk > 0 && <Pill tone="warning" icon="alert-triangle">{atRisk} en riesgo</Pill>}
 
         <div style={{ flex: 1 }} />
 
-        {/* Stage config button */}
-        <button
-          onClick={() => { setShowStageConf(v => !v); setSelected(null) }}
-          title="Configurar etapas del embudo"
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '6px 12px', borderRadius: 'var(--r-md)', fontSize: 12, fontWeight: 500,
-            background: showStageConf ? 'var(--kiuvo-blue)' : 'var(--surface)',
-            color: showStageConf ? '#fff' : 'var(--fg-secondary)',
-            border: `0.5px solid ${showStageConf ? 'transparent' : 'var(--border)'}`,
-            transition: 'all 0.15s',
-          }}
-        >
-          <Icon name="settings" size={14} color={showStageConf ? '#fff' : 'var(--fg-secondary)'} />
-          Configurar etapas
-        </button>
-
         {/* Health filter */}
-        <div style={{ display: 'flex', gap: 3, background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)', padding: 2 }}>
-          {[['all', 'Todos'], ['green', 'Al día'], ['amber', 'Riesgo'], ['red', 'Urgente']].map(([k, l]) => (
-            <button key={k} onClick={() => setHealthFilter(k)} style={{
-              padding: '4px 10px', borderRadius: 'var(--r-sm)', fontSize: 11,
-              background: healthFilter === k ? 'var(--bg)' : 'transparent',
-              color: healthFilter === k ? 'var(--fg)' : 'var(--fg-secondary)',
-              fontWeight: healthFilter === k ? 500 : 400,
-              border: healthFilter === k ? '0.5px solid var(--border)' : 'none',
-            }}>{l}</button>
-          ))}
-        </div>
+        <Segmented
+          surface
+          value={healthFilter}
+          onChange={setHealthFilter}
+          options={[['all', 'Todos'], ['green', 'Al día'], ['amber', 'Riesgo'], ['red', 'Urgente']].map(([id, label]) => ({ id, label }))}
+        />
 
         {/* Seller filter */}
         <select
+          className="k-input k-input--sm k-input--pill"
           value={sellerFilter}
           onChange={e => setSellerFilter(e.target.value)}
-          style={{
-            padding: '6px 10px', background: 'var(--surface)',
-            border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)',
-            fontSize: 12, color: 'var(--fg)', outline: 'none', cursor: 'pointer',
-          }}
+          style={{ width: 'auto', maxWidth: '100%' }}
         >
           <option value="all">Todos los vendedores</option>
           {sellers.map(s => {
@@ -796,12 +568,25 @@ export default function AdminPipelineView() {
             return <option key={s} value={s}>{seller?.name || s}</option>
           })}
         </select>
+
+        {/* Stage config button */}
+        <Button
+          size="sm"
+          variant={showStageConf ? 'primary' : 'soft'}
+          icon="settings"
+          aria-pressed={showStageConf}
+          title="Configurar etapas del embudo"
+          onClick={() => { setShowStageConf(v => !v); setSelected(null) }}
+          style={showStageConf ? undefined : { background: 'var(--surface)' }}
+        >
+          Configurar etapas
+        </Button>
       </div>
 
       {/* ── Kanban board ── */}
       <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
         {/* Columns — overflowX: auto lets them scroll when a side panel narrows the area */}
-        <div style={{ flex: 1, display: 'flex', minWidth: 0, overflowX: 'auto', overflowY: 'hidden' }}>
+        <div className="pv-board">
           {stages.map(stage => {
             const cards = filtered.filter(p => p.stage === stage.id)
               .sort((a, b) => b.value - a.value)

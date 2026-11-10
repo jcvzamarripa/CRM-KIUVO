@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import Icon from '../shared/Icon'
+import { Card, Pill, Empty, Bone } from '../ui'
 import { supabase, isSupabaseConfigured } from '../../lib/supabase'
 
 // ── hook ─────────────────────────────────────────────────────────────────────
@@ -91,133 +92,61 @@ function useAlerts() {
 
 // ── styles ────────────────────────────────────────────────────────────────────
 const TONE = {
-  red:   { bg: 'var(--danger-bg)',       border: 'var(--danger-border)',  fg: 'var(--danger)',     pill: '#E24B4A18', pillFg: 'var(--danger)' },
-  amber: { bg: 'var(--warning-bg)',      border: 'var(--warning-border)', fg: 'var(--warning-fg)', pill: '#EF9F2718', pillFg: 'var(--warning-fg)' },
-  info:  { bg: 'var(--kiuvo-blue-soft)', border: 'var(--kiuvo-blue-mid)', fg: 'var(--kiuvo-blue)', pill: '#185FA518', pillFg: 'var(--kiuvo-blue)' },
+  red:   { bg: 'var(--coral-soft)',  fg: 'var(--coral-fg)',        pill: 'coral' },
+  amber: { bg: 'var(--warning-bg)',  fg: 'var(--warning-fg)',      pill: 'warning' },
+  info:  { bg: 'var(--info-bg)',     fg: 'var(--kiuvo-blue-deep)', pill: 'sky' },
 }
 const BADGE_LABEL = { red: 'Urgente', amber: 'Atención', info: 'Info' }
 
 // ── component ─────────────────────────────────────────────────────────────────
 export default function AlertsPanel() {
-  const [hovered, setHovered]  = useState(null)
-  const { alerts, loading }    = useAlerts()
+  const { alerts, loading } = useAlerts()
   const urgentes = alerts.filter(a => a.kind === 'red').length
 
   return (
-    <div style={{
-      gridColumn: 'span 6', background: 'var(--surface)',
-      border: '0.5px solid var(--border)', borderRadius: 'var(--r-lg)',
-      overflow: 'hidden', display: 'flex', flexDirection: 'column',
-    }}>
-      {/* Header */}
-      <div style={{
-        padding: '14px 18px 12px', borderBottom: '0.5px solid var(--border)',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 30, height: 30, borderRadius: 'var(--r-md)',
-            background: 'var(--danger-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <Icon name="bell" size={15} color="var(--danger)" />
-          </div>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg)' }}>Alertas operativas</div>
-            <div style={{ fontSize: 11, color: 'var(--fg-secondary)' }}>Requieren atención esta semana</div>
-          </div>
+    <Card flush style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ padding: '20px 20px 12px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+        <div>
+          <div className="k-h2">Alertas</div>
+          <div className="k-muted" style={{ fontSize: 13, marginTop: 2 }}>Requieren atención esta semana</div>
         </div>
-        {urgentes > 0 && (
-          <span style={{
-            padding: '3px 8px', borderRadius: 'var(--r-full)',
-            background: 'var(--danger-bg)', color: 'var(--danger)',
-            fontSize: 11, fontWeight: 600,
-          }}>
-            {urgentes} urgente{urgentes !== 1 ? 's' : ''}
-          </span>
-        )}
+        {urgentes > 0 && <Pill tone="coral">{urgentes} urgente{urgentes !== 1 ? 's' : ''}</Pill>}
       </div>
 
-      {/* Body */}
       <div style={{ flex: 1 }}>
         {loading ? (
-          <div style={{ padding: 24, textAlign: 'center', color: 'var(--fg-tertiary)', fontSize: 13 }}>
-            Verificando alertas…
+          <div style={{ padding: '4px 20px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {[0, 1, 2].map(i => <Bone key={i} h={44} r="var(--r-md)" />)}
           </div>
         ) : alerts.length === 0 ? (
-          <div style={{
-            padding: 32, display: 'flex', flexDirection: 'column',
-            alignItems: 'center', gap: 8, color: 'var(--fg-tertiary)',
-          }}>
-            <div style={{ fontSize: 28, opacity: 0.5 }}>✅</div>
-            <div style={{ fontSize: 13, fontWeight: 500 }}>Todo en orden</div>
-            <div style={{ fontSize: 11 }}>No hay alertas operativas en este momento.</div>
-          </div>
+          <Empty icon="circle-check">Todo en orden.<br />No hay alertas en este momento.</Empty>
         ) : (
           alerts.map((a, i) => {
             const t = TONE[a.kind]
-            const isHovered = hovered === i
             return (
-              <div
-                key={i}
-                onMouseEnter={() => setHovered(i)}
-                onMouseLeave={() => setHovered(null)}
-                style={{
-                  padding: '11px 18px',
-                  display: 'flex', alignItems: 'center', gap: 12,
-                  borderBottom: i < alerts.length - 1 ? '0.5px solid var(--border)' : 'none',
-                  cursor: 'pointer',
-                  background: isHovered ? 'var(--bg-secondary)' : 'transparent',
-                  transition: 'background 0.12s',
-                }}
-              >
-                {/* Icon chip */}
+              <div key={i} style={{
+                padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 12,
+                borderTop: '1px solid var(--border)',
+              }}>
                 <div style={{
-                  width: 34, height: 34, borderRadius: 'var(--r-md)', flexShrink: 0,
+                  width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
                   background: t.bg, color: t.fg,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  border: `0.5px solid ${t.border}`,
-                  boxShadow: isHovered ? `0 2px 8px ${t.fg}22` : 'none',
-                  transition: 'box-shadow 0.15s',
                 }}>
-                  <Icon name={a.icon} size={16} />
+                  <Icon name={a.icon} size={20} />
                 </div>
-
-                {/* Text */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--fg)' }}>{a.title}</span>
-                    <span style={{
-                      fontSize: 10, fontWeight: 500, padding: '1px 6px', borderRadius: 'var(--r-full)',
-                      background: t.pill, color: t.pillFg,
-                    }}>
-                      {BADGE_LABEL[a.kind]}
-                    </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 14, fontWeight: 600 }}>{a.title}</span>
+                    <Pill tone={t.pill}>{BADGE_LABEL[a.kind]}</Pill>
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--fg-secondary)', marginTop: 2 }}>{a.sub}</div>
+                  <div className="k-muted" style={{ fontSize: 13, marginTop: 2 }}>{a.sub}</div>
                 </div>
-
-                {/* CTA on hover */}
-                <div style={{
-                  fontSize: 11, fontWeight: 500, color: t.fg,
-                  opacity: isHovered ? 1 : 0,
-                  transition: 'opacity 0.15s',
-                  whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 3,
-                }}>
-                  {a.action}
-                  <Icon name="arrow-right" size={12} color={t.fg} />
-                </div>
-
-                <Icon
-                  name="chevron-right"
-                  size={15}
-                  color={isHovered ? t.fg : 'var(--fg-tertiary)'}
-                  style={{ flexShrink: 0, transition: 'color 0.12s' }}
-                />
               </div>
             )
           })
         )}
       </div>
-    </div>
+    </Card>
   )
 }

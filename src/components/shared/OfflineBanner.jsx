@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import Icon from './Icon'
 import useOnlineStatus from '../../hooks/useOnlineStatus'
 import { getQueue, getQueueCount, dequeue } from '../../lib/offlineQueue'
 import { supabase, isSupabaseConfigured } from '../../lib/supabase'
@@ -176,50 +177,48 @@ export default function OfflineBanner() {
 
   // ── Styles per state ──────────────────────────────────────────────────────
   const cfg = {
-    offline: { bg: '#D85A30', icon: '📵', text: 'Sin conexión · los cambios se guardan localmente' },
-    syncing: { bg: '#EF9F27', icon: '↻',  text: `Reconectado · sincronizando ${pending} cambio${pending !== 1 ? 's' : ''}…` },
-    synced:  { bg: '#1D9E75', icon: '✓',  text: syncedCount > 0
+    offline: { bg: 'var(--coral)',   fg: 'var(--ink)',       icon: 'wifi-off', text: 'Sin conexión · los cambios se guardan en el teléfono' },
+    syncing: { bg: 'var(--ink)',     fg: 'var(--on-ink)',    icon: 'loader',   text: `Reconectado · sincronizando ${pending} cambio${pending !== 1 ? 's' : ''}…` },
+    synced:  { bg: 'var(--accent)',  fg: 'var(--accent-fg)', icon: 'check',    text: syncedCount > 0
         ? `Conexión restaurada · ${syncedCount} cambio${syncedCount !== 1 ? 's' : ''} sincronizado${syncedCount !== 1 ? 's' : ''}`
         : 'Conexión restaurada' },
   }[state]
 
+  // Estilos inline: el banner se monta fuera del contenedor .kiuvo
   return (
-    <div style={{
+    <div role="status" style={{
       position: 'fixed', top: 0, left: 0, right: 0, zIndex: 99999,
       background: cfg.bg,
-      color: '#fff',
-      padding: '9px 20px',
+      color: cfg.fg,
+      padding: 'calc(10px + env(safe-area-inset-top, 0px)) 16px 10px',
       display: 'flex', alignItems: 'center', gap: 10,
-      fontSize: 13, fontWeight: 500,
-      boxShadow: '0 2px 12px rgba(0,0,0,0.25)',
+      fontFamily: 'var(--font-sans)',
+      fontSize: 14, fontWeight: 600, lineHeight: 1.3,
+      boxShadow: 'var(--shadow-float)',
       transition: 'background 0.3s',
       userSelect: 'none',
     }}>
-      {/* Icon */}
       <span style={{
-        fontSize: state === 'syncing' ? 16 : 14,
-        display: 'inline-block',
-        animation: state === 'syncing' ? 'spin 1s linear infinite' : 'none',
+        display: 'inline-flex',
+        animation: state === 'syncing' ? 'kiuvo-banner-spin 1s linear infinite' : 'none',
       }}>
-        {cfg.icon}
+        <Icon name={cfg.icon} size={20} />
       </span>
 
-      {/* Message */}
       <span style={{ flex: 1 }}>{cfg.text}</span>
 
-      {/* Pending badge */}
       {state === 'offline' && pending > 0 && (
         <span style={{
-          background: 'rgba(255,255,255,0.25)',
-          padding: '2px 10px', borderRadius: 99,
-          fontSize: 12, fontWeight: 600,
+          background: 'var(--ink)', color: 'var(--on-ink)',
+          padding: '4px 12px', borderRadius: 'var(--r-full)',
+          fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap',
         }}>
           {pending} pendiente{pending !== 1 ? 's' : ''}
         </span>
       )}
 
       <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes kiuvo-banner-spin { to { transform: rotate(360deg); } }
       `}</style>
     </div>
   )

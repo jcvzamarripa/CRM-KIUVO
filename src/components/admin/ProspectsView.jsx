@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import Icon from '../shared/Icon'
+import { Button, IconButton, Card, Pill, Chip, Segmented, SearchInput, Avatar, Empty, Bone } from '../ui'
 import { useStages } from '../../contexts/StagesContext'
 import { useAdminProspects } from '../../hooks/useAdminProspects'
 import { useSellers } from '../../hooks/useSellers'
@@ -7,8 +8,24 @@ import { rules, collectErrors } from '../../lib/validation'
 import { supabase } from '../../lib/supabase'
 import { saveFile } from '../../lib/saveFile'
 
-const HEALTH_COLOR = { green: 'var(--success)', amber: 'var(--warning)', red: 'var(--danger)', black: 'var(--fg-tertiary)' }
+const HEALTH_TONE  = { green: 'success', amber: 'warning', red: 'coral', black: undefined }
+const HEALTH_LABEL = { green: 'Al día', amber: 'En riesgo', red: 'Urgente', black: 'Perdido' }
 const fmt = n => '$' + n.toLocaleString('es-MX')
+
+const LAYOUT_CSS = `
+  @keyframes slideInRight { from { transform:translateX(24px); opacity:0 } to { transform:translateX(0); opacity:1 } }
+  .prv-panel { width: 100%; flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--surface); border-radius: var(--r-xl); animation: slideInRight 0.18s ease; }
+  .prv-panel__head { padding: 16px 16px 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-shrink: 0; }
+  .prv-panel__foot { flex-shrink: 0; padding: 12px 16px 16px; border-top: 1px solid var(--border); }
+  .prv-toolbar { padding: 14px 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; flex-shrink: 0; }
+  .prv-tablewrap { flex: 1; min-height: 0; padding: 0 20px 20px; display: flex; }
+  .prv-table th { position: sticky; top: 0; z-index: 1; background: var(--surface); }
+  .prv-table tr[aria-selected="true"] td { background: var(--bg-tertiary); }
+  @media (max-width: 768px) {
+    .prv-toolbar { padding: 12px; }
+    .prv-tablewrap { padding: 0 12px 12px; }
+  }
+`
 
 // ─── New Prospect Panel ───────────────────────────────────────────────────────
 function NewProspectPanel({ stages, sellers = [], onSave, onClose }) {
@@ -62,69 +79,61 @@ function NewProspectPanel({ stages, sellers = [], onSave, onClose }) {
   }
 
   return (
-    <div style={{
-      width: '100%', flex: 1, borderLeft: '0.5px solid var(--border)',
-      background: 'var(--surface)', display: 'flex', flexDirection: 'column',
-      animation: 'slideInRight 0.18s ease', overflow: 'hidden',
-    }}>
-      <style>{`@keyframes slideInRight { from { transform:translateX(24px); opacity:0 } to { transform:translateX(0); opacity:1 } }`}</style>
-
+    <div className="prv-panel">
       {/* Header */}
-      <div style={{
-        padding: '16px 20px', borderBottom: '0.5px solid var(--border)',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0,
-      }}>
-        <div>
-          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--fg)' }}>Nuevo prospecto</div>
-          <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginTop: 1 }}>Registro manual</div>
+      <div className="prv-panel__head">
+        <div style={{ minWidth: 0 }}>
+          <div className="k-h2">Nuevo prospecto</div>
+          <div className="k-dim" style={{ fontSize: 13, marginTop: 2 }}>Registro manual</div>
         </div>
-        <button onClick={onClose} style={{ color: 'var(--fg-tertiary)', padding: 4 }}>
-          <Icon name="x" size={18} />
-        </button>
+        <IconButton icon="x" label="Cerrar" variant="soft" onClick={onClose} style={{ width: 40, height: 40 }} />
       </div>
 
       {/* Form body */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '8px 16px 16px' }}>
 
         {/* Empresa */}
         <Field label="Empresa *" error={errors.name}>
           <input
+            className="k-input k-input--sm"
             value={form.name}
             onChange={e => set('name', e.target.value)}
             placeholder="Nombre de la empresa"
             autoFocus
-            style={{ ...inputStyle, borderColor: errors.name ? 'var(--danger)' : 'var(--border)' }}
+            style={errors.name ? errorRing : undefined}
           />
         </Field>
 
         {/* Contacto */}
         <Field label="Contacto *" error={errors.contact}>
           <input
+            className="k-input k-input--sm"
             value={form.contact}
             onChange={e => set('contact', e.target.value)}
             placeholder="Nombre del contacto"
-            style={{ ...inputStyle, borderColor: errors.contact ? 'var(--danger)' : 'var(--border)' }}
+            style={errors.contact ? errorRing : undefined}
           />
         </Field>
 
         {/* Phone + City row */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12 }}>
           <Field label="Teléfono" error={errors.phone}>
             <input
+              className="k-input k-input--sm"
               value={form.phone}
               onChange={e => set('phone', e.target.value)}
               placeholder="55 1234 5678"
               type="tel"
               inputMode="tel"
-              style={{ ...inputStyle, borderColor: errors.phone ? 'var(--danger)' : 'var(--border)' }}
+              style={errors.phone ? errorRing : undefined}
             />
           </Field>
           <Field label="Ciudad">
             <input
+              className="k-input k-input--sm"
               value={form.city}
               onChange={e => set('city', e.target.value)}
               placeholder="Ciudad de México"
-              style={inputStyle}
             />
           </Field>
         </div>
@@ -132,16 +141,16 @@ function NewProspectPanel({ stages, sellers = [], onSave, onClose }) {
         {/* Valor estimado */}
         <Field label="Valor estimado (MXN)" error={errors.value}>
           <div style={{ position: 'relative' }}>
-            <span style={{
-              position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)',
-              fontSize: 13, color: 'var(--fg-tertiary)',
+            <span className="k-dim" style={{
+              position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 14,
             }}>$</span>
             <input
+              className="k-input k-input--sm"
               value={form.value}
               onChange={e => set('value', e.target.value)}
               placeholder="0"
               inputMode="numeric"
-              style={{ ...inputStyle, paddingLeft: 22, borderColor: errors.value ? 'var(--danger)' : 'var(--border)' }}
+              style={{ paddingLeft: 28, ...(errors.value ? errorRing : null) }}
             />
           </div>
         </Field>
@@ -149,9 +158,10 @@ function NewProspectPanel({ stages, sellers = [], onSave, onClose }) {
         {/* Etapa */}
         <Field label="Etapa inicial">
           <select
+            className="k-input k-input--sm"
             value={form.stage}
             onChange={e => set('stage', e.target.value)}
-            style={{ ...inputStyle, cursor: 'pointer' }}
+            style={{ cursor: 'pointer' }}
           >
             {stages.map(s => (
               <option key={s.id} value={s.id}>{s.label}</option>
@@ -161,68 +171,26 @@ function NewProspectPanel({ stages, sellers = [], onSave, onClose }) {
 
         {/* Vendedor */}
         <Field label="Vendedor asignado">
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {sellers.map(s => {
-              const active = form.owner === s.init
-              return (
-                <button
-                  key={s.init}
-                  onClick={() => set('owner', s.init)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '5px 10px', borderRadius: 'var(--r-full)',
-                    background: active ? s.color : 'var(--bg)',
-                    color: active ? '#fff' : 'var(--fg-secondary)',
-                    border: `1.5px solid ${active ? s.color : 'var(--border)'}`,
-                    fontSize: 12, fontWeight: active ? 500 : 400,
-                    transition: 'all 0.12s',
-                  }}
-                >
-                  <span style={{
-                    width: 18, height: 18, borderRadius: '50%',
-                    background: active ? 'rgba(255,255,255,0.3)' : s.color + '22',
-                    color: active ? '#fff' : s.color,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 9, fontWeight: 700,
-                  }}>{s.init}</span>
-                  {s.name.split(' ')[0]}
-                </button>
-              )
-            })}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {sellers.map(s => (
+              <Chip
+                key={s.init}
+                selected={form.owner === s.init}
+                onClick={() => set('owner', s.init)}
+                style={{ minHeight: 40, padding: '0 14px 0 6px', fontSize: 13 }}
+              >
+                <Avatar size="sm" initials={s.init} color={s.color} style={{ width: 26, height: 26, fontSize: 10 }} />
+                {s.name.split(' ')[0]}
+              </Chip>
+            ))}
           </div>
         </Field>
       </div>
 
       {/* Footer */}
-      <div style={{
-        padding: '14px 20px', borderTop: '0.5px solid var(--border)',
-        display: 'flex', gap: 8, flexShrink: 0,
-      }}>
-        <button
-          onClick={onClose}
-          style={{
-            flex: 1, padding: '9px 0', borderRadius: 'var(--r-md)',
-            border: '0.5px solid var(--border)', background: 'var(--bg)',
-            color: 'var(--fg)', fontSize: 13, fontWeight: 500,
-          }}
-        >
-          Cancelar
-        </button>
-        <button
-          onClick={handleSubmit}
-          disabled={!canSave}
-          style={{
-            flex: 2, padding: '9px 0', borderRadius: 'var(--r-md)',
-            background: canSave ? 'var(--kiuvo-blue)' : 'var(--bg-tertiary)',
-            color: canSave ? '#fff' : 'var(--fg-tertiary)',
-            fontSize: 13, fontWeight: 500,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            transition: 'background 0.15s',
-          }}
-        >
-          <Icon name="user-plus" size={15} color={canSave ? '#fff' : 'var(--fg-tertiary)'} />
-          Dar de alta
-        </button>
+      <div className="prv-panel__foot" style={{ display: 'flex', gap: 8 }}>
+        <Button variant="soft" onClick={onClose} style={{ flex: 1 }}>Cancelar</Button>
+        <Button icon="user-plus" disabled={!canSave} onClick={handleSubmit} style={{ flex: 2 }}>Dar de alta</Button>
       </div>
     </div>
   )
@@ -230,18 +198,77 @@ function NewProspectPanel({ stages, sellers = [], onSave, onClose }) {
 
 // ─── Kind config for history timeline ─────────────────────────────────────────
 const KIND_CFG = {
-  visit:    { icon: 'map-pin',        color: '#185FA5', label: 'Visita' },
-  call:     { icon: 'phone',          color: '#7C3AED', label: 'Llamada' },
-  whatsapp: { icon: 'brand-whatsapp', color: '#25D366', label: 'WhatsApp' },
-  quote:    { icon: 'file-text',      color: '#EF9F27', label: 'Cotización' },
-  win:      { icon: 'trophy',         color: '#1D9E75', label: 'Cierre' },
-  stage:    { icon: 'arrow-right',    color: '#1D9E75', label: 'Etapa' },
-  add:      { icon: 'user-plus',      color: '#185FA5', label: 'Alta' },
-  new:      { icon: 'user-plus',      color: '#185FA5', label: 'Alta' },
-  msg:      { icon: 'message',        color: '#7C3AED', label: 'Mensaje' },
-  email:    { icon: 'mail',           color: '#7C3AED', label: 'Email' },
+  visit:    { icon: 'map-pin',        tone: 'sky',     label: 'Visita' },
+  call:     { icon: 'phone',          tone: 'lilac',   label: 'Llamada' },
+  whatsapp: { icon: 'brand-whatsapp', tone: 'success', label: 'WhatsApp' },
+  quote:    { icon: 'file-text',      tone: 'warning', label: 'Cotización' },
+  win:      { icon: 'trophy',         tone: 'accent',  label: 'Cierre' },
+  stage:    { icon: 'arrow-right',    tone: 'success', label: 'Etapa' },
+  add:      { icon: 'user-plus',      tone: 'sky',     label: 'Alta' },
+  new:      { icon: 'user-plus',      tone: 'sky',     label: 'Alta' },
+  msg:      { icon: 'send',           tone: 'lilac',   label: 'Mensaje' },
+  email:    { icon: 'mail',           tone: 'lilac',   label: 'Email' },
 }
-const kindCfg = k => KIND_CFG[k] || { icon: 'activity', color: '#888', label: k || 'Actividad' }
+const kindCfg = k => KIND_CFG[k] || { icon: 'history', tone: undefined, label: k || 'Actividad' }
+
+// ─── Timeline (compartido por el historial y el detalle) ─────────────────────
+function TimelineSkeleton({ rows = 3 }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <Bone w={32} h={32} r="50%" style={{ flexShrink: 0 }} />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6, paddingTop: 4 }}>
+            <Bone w="55%" h={11} />
+            <Bone w="80%" h={9} />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function Timeline({ items }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      {items.map((item, idx) => {
+        const cfg = kindCfg(item.kind)
+        return (
+          <div key={item.id} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', position: 'relative' }}>
+            {idx < items.length - 1 && (
+              <div style={{ position: 'absolute', left: 15, top: 34, bottom: 0, width: 2, background: 'var(--border)' }} />
+            )}
+            <div style={{
+              width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+              background: 'var(--bg-secondary)', color: 'var(--fg-secondary)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Icon name={cfg.icon} size={15} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0, paddingBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <Pill tone={cfg.tone}>{cfg.label}</Pill>
+                {(item.seller?.full_name || item.seller?.initials) && (
+                  <span className="k-dim" style={{ fontSize: 12 }}>
+                    {item.seller.full_name || item.seller.initials}
+                  </span>
+                )}
+              </div>
+              {item.notes && (
+                <div style={{ fontSize: 14, color: 'var(--fg)', marginTop: 6, lineHeight: 1.45 }}>
+                  {item.notes}
+                </div>
+              )}
+              <div className="k-dim" style={{ fontSize: 12, marginTop: 4 }}>
+                {fmtDate(item.created_at)}
+              </div>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
 function fmtDate(iso) {
   if (!iso) return ''
@@ -341,85 +368,27 @@ function HistoryView({ p, onBack }) {
   return (
     <>
       {/* Header */}
-      <div style={{ padding: '14px 18px', borderBottom: '0.5px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-        <button onClick={onBack} style={{ color: 'var(--fg-tertiary)', display: 'flex', alignItems: 'center' }}>
-          <Icon name="arrow-left" size={16} />
-        </button>
+      <div className="prv-panel__head" style={{ justifyContent: 'flex-start' }}>
+        <IconButton icon="arrow-left" label="Volver" variant="soft" onClick={onBack} style={{ width: 40, height: 40 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div className="k-h3" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {p.name}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--fg-tertiary)' }}>Historial de actividades</div>
+          <div className="k-dim" style={{ fontSize: 12 }}>Historial de actividades</div>
         </div>
       </div>
 
       {/* Timeline */}
-      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '12px 18px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: '8px 16px 16px' }}>
         {loading ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {[1,2,3].map(i => (
-              <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--border)', flexShrink: 0 }} />
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5, paddingTop: 4 }}>
-                  <div style={{ height: 10, width: '60%', background: 'var(--border)', borderRadius: 4 }} />
-                  <div style={{ height: 8, width: '80%', background: 'var(--border)', borderRadius: 4 }} />
-                </div>
-              </div>
-            ))}
-          </div>
+          <TimelineSkeleton rows={3} />
         ) : items.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--fg-tertiary)' }}>
-            <Icon name="clock" size={32} color="var(--border)" />
-            <div style={{ marginTop: 10, fontSize: 13 }}>Sin actividades registradas</div>
-            <div style={{ marginTop: 4, fontSize: 11 }}>Las visitas, llamadas y mensajes aparecerán aquí</div>
-          </div>
+          <Empty icon="clock">
+            Sin actividades registradas
+            <div className="k-dim" style={{ fontSize: 13, marginTop: 4 }}>Las visitas, llamadas y mensajes aparecerán aquí</div>
+          </Empty>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-            {items.map((item, idx) => {
-              const cfg = kindCfg(item.kind)
-              return (
-                <div key={item.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', position: 'relative' }}>
-                  {/* Vertical line */}
-                  {idx < items.length - 1 && (
-                    <div style={{
-                      position: 'absolute', left: 13, top: 28, bottom: -6,
-                      width: 2, background: 'var(--border)',
-                    }} />
-                  )}
-                  {/* Icon bubble */}
-                  <div style={{
-                    width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-                    background: cfg.color + '18', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    border: `1.5px solid ${cfg.color}40`, marginTop: 2,
-                  }}>
-                    <Icon name={cfg.icon} size={13} color={cfg.color} />
-                  </div>
-                  {/* Content */}
-                  <div style={{ flex: 1, minWidth: 0, paddingBottom: 14 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                      <span style={{
-                        fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 'var(--r-full)',
-                        background: cfg.color + '18', color: cfg.color,
-                      }}>{cfg.label}</span>
-                      {item.seller?.initials && (
-                        <span style={{ fontSize: 11, color: 'var(--fg-tertiary)' }}>
-                          {item.seller.full_name || item.seller.initials}
-                        </span>
-                      )}
-                    </div>
-                    {item.notes && (
-                      <div style={{ fontSize: 12, color: 'var(--fg)', marginTop: 4, lineHeight: 1.45 }}>
-                        {item.notes}
-                      </div>
-                    )}
-                    <div style={{ fontSize: 10, color: 'var(--fg-tertiary)', marginTop: 4 }}>
-                      {fmtDate(item.created_at)}
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+          <Timeline items={items} />
         )}
       </div>
     </>
@@ -491,78 +460,21 @@ function ContactHistorySection({ prospectId }) {
   return (
     <div style={{ marginTop: 4 }}>
       {/* Section header */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        marginBottom: 10,
-      }}>
-        <Icon name="history" size={13} color="var(--fg-tertiary)" />
-        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--fg-tertiary)', letterSpacing: 0.4, textTransform: 'uppercase' }}>
-          Historial de contactos
-        </span>
-        {!loading && items.length > 0 && (
-          <span style={{
-            fontSize: 10, padding: '1px 6px', borderRadius: 'var(--r-full)',
-            background: 'var(--border)', color: 'var(--fg-secondary)',
-          }}>{items.length}</span>
-        )}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <Icon name="history" size={16} color="var(--fg-tertiary)" />
+        <span className="k-label" style={{ marginBottom: 0 }}>Historial de contactos</span>
+        {!loading && items.length > 0 && <Pill>{items.length}</Pill>}
       </div>
 
       {loading ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {[1, 2].map(i => (
-            <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-              <div style={{ width: 24, height: 24, borderRadius: '50%', background: 'var(--border)', flexShrink: 0 }} />
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 5, paddingTop: 3 }}>
-                <div style={{ height: 9, width: '55%', background: 'var(--border)', borderRadius: 4 }} />
-                <div style={{ height: 7, width: '75%', background: 'var(--border)', borderRadius: 4 }} />
-              </div>
-            </div>
-          ))}
-        </div>
+        <TimelineSkeleton rows={2} />
       ) : items.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '16px 0', color: 'var(--fg-tertiary)' }}>
-          <div style={{ fontSize: 12 }}>Sin contactos registrados</div>
-          <div style={{ fontSize: 11, marginTop: 3, color: 'var(--border)' }}>Las visitas, llamadas y mensajes aparecerán aquí</div>
+        <div style={{ textAlign: 'center', padding: '16px 0' }}>
+          <div className="k-muted" style={{ fontSize: 14 }}>Sin contactos registrados</div>
+          <div className="k-dim" style={{ fontSize: 12, marginTop: 4 }}>Las visitas, llamadas y mensajes aparecerán aquí</div>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {items.map((item, idx) => {
-            const cfg = kindCfg(item.kind)
-            return (
-              <div key={item.id} style={{ display: 'flex', gap: 9, alignItems: 'flex-start', position: 'relative' }}>
-                {idx < items.length - 1 && (
-                  <div style={{ position: 'absolute', left: 11, top: 24, bottom: -4, width: 1.5, background: 'var(--border)' }} />
-                )}
-                <div style={{
-                  width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
-                  background: cfg.color + '18', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  border: `1.5px solid ${cfg.color}40`, marginTop: 1,
-                }}>
-                  <Icon name={cfg.icon} size={11} color={cfg.color} />
-                </div>
-                <div style={{ flex: 1, minWidth: 0, paddingBottom: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
-                    <span style={{
-                      fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 'var(--r-full)',
-                      background: cfg.color + '18', color: cfg.color,
-                    }}>{cfg.label}</span>
-                    {item.seller?.full_name && (
-                      <span style={{ fontSize: 10, color: 'var(--fg-tertiary)' }}>{item.seller.full_name}</span>
-                    )}
-                  </div>
-                  {item.notes && (
-                    <div style={{ fontSize: 12, color: 'var(--fg)', marginTop: 3, lineHeight: 1.45 }}>
-                      {item.notes}
-                    </div>
-                  )}
-                  <div style={{ fontSize: 10, color: 'var(--fg-tertiary)', marginTop: 3 }}>
-                    {fmtDate(item.created_at)}
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
+        <Timeline items={items} />
       )}
     </div>
   )
@@ -577,101 +489,81 @@ function DetailPanel({ p, stageById, sellers = [], onClose, onDelete }) {
   useEffect(() => { setConfirming(false) }, [p.id])
 
   return (
-    <div style={{
-      width: '100%', flex: 1, borderLeft: '0.5px solid var(--border)',
-      background: 'var(--surface)', display: 'flex', flexDirection: 'column',
-      animation: 'slideInRight 0.18s ease', overflow: 'hidden',
-    }}>
+    <div className="prv-panel">
       {/* Header */}
-      <div style={{ padding: '16px 18px', borderBottom: '0.5px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg)' }}>Detalle</div>
-        <button onClick={onClose} style={{ color: 'var(--fg-tertiary)' }}>
-          <Icon name="x" size={16} />
-        </button>
+      <div className="prv-panel__head">
+        <Pill>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: stage.color || 'var(--fg-tertiary)' }} />
+          {stage.label || p.stage}
+        </Pill>
+        <IconButton icon="x" label="Cerrar" variant="soft" onClick={onClose} style={{ width: 40, height: 40 }} />
       </div>
 
       {/* Scrollable info */}
-      <div style={{ flex: 1, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto', minHeight: 0 }}>
-        <span style={{
-          display: 'inline-block', padding: '4px 12px', borderRadius: 'var(--r-full)',
-          background: (stage.color || '#888') + '20', color: stage.color || '#888',
-          fontSize: 12, fontWeight: 500, alignSelf: 'flex-start',
-        }}>
-          {stage.label || p.stage}
-        </span>
+      <div style={{ flex: 1, padding: '4px 16px 16px', display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto', minHeight: 0 }}>
         <div>
-          <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--fg)' }}>{p.name}</div>
-          <div style={{ fontSize: 13, color: 'var(--fg-secondary)', marginTop: 2 }}>{p.contact}</div>
-        </div>
-        {[
-          { label: 'Teléfono',        value: p.phone },
-          { label: 'Valor estimado',  value: fmt(p.value) },
-          { label: 'Visitas',         value: `${p.visits} registradas` },
-          { label: 'Días en etapa',   value: `${p.days} días` },
-          { label: 'Último contacto', value: p.last },
-          { label: 'Vendedor',        value: seller?.name || p.owner_name || p.owner },
-          ...(p.city    ? [{ label: 'Ciudad',    value: p.city }]    : []),
-          ...(p.address ? [{ label: 'Dirección', value: p.address }] : []),
-          ...(p.notes   ? [{ label: 'Notas',     value: p.notes }]   : []),
-        ].map(row => (
-          <div key={row.label}>
-            <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginBottom: 2 }}>{row.label}</div>
-            <div style={{ fontSize: 13, color: 'var(--fg)', fontWeight: 500, whiteSpace: 'pre-wrap' }}>{row.value}</div>
+          <div className="k-h2">{p.name}</div>
+          <div className="k-muted" style={{ fontSize: 14, marginTop: 2 }}>{p.contact}</div>
+          <div style={{ marginTop: 10 }}>
+            <Pill tone={HEALTH_TONE[p.health] || 'success'}>{HEALTH_LABEL[p.health] || 'Al día'}</Pill>
           </div>
-        ))}
+        </div>
+
+        <Card tone="lilac" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>Valor estimado</div>
+          <div className="k-num" style={{ fontSize: 26 }}>{fmt(p.value)}</div>
+        </Card>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '14px 12px' }}>
+          {[
+            { label: 'Teléfono',        value: p.phone },
+            { label: 'Visitas',         value: `${p.visits} registradas` },
+            { label: 'Días en etapa',   value: `${p.days} días` },
+            { label: 'Último contacto', value: p.last },
+            { label: 'Vendedor',        value: seller?.name || p.owner_name || p.owner },
+            ...(p.city    ? [{ label: 'Ciudad',    value: p.city }]    : []),
+            ...(p.address ? [{ label: 'Dirección', value: p.address, wide: true }] : []),
+            ...(p.notes   ? [{ label: 'Notas',     value: p.notes, wide: true }]   : []),
+          ].map(row => (
+            <div key={row.label} style={row.wide ? { gridColumn: '1 / -1' } : undefined}>
+              <div className="k-dim" style={{ fontSize: 12, marginBottom: 2 }}>{row.label}</div>
+              <div style={{ fontSize: 14, color: 'var(--fg)', fontWeight: 500, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{row.value || '—'}</div>
+            </div>
+          ))}
+        </div>
 
         {/* Divider */}
-        <div style={{ borderTop: '0.5px solid var(--border)', marginTop: 2 }} />
+        <div style={{ borderTop: '1px solid var(--border)', marginTop: 2 }} />
 
         {/* Inline contact history */}
         <ContactHistorySection prospectId={p.id} />
       </div>
 
       {/* Fixed footer */}
-      <div style={{ flexShrink: 0, borderTop: '0.5px solid var(--border)', padding: '12px 18px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div className="prv-panel__foot" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <a
+          className="k-btn k-btn--accent k-btn--block"
           href={`https://wa.me/52${(p.phone || '').replace(/\D/g, '')}`}
           target="_blank" rel="noreferrer"
-          style={{
-            width: '100%', padding: '9px 0', borderRadius: 'var(--r-md)',
-            background: '#25D366', color: '#fff', fontSize: 13, fontWeight: 500,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            textDecoration: 'none', boxSizing: 'border-box',
-          }}
         >
-          <Icon name="brand-whatsapp" size={15} color="#fff" />
+          <Icon name="brand-whatsapp" size={18} />
           WhatsApp
         </a>
 
         {/* Delete */}
         {confirming ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ fontSize: 12, color: 'var(--fg-secondary)', textAlign: 'center' }}>
+            <div className="k-muted" style={{ fontSize: 14, textAlign: 'center' }}>
               ¿Eliminar <b style={{ color: 'var(--fg)' }}>{p.name}</b>?<br />
-              <span style={{ color: 'var(--danger)' }}>Esta acción no se puede deshacer.</span>
+              <span style={{ color: 'var(--coral-fg)' }}>Esta acción no se puede deshacer.</span>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => setConfirming(false)} style={{ flex: 1, padding: '8px 0', borderRadius: 'var(--r-md)', border: '0.5px solid var(--border)', background: 'var(--surface)', color: 'var(--fg)', fontSize: 13 }}>
-                Cancelar
-              </button>
-              <button onClick={() => { onDelete(p.id); onClose() }} style={{ flex: 1, padding: '8px 0', borderRadius: 'var(--r-md)', background: 'var(--danger)', color: '#fff', fontSize: 13, fontWeight: 500 }}>
-                Eliminar
-              </button>
+              <Button variant="soft" onClick={() => setConfirming(false)} style={{ flex: 1 }}>Cancelar</Button>
+              <Button variant="danger" onClick={() => { onDelete(p.id); onClose() }} style={{ flex: 1 }}>Eliminar</Button>
             </div>
           </div>
         ) : (
-          <button
-            onClick={() => setConfirming(true)}
-            style={{
-              width: '100%', padding: '8px 0', borderRadius: 'var(--r-md)',
-              border: '0.5px solid var(--danger-border)', background: 'var(--danger-bg)',
-              color: 'var(--danger-fg)', fontSize: 13, fontWeight: 500,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            }}
-          >
-            <Icon name="trash" size={14} color="var(--danger-fg)" />
-            Eliminar prospecto
-          </button>
+          <Button variant="danger" block icon="trash" onClick={() => setConfirming(true)}>Eliminar prospecto</Button>
         )}
       </div>
     </div>
@@ -679,18 +571,15 @@ function DetailPanel({ p, stageById, sellers = [], onClose, onDelete }) {
 }
 
 // ─── Field wrapper ────────────────────────────────────────────────────────────
+// <div> y no <label>: el campo de vendedor contiene botones y un label los activaría
 function Field({ label, children, error }) {
   return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)', marginBottom: 6, letterSpacing: 0.2 }}>
-        {label}
-      </div>
+    <div className="k-field">
+      <div className="k-field__label">{label}</div>
       {children}
       {error && (
-        <div style={{ fontSize: 11, color: 'var(--danger)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-          </svg>
+        <div className="k-field__error" style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <Icon name="alert-circle" size={14} />
           {error}
         </div>
       )}
@@ -698,12 +587,7 @@ function Field({ label, children, error }) {
   )
 }
 
-const inputStyle = {
-  width: '100%', padding: '8px 10px', fontSize: 13,
-  background: 'var(--bg)', border: '0.5px solid var(--border)',
-  borderRadius: 'var(--r-md)', color: 'var(--fg)', outline: 'none',
-  boxSizing: 'border-box',
-}
+const errorRing = { boxShadow: 'inset 0 0 0 2px var(--coral)' }
 
 // ─── Main view ────────────────────────────────────────────────────────────────
 export default function ProspectsView() {
@@ -804,14 +688,15 @@ export default function ProspectsView() {
   const panelOpen = showNew || !!selected
 
   return (
-    <div ref={containerRef} style={{ display: 'flex', flex: 1, width: 0, minWidth: 0, height: '100%', minHeight: 0, overflow: 'hidden', position: 'relative' }}>
+    <div ref={containerRef} style={{ display: 'flex', flex: 1, width: 0, minWidth: 0, height: '100%', minHeight: 0, overflow: 'hidden', position: 'relative', background: 'var(--bg)' }}>
+      <style>{LAYOUT_CSS}</style>
       {/* ── Overlay backdrop for narrow screens ── */}
       {isNarrow && panelOpen && (
         <div
           onClick={() => { setSelected(null); setShowNew(false) }}
           style={{
             position: 'absolute', inset: 0, zIndex: 9,
-            background: 'rgba(0,0,0,0.35)',
+            background: 'rgba(0,0,0,0.5)',
           }}
         />
       )}
@@ -820,191 +705,137 @@ export default function ProspectsView() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
 
         {/* Filters bar */}
-        <div style={{
-          padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 8,
-          borderBottom: '0.5px solid var(--border)', background: 'var(--bg)', flexShrink: 0,
-          flexWrap: 'wrap', rowGap: 8,
-        }}>
+        <div className="prv-toolbar">
 
           {/* Acciones primarias — siempre visibles */}
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
-            <button
-              onClick={() => { setShowNew(true); setSelected(null) }}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '7px 14px', borderRadius: 'var(--r-md)',
-                background: 'var(--kiuvo-blue)', color: '#fff',
-                fontSize: 13, fontWeight: 500,
-              }}
-            >
-              <Icon name="plus" size={15} color="#fff" />
-              Nuevo prospecto
-            </button>
+          <Button size="sm" icon="plus" onClick={() => { setShowNew(true); setSelected(null) }}>
+            Nuevo prospecto
+          </Button>
 
-            <button
-              onClick={handleExportCSV}
-              title="Exportar prospectos filtrados a CSV"
-              style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                padding: '7px 12px', borderRadius: 'var(--r-md)',
-                border: `0.5px solid ${exportFlash ? 'var(--success)' : 'var(--border)'}`,
-                background: exportFlash ? 'var(--success-bg)' : 'var(--surface)',
-                color: exportFlash ? 'var(--success)' : 'var(--fg-secondary)',
-                fontSize: 12, fontWeight: 500, transition: 'all 0.2s',
-              }}
-            >
-              <Icon name={exportFlash ? 'check' : 'download'} size={13} color={exportFlash ? 'var(--success)' : 'var(--fg-secondary)'} />
-              {exportFlash ? 'Descargado' : 'CSV'}
-            </button>
-          </div>
-
-          {/* Separator */}
-          <div style={{ width: '0.5px', height: 24, background: 'var(--border)', flexShrink: 0 }} />
+          <Button
+            size="sm"
+            variant="soft"
+            icon={exportFlash ? 'check' : 'download'}
+            onClick={handleExportCSV}
+            title="Exportar prospectos filtrados a CSV"
+            style={exportFlash
+              ? { background: 'var(--success-bg)', color: 'var(--success-fg)' }
+              : { background: 'var(--surface)' }}
+          >
+            {exportFlash ? 'Descargado' : 'CSV'}
+          </Button>
 
           {/* Search */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '7px 12px', background: 'var(--surface)',
-            border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)', flex: 1, minWidth: 160, maxWidth: 260,
-          }}>
-            <Icon name="search" size={14} color="var(--fg-tertiary)" />
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Buscar empresa o contacto…"
-              style={{ border: 'none', background: 'transparent', fontSize: 13, color: 'var(--fg)', outline: 'none', width: '100%' }}
-            />
-          </div>
+          <SearchInput
+            small
+            value={search}
+            onChange={setSearch}
+            placeholder="Buscar empresa o contacto…"
+            style={{ flex: '1 1 200px', maxWidth: 320 }}
+          />
 
           {/* Stage pills */}
-          <div style={{ display: 'flex', gap: 4, flexShrink: 0, flexWrap: 'wrap' }}>
-            {['all', ...stages.map(s => s.id)].map(sid => {
-              const s = stageById[sid]
-              const on = stageFilter === sid
-              return (
-                <button key={sid} onClick={() => setStageFilter(sid)} style={{
-                  padding: '5px 12px', borderRadius: 'var(--r-full)', fontSize: 12,
-                  background: on ? (sid === 'all' ? 'var(--kiuvo-blue)' : s?.color) : 'var(--surface)',
-                  color: on ? '#fff' : 'var(--fg-secondary)',
-                  border: `0.5px solid ${on ? 'transparent' : 'var(--border)'}`,
-                  fontWeight: on ? 500 : 400,
-                }}>
-                  {sid === 'all' ? 'Todas' : s?.label || sid}
-                </button>
-              )
-            })}
-          </div>
+          <Segmented
+            surface
+            value={stageFilter}
+            onChange={setStageFilter}
+            options={['all', ...stages.map(s => s.id)].map(sid => ({
+              id: sid,
+              label: sid === 'all' ? 'Todas' : stageById[sid]?.label || sid,
+            }))}
+          />
 
           {/* Owner filter */}
           <select
+            className="k-input k-input--sm k-input--pill"
             value={ownerFilter}
             onChange={e => setOwnerFilter(e.target.value)}
-            style={{
-              padding: '6px 10px', background: 'var(--surface)',
-              border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)',
-              fontSize: 12, color: 'var(--fg)', outline: 'none', flexShrink: 0,
-            }}
+            style={{ width: 'auto', maxWidth: '100%' }}
           >
             <option value="all">Todos los vendedores</option>
             {sellerInits.map(s => <option key={s} value={s}>{sellerName(s)}</option>)}
           </select>
 
-          <div style={{ flexShrink: 0, fontSize: 12, color: 'var(--fg-tertiary)', whiteSpace: 'nowrap' }}>
+          <div className="k-dim" style={{ flexShrink: 0, fontSize: 13, whiteSpace: 'nowrap' }}>
             {filtered.length} prospectos
           </div>
         </div>
 
         {/* Table */}
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
-              <tr style={{ background: 'var(--bg-secondary)' }}>
-                {['Empresa / Contacto', 'Etapa', 'Valor', 'Visitas', 'Vendedor', 'Último contacto', 'Salud', ''].map((h, i) => (
-                  <th key={i} style={{
-                    padding: '9px 14px', textAlign: i === 0 ? 'left' : 'center',
-                    fontSize: 11, fontWeight: 500, color: 'var(--fg-secondary)',
-                    borderBottom: '0.5px solid var(--border)', whiteSpace: 'nowrap',
-                    display:
-                      (i === 6 && hideSalud)  ? 'none' :
-                      (i === 5 && hideUltimo) ? 'none' :
-                      (i === 3 && hideVisitas) ? 'none' : undefined,
-                  }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(p => {
-                const stage = stageById[p.stage] || {}
-                return (
-                  <tr
-                    key={p.id}
-                    onClick={() => { setSelected(selected?.id === p.id ? null : p); setShowNew(false) }}
-                    style={{
-                      cursor: 'pointer',
-                      background: selected?.id === p.id ? 'var(--kiuvo-blue-soft)' : 'transparent',
-                    }}
-                  >
-                    <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)' }}>
-                      <div style={{ fontWeight: 500, color: 'var(--fg)' }}>{p.name}</div>
-                      <div style={{ fontSize: 11, color: 'var(--fg-tertiary)', marginTop: 1 }}>{p.contact} · {p.phone}</div>
-                    </td>
-                    <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', textAlign: 'center' }}>
-                      <span style={{
-                        display: 'inline-block', padding: '3px 9px', borderRadius: 'var(--r-full)',
-                        background: (stage.color || '#888') + '20', color: stage.color || '#888',
-                        fontSize: 11, fontWeight: 500,
-                      }}>
-                        {stage.label || p.stage}
-                      </span>
-                    </td>
-                    <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', textAlign: 'center', fontVariantNumeric: 'tabular-nums', fontWeight: 500, color: 'var(--fg)' }}>
-                      {fmt(p.value)}
-                    </td>
-                    <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', textAlign: 'center', color: 'var(--fg)', fontVariantNumeric: 'tabular-nums', display: hideVisitas ? 'none' : undefined }}>
-                      {p.visits}
-                    </td>
-                    <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', textAlign: 'center' }}>
-                      <span style={{
-                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                        width: 26, height: 26, borderRadius: '50%',
-                        background: sellerColor(p.owner) + '22',
-                        color: sellerColor(p.owner),
-                        fontSize: 11, fontWeight: 500,
-                      }}>
-                        {p.owner}
-                      </span>
-                    </td>
-                    <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', textAlign: 'center', fontSize: 12, color: 'var(--fg-secondary)', display: hideUltimo ? 'none' : undefined }}>
-                      {p.last}
-                    </td>
-                    <td style={{ padding: '11px 14px', borderBottom: '0.5px solid var(--border)', textAlign: 'center', display: hideSalud ? 'none' : undefined }}>
-                      <span style={{
-                        display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
-                        background: HEALTH_COLOR[p.health],
-                      }} />
-                    </td>
-                    <td style={{ padding: '11px 10px', borderBottom: '0.5px solid var(--border)', textAlign: 'center' }}>
-                      <Icon name="chevron-right" size={14} color="var(--fg-tertiary)" />
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+        <div className="prv-tablewrap">
+          <Card flush style={{ flex: 1, minWidth: 0, overflow: 'auto' }}>
+            <table className="k-table k-table--click prv-table">
+              <thead>
+                <tr>
+                  {['Empresa / Contacto', 'Etapa', 'Valor', 'Visitas', 'Vendedor', 'Último contacto', 'Salud', ''].map((h, i) => (
+                    <th key={i} style={{
+                      textAlign: i === 0 ? 'left' : 'center',
+                      display:
+                        (i === 6 && hideSalud)  ? 'none' :
+                        (i === 5 && hideUltimo) ? 'none' :
+                        (i === 3 && hideVisitas) ? 'none' : undefined,
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(p => {
+                  const stage = stageById[p.stage] || {}
+                  return (
+                    <tr
+                      key={p.id}
+                      aria-selected={selected?.id === p.id}
+                      onClick={() => { setSelected(selected?.id === p.id ? null : p); setShowNew(false) }}
+                    >
+                      <td>
+                        <div style={{ fontWeight: 600, color: 'var(--fg)' }}>{p.name}</div>
+                        <div className="k-dim" style={{ fontSize: 12, marginTop: 1 }}>{p.contact} · {p.phone}</div>
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <Pill>
+                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: stage.color || 'var(--fg-tertiary)' }} />
+                          {stage.label || p.stage}
+                        </Pill>
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <span className="k-num" style={{ fontSize: 15 }}>{fmt(p.value)}</span>
+                      </td>
+                      <td style={{ textAlign: 'center', fontVariantNumeric: 'tabular-nums', display: hideVisitas ? 'none' : undefined }}>
+                        {p.visits}
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <Avatar size="sm" initials={p.owner} color={sellerColor(p.owner)} />
+                      </td>
+                      <td className="k-muted" style={{ textAlign: 'center', fontSize: 13, display: hideUltimo ? 'none' : undefined }}>
+                        {p.last}
+                      </td>
+                      <td style={{ textAlign: 'center', display: hideSalud ? 'none' : undefined }}>
+                        <Pill tone={HEALTH_TONE[p.health]}>{HEALTH_LABEL[p.health] || '—'}</Pill>
+                      </td>
+                      <td style={{ textAlign: 'center', paddingLeft: 4, paddingRight: 12 }}>
+                        <Icon name="chevron-right" size={16} color="var(--fg-tertiary)" />
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            {!loadingProspects && filtered.length === 0 && <Empty icon="users">Sin prospectos con estos filtros</Empty>}
+          </Card>
         </div>
       </div>
 
       {/* ── Right panel (new form or detail) ── */}
       {rightPanel && (
         <div style={isNarrow ? {
-          position: 'absolute', top: 0, right: 0, bottom: 0, zIndex: 10,
-          width: Math.min(400, containerW * 0.90),
-          boxShadow: '-4px 0 24px rgba(0,0,0,0.18)',
+          position: 'absolute', top: 8, right: 8, bottom: 8, zIndex: 10,
+          width: Math.min(400, containerW - 16),
+          boxShadow: 'var(--shadow-float)', borderRadius: 'var(--r-xl)',
           display: 'flex', flexDirection: 'column',
         } : {
           // 32% del contenedor real, entre 300px y 400px
           width: Math.min(400, Math.max(300, containerW * 0.32)),
-          flexShrink: 0,
+          flexShrink: 0, padding: '14px 20px 20px 0', boxSizing: 'border-box',
           display: 'flex', flexDirection: 'column',
         }}>
           {rightPanel}
