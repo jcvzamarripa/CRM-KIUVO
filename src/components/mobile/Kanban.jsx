@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, Suspense, lazy } from 'react'
 import Icon from '../shared/Icon'
+import { Button } from '../ui'
 import { STAGES, STAGE_BY_ID } from '../../constants/stages'
 import { supabase, isSupabaseConfigured } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -196,7 +197,7 @@ function AddProspectModal({ stage, onClose, onSave }) {
 }
 
 // ─── ActionSheet ──────────────────────────────────────────────────────────────
-function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, onUpdateProspect, onNewProposal, isAdmin }) {
+function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, onUpdateProspect, onNewProposal, onCheckIn, isAdmin }) {
   const { user } = useAuth()
   const { addToast } = useToast()
   const { stages: allStages } = useStages()
@@ -426,6 +427,14 @@ function ActionSheet({ prospect, onClose, onMoveStage, onDelete, onSaveNotes, on
             {editMode ? 'Cancelar' : 'Editar datos'}
           </button>
         </div>
+
+        {onCheckIn && (
+          <div style={{ padding: '0 16px 14px', flexShrink: 0 }}>
+            <Button variant="accent" block icon="map-pin-check" onClick={() => { onClose(); onCheckIn(prospect) }}>
+              Check-in en este prospecto
+            </Button>
+          </div>
+        )}
 
         {/* Scrollable content */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px 32px' }}>
@@ -1260,7 +1269,7 @@ function ProspectCard({ p, onAction, onAdvance, onODP, showStage = false }) {
 }
 
 // ─── Kanban ───────────────────────────────────────────────────────────────────
-export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 }) {
+export default function Kanban({ jumpTo, onCheckIn, onOpenNotifications, unreadCount = 0 }) {
   const { user, profile } = useAuth()
   const { addToast } = useToast()
   const { stages: contextStages, stageById: contextStageById } = useStages()
@@ -1349,6 +1358,7 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
 
   // ── Realtime ──────────────────────────────────────────────────────
   useEffect(() => {
+    if (!supabase) return
     const ch = supabase
       .channel(`kanban-${user.id}`)
       .on('postgres_changes', {
@@ -1914,6 +1924,7 @@ export default function Kanban({ jumpTo, onOpenNotifications, unreadCount = 0 })
           onSaveNotes={handleSaveNotes}
           onUpdateProspect={handleUpdateProspect}
           onNewProposal={handleNewProposal}
+          onCheckIn={onCheckIn}
           isAdmin={isAdmin}
         />
       )}

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import useOnlineStatus from '../../hooks/useOnlineStatus'
 import { getQueue, getQueueCount, dequeue } from '../../lib/offlineQueue'
 import { supabase, isSupabaseConfigured } from '../../lib/supabase'
+import { replayCheckIn } from '../../lib/checkin'
 
 // ── Sync de cotizaciones offline ──────────────────────────────────────────────
 async function syncQuote(item) {
@@ -85,6 +86,9 @@ async function replayQueue() {
       if (isSupabaseConfigured) {
         if (item.type === 'INSERT_QUOTE') {
           await syncQuote(item)
+          dequeue(item.id); synced++
+        } else if (item.type === 'CHECKIN') {
+          await replayCheckIn(item)
           dequeue(item.id); synced++
         } else {
           // La visita se fecha con la hora en que ocurrió, no con la de sincronización

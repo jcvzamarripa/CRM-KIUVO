@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import Icon from '../shared/Icon'
+import { compressImage } from '../../lib/photo'
 import { supabase, isSupabaseConfigured } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { rules } from '../../lib/validation'
@@ -211,7 +212,7 @@ function PhotoField({ photo, onPhoto }) {
         if (file) {
           try {
             const url = URL.createObjectURL(file)
-            onPhoto(url)
+            onPhoto(url, file)
           } catch {
             // URL.createObjectURL no soportado — mostrar nombre como fallback
             onPhoto(null)
@@ -310,6 +311,8 @@ export default function NewProspectModal({ onClose, onCreated }) {
     email: '', location: '', employees: '', notes: '',
   })
   const [photo, setPhoto]         = useState(null)
+  const [photoFile, setPhotoFile] = useState(null)
+  const [photoSaved, setPhotoSaved] = useState(false)
   const [locCoords, setLocCoords] = useState(null)
   const [errors, setErrors]       = useState({})
   const [loading, setLoading]     = useState(false)
@@ -386,6 +389,20 @@ export default function NewProspectModal({ onClose, onCreated }) {
         prospect_id: data.id, seller_id: user.id, kind: 'new',
       }).then(() => {})
 
+      // En su propio try: si la foto falla, el prospecto ya existe y no debe re-encolarse
+      if (photoFile) try {
+        const compressed = await compressImage(photoFile)
+        const path = `${data.id}/${Date.now()}.jpg`
+        const { error: upErr } = await supabase.storage
+          .from('prospect-images')
+          .upload(path, compressed, { contentType: 'image/jpeg', upsert: false })
+        if (!upErr) {
+          const { data: { publicUrl } } = supabase.storage.from('prospect-images').getPublicUrl(path)
+          const { error: rowErr } = await supabase.from('prospect_images').insert({ prospect_id: data.id, url: publicUrl, path })
+          setPhotoSaved(!rowErr)
+        }
+      } catch { /* el prospecto queda sin foto */ }
+
       onCreated?.(data)
       setStep('success')
       setTimeout(onClose, 1800)
@@ -411,7 +428,7 @@ export default function NewProspectModal({ onClose, onCreated }) {
         overflow: 'hidden',
       }}>
         {step === 'success' ? (
-          <SuccessView name={form.businessName || form.clientName} hasPhoto={!!photo} offline={savedOffline} />
+          <SuccessView name={form.businessName || form.clientName} hasPhoto={photoSaved} offline={savedOffline} />
         ) : (
           <>
             {/* Handle */}
@@ -532,7 +549,7 @@ export default function NewProspectModal({ onClose, onCreated }) {
                 </div>
               </div>
 
-              <PhotoField photo={photo} onPhoto={setPhoto} />
+              <PhotoField photo={photo} onPhoto={(url, file) => { setPhoto(url); setPhotoFile(file || null) }} />
 
               <div style={{ height: 8 }} />
             </div>

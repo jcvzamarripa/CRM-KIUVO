@@ -9,10 +9,9 @@ export function useFunnelCounts() {
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
-    const { data } = await supabase
-      .from('prospects')
-      .select('stage_id, health')
-      .eq('owner_id', user.id)
+    const { data } = supabase
+      ? await supabase.from('prospects').select('stage_id, health').eq('owner_id', user.id)
+      : { data: [] }
 
     // Build per-stage counts from the flat list
     const map = {}
@@ -33,6 +32,7 @@ export function useFunnelCounts() {
 
   // Realtime — reload counts on any prospect change for this user
   useEffect(() => {
+    if (!supabase) return
     const ch = supabase
       .channel(`funnel-counts-${user.id}`)
       .on('postgres_changes', {

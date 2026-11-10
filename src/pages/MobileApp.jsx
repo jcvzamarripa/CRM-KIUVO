@@ -1,11 +1,10 @@
 import React, { useState, Suspense, lazy } from 'react'
 import { useNotifications } from '../hooks/useNotifications'
 import ErrorBoundary from '../components/shared/ErrorBoundary'
-import StatusBar from '../components/mobile/StatusBar'
 import BottomNav from '../components/mobile/BottomNav'
 import Dashboard from '../components/mobile/Dashboard'
 import Kanban from '../components/mobile/Kanban'
-import VisitModal from '../components/mobile/VisitModal'
+import CheckInModal from '../components/mobile/CheckInModal'
 import NewProspectModal from '../components/mobile/NewProspectModal'
 import NotificationsPanel from '../components/mobile/NotificationsPanel'
 import WhatsAppModal from '../components/mobile/WhatsAppModal'
@@ -38,7 +37,8 @@ function PlaceholderScreen({ title, icon }) {
 
 export default function MobileApp({ dark, onToggleDark }) {
   const [screen, setScreen] = useState('inicio')
-  const [showVisitModal, setShowVisitModal] = useState(false)
+  const [checkIn, setCheckIn] = useState(null)   // null | { prospect, type }
+  const [refreshKey, setRefreshKey] = useState(0)
   const [showNewProspect, setShowNewProspect] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [showQuote, setShowQuote] = useState(false)
@@ -70,7 +70,8 @@ export default function MobileApp({ dark, onToggleDark }) {
       dark={dark}
       onToggleDark={onToggleDark}
       onOpenKanban={goKanban}
-      onRegisterVisit={() => setShowVisitModal(true)}
+      onRegisterVisit={() => setCheckIn({ type: 'call' })}
+      refreshKey={refreshKey}
       onNewProspect={() => setShowNewProspect(true)}
       onOpenNotifications={() => setShowNotifications(true)}
       onQuote={() => setShowQuote(true)}
@@ -81,7 +82,7 @@ export default function MobileApp({ dark, onToggleDark }) {
       unreadCount={notifications.unreadCount}
     />
   else if (screen === 'embudo')
-    content = <Kanban jumpTo={kanbanJump} onOpenNotifications={() => setShowNotifications(true)} unreadCount={notifications.unreadCount} />
+    content = <Kanban jumpTo={kanbanJump} onCheckIn={prospect => setCheckIn({ prospect })} onOpenNotifications={() => setShowNotifications(true)} unreadCount={notifications.unreadCount} />
   else if (screen === 'mapa')
     content = <MapScreen />
   else if (screen === 'agenda')
@@ -158,14 +159,24 @@ export default function MobileApp({ dark, onToggleDark }) {
       width: '100%', height: '100%', background: 'var(--bg)',
       position: 'relative', overflow: 'hidden',
     }}>
-      <StatusBar />
-      <div style={{ position: 'absolute', top: 44, bottom: 0, left: 0, right: 0, overflowY: 'auto', overflowX: 'hidden' }}>
+      <div style={{ position: 'absolute', top: 'env(safe-area-inset-top, 0px)', bottom: 0, left: 0, right: 0, overflowY: 'auto', overflowX: 'hidden' }}>
         <ErrorBoundary key={screen}>
           {content}
         </ErrorBoundary>
       </div>
-      <BottomNav active={screen} onChange={setScreen} />
-      {showVisitModal    && <VisitModal       onClose={() => setShowVisitModal(false)} />}
+      <BottomNav
+        active={screen}
+        onChange={id => { setMasSubScreen(null); setScreen(id) }}
+        onCheckIn={() => setCheckIn({})}
+      />
+      {checkIn && (
+        <CheckInModal
+          initialProspect={checkIn.prospect}
+          initialType={checkIn.type}
+          onClose={() => setCheckIn(null)}
+          onSaved={() => setRefreshKey(k => k + 1)}
+        />
+      )}
       {showNewProspect   && <NewProspectModal  onClose={() => setShowNewProspect(false)} />}
       {showNotifications && (
         <NotificationsPanel

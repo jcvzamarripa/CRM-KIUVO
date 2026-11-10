@@ -48,6 +48,7 @@ function getPeriodDates(period) {
   const today    = new Date()
   const toISO    = d => d.toISOString().slice(0, 10)
   const todayISO = toISO(today)
+  if (period === 'Día') return { from: todayISO, to: todayISO }
   if (period === 'Semana') {
     const mon = new Date(today)
     mon.setDate(today.getDate() - ((today.getDay() + 6) % 7))
@@ -177,7 +178,9 @@ function MetasTab({ sellers = [] }) {
 
     const next = {}
     sellers.forEach(s => {
-      next[s.init] = { ventas: s.goal || 100000, prospectos: 20, visitas: 25 }
+      next[s.init] = period === 'Día'
+        ? { ventas: Math.round((s.goal || 100000) / 22), prospectos: 5, visitas: 15 }
+        : { ventas: s.goal || 100000, prospectos: 20, visitas: 25 }
     })
     const { data } = await supabase
       .from('seller_goals')
@@ -328,7 +331,7 @@ function MetasTab({ sellers = [] }) {
       }}>
         {/* Period */}
         <div style={{ display: 'inline-flex', background: 'var(--bg)', border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)', padding: 2, gap: 1 }}>
-          {['Semana','Mes','Trimestre','Año'].map(p => (
+          {['Día','Semana','Mes','Trimestre','Año'].map(p => (
             <button key={p} onClick={() => setPeriod(p)} style={{
               padding: '4px 12px', fontSize: 11,
               fontWeight: period === p ? 500 : 400,

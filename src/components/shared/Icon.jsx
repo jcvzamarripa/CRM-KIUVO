@@ -61,6 +61,11 @@ import {
 
   // Archive / Repository
   IconArchive,
+
+  // Campo: check-in y tareas
+  IconMapPinCheck, IconCurrentLocation, IconCloudOff, IconFileInvoice, IconRefresh,
+  IconListCheck, IconUserOff, IconThumbDown, IconRotateClockwise, IconCash,
+  IconCalendarTime, IconPhoto,
 } from '@tabler/icons-react'
 
 const ICON_MAP = {
@@ -184,6 +189,21 @@ const ICON_MAP = {
 
   // ── Misc ───────────────────────────────────────────
   'camera':             IconCamera,
+
+  // ── Campo: check-in y tareas ───────────────────────
+  'map-pin-check':      IconMapPinCheck,
+  'current-location':   IconCurrentLocation,
+  'cloud-off':          IconCloudOff,
+  'file-invoice':       IconFileInvoice,
+  'refresh':            IconRefresh,
+  'loader':             IconLoader2,
+  'list-check':         IconListCheck,
+  'user-off':           IconUserOff,
+  'thumb-down':         IconThumbDown,
+  'rotate-clockwise':   IconRotateClockwise,
+  'cash':               IconCash,
+  'calendar-time':      IconCalendarTime,
+  'photo':              IconPhoto,
 }
 
 export default function Icon({ name, size = 18, color, style }) {

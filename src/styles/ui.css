@@ -1,0 +1,168 @@
+/* KIUVO CRM — primitivos de interfaz (ver src/components/ui) */
+
+.k-display { font-family: var(--font-display); letter-spacing: -0.02em; }
+
+/* ── Botones ─────────────────────────────────────────────────────────────── */
+.kiuvo .k-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: var(--tap); padding: 0 20px;
+  border-radius: var(--r-full);
+  font-size: 15px; font-weight: 600; line-height: 1;
+  transition: transform 0.08s ease, opacity 0.15s ease;
+  white-space: nowrap;
+}
+.kiuvo .k-btn:active { transform: scale(0.97); opacity: 1; }
+.kiuvo .k-btn:disabled { opacity: 0.45; cursor: default; transform: none; }
+.kiuvo .k-btn--lg { min-height: 56px; font-size: 16px; padding: 0 26px; }
+.kiuvo .k-btn--sm { min-height: 40px; font-size: 13px; padding: 0 14px; }
+.kiuvo .k-btn--block { display: flex; width: 100%; }
+.kiuvo .k-btn--primary { background: var(--primary-bg); color: var(--primary-fg); }
+.kiuvo .k-btn--accent  { background: var(--accent); color: var(--accent-fg); }
+.kiuvo .k-btn--soft    { background: var(--bg-secondary); color: var(--fg); }
+.kiuvo .k-btn--outline { background: transparent; color: var(--fg); box-shadow: inset 0 0 0 1.5px var(--border-strong); }
+.kiuvo .k-btn--danger  { background: var(--coral-soft); color: var(--coral-fg); }
+
+.kiuvo .k-iconbtn {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: var(--tap); height: var(--tap); border-radius: 50%;
+  background: var(--surface); color: var(--fg);
+  transition: transform 0.08s ease;
+}
+.kiuvo .k-iconbtn:active { transform: scale(0.94); opacity: 1; }
+.kiuvo .k-iconbtn--accent { background: var(--accent); color: var(--accent-fg); }
+.kiuvo .k-iconbtn--ink    { background: var(--ink); color: var(--on-ink); }
+.kiuvo .k-iconbtn--soft   { background: var(--bg-secondary); }
+.kiuvo .k-iconbtn--lg     { width: 56px; height: 56px; }
+
+/* ── Tarjetas ────────────────────────────────────────────────────────────── */
+.kiuvo .k-card {
+  background: var(--surface); color: var(--fg);
+  border-radius: var(--r-lg); padding: 16px;
+}
+.kiuvo .k-card--ink    { background: var(--ink); color: var(--on-ink); }
+.kiuvo .k-card--accent { background: var(--accent); color: var(--accent-fg); }
+.kiuvo .k-card--lilac  { background: var(--accent-2); color: #14102E; }
+.kiuvo .k-card--flush  { padding: 0; overflow: hidden; }
+
+/* ── Píldoras (etiquetas, no interactivas) ───────────────────────────────── */
+.kiuvo .k-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: var(--r-full);
+  font-size: 12px; font-weight: 600; line-height: 1.3; white-space: nowrap;
+  background: var(--bg-secondary); color: var(--fg-secondary);
+}
+.kiuvo .k-pill--accent  { background: var(--accent); color: var(--accent-fg); }
+.kiuvo .k-pill--lilac   { background: var(--accent-2-soft); color: var(--accent-2-fg); }
+.kiuvo .k-pill--coral   { background: var(--coral-soft); color: var(--coral-fg); }
+.kiuvo .k-pill--sky     { background: var(--info-bg); color: var(--kiuvo-blue-deep); }
+.kiuvo .k-pill--success { background: var(--success-bg); color: var(--success-fg); }
+.kiuvo .k-pill--warning { background: var(--warning-bg); color: var(--warning-fg); }
+.kiuvo .k-pill--on-ink  { background: rgba(255, 255, 255, 0.12); color: var(--on-ink); }
+
+/* ── Chips (opciones seleccionables) ─────────────────────────────────────── */
+.kiuvo .k-chip {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: var(--tap); padding: 0 16px;
+  border-radius: var(--r-full);
+  background: var(--surface); color: var(--fg);
+  font-size: 14px; font-weight: 500; text-align: center; line-height: 1.2;
+  box-shadow: inset 0 0 0 1.5px var(--border);
+  transition: transform 0.08s ease;
+}
+.kiuvo .k-chip:active { transform: scale(0.97); opacity: 1; }
+.kiuvo .k-chip[aria-pressed="true"] {
+  background: var(--primary-bg); color: var(--primary-fg); box-shadow: none; font-weight: 600;
+}
+.kiuvo .k-chip--tall { min-height: 56px; border-radius: var(--r-md); justify-content: flex-start; text-align: left; }
+
+/* ── Campos ──────────────────────────────────────────────────────────────── */
+.kiuvo .k-input {
+  width: 100%; min-height: var(--tap); padding: 12px 16px;
+  background: var(--surface); color: var(--fg);
+  border: none; outline: none; border-radius: var(--r-md);
+  box-shadow: inset 0 0 0 1.5px var(--border);
+  font: inherit; font-size: 16px; /* 16px evita el zoom automático de iOS */
+}
+.kiuvo .k-input:focus { box-shadow: inset 0 0 0 2px var(--fg); }
+.kiuvo .k-input::placeholder { color: var(--fg-tertiary); }
+.kiuvo textarea.k-input { resize: none; line-height: 1.4; }
+
+.kiuvo .k-label {
+  font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--fg-tertiary); margin-bottom: 10px;
+}
+
+/* ── Hoja inferior ───────────────────────────────────────────────────────── */
+.k-sheet__backdrop {
+  position: fixed; inset: 0; z-index: 300; background: rgba(0, 0, 0, 0.5);
+  animation: k-fade 0.18s ease;
+}
+.kiuvo .k-sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 301;
+  max-height: 94%; display: flex; flex-direction: column;
+  background: var(--bg); color: var(--fg);
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  animation: k-rise 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.kiuvo .k-sheet--full { top: env(safe-area-inset-top, 0px); max-height: none; }
+.kiuvo .k-sheet__head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 18px 16px 10px; flex-shrink: 0;
+}
+.kiuvo .k-sheet__title { font-family: var(--font-display); font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+.kiuvo .k-sheet__body { flex: 1; overflow-y: auto; padding: 6px 16px 16px; -webkit-overflow-scrolling: touch; }
+.kiuvo .k-sheet__foot {
+  flex-shrink: 0; padding: 12px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+  background: var(--bg);
+}
+
+/* ── Navegación inferior flotante ────────────────────────────────────────── */
+.kiuvo .k-nav {
+  position: absolute; z-index: 10;
+  left: 10px; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  height: 66px; padding: 0 6px;
+  display: grid; grid-template-columns: repeat(5, 1fr); align-items: center;
+  background: #0E0E0E; border-radius: var(--r-xl);
+  box-shadow: var(--shadow-float);
+}
+.kiuvo-dark .k-nav { background: #1A1A18; }
+.kiuvo .k-nav__item {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  height: 100%; color: #A9A9A4; font-size: 11px; font-weight: 500;
+}
+.kiuvo .k-nav__icon {
+  display: flex; align-items: center; justify-content: center;
+  width: 48px; height: 30px; border-radius: var(--r-full);
+}
+.kiuvo .k-nav__item[aria-current="page"] { color: #FFFFFF; font-weight: 600; }
+.kiuvo .k-nav__item[aria-current="page"] .k-nav__icon { background: var(--accent); color: var(--accent-fg); }
+
+.kiuvo .k-fab {
+  position: absolute; z-index: 11;
+  right: 14px; bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+  height: 58px; padding: 0 22px 0 18px;
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--accent); color: var(--accent-fg);
+  border-radius: var(--r-full);
+  font-size: 16px; font-weight: 700;
+  box-shadow: var(--shadow-float);
+}
+.kiuvo .k-fab:active { transform: scale(0.96); opacity: 1; }
+
+/* ── Varios ──────────────────────────────────────────────────────────────── */
+.kiuvo .k-check {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 30px; height: 30px; border-radius: 50%;
+  box-shadow: inset 0 0 0 2px var(--border-strong); color: transparent;
+}
+.kiuvo .k-check[aria-checked="true"] { background: var(--primary-bg); color: var(--primary-fg); box-shadow: none; }
+
+.k-spin { animation: k-spin 0.8s linear infinite; }
+
+@keyframes k-spin { to { transform: rotate(360deg); } }
+@keyframes k-fade { from { opacity: 0; } }
+@keyframes k-rise { from { transform: translateY(24px); opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .k-sheet, .k-sheet__backdrop, .k-btn, .k-chip, .k-iconbtn { animation: none !important; transition: none !important; }
+}

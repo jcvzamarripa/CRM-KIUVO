@@ -27,6 +27,23 @@ const KIND_LABELS = {
   approved: 'cerró venta en',
 }
 
+const OUTCOME_LABELS = {
+  no_estaba: 'No estaba el encargado', volver: 'Pidió que regrese', cita: 'Agendó cita',
+  cotizacion: 'Pidió cotización', venta: 'Venta cerrada', no_interesa: 'No le interesa',
+}
+
+function verificationText(v) {
+  if (v.kind && v.kind !== 'visit') return ''
+  const dist = v.distance_m != null ? ` a ${v.distance_m} m` : ''
+  return {
+    verified:     `Verificada${dist}`,
+    no_reference: 'Primera visita con GPS',
+    far:          `LEJOS del prospecto (${v.distance_m} m)`,
+    no_gps:       'SIN ubicación',
+    no_photo:     'SIN foto',
+  }[v.verification] || ''
+}
+
 export function useActivities({ limit = 50 } = {}) {
   const [activities, setActivities] = useState([])
   const [loading,    setLoading]    = useState(true)
@@ -44,7 +61,7 @@ export function useActivities({ limit = 50 } = {}) {
     const visitsPromise = supabase
       .from('visits')
       .select(`
-        id, kind, notes, created_at,
+        id, kind, notes, created_at, outcome, verification, distance_m,
         seller:profiles ( full_name, initials, avatar_color ),
         prospect:prospects ( name )
       `)
@@ -98,7 +115,7 @@ export function useActivities({ limit = 50 } = {}) {
         sellerInit:  v.seller?.initials     || '?',
         sellerName:  v.seller?.full_name    || 'Vendedor',
         sellerColor: v.seller?.avatar_color || '#888',
-        detail:      v.notes || '',
+        detail:      [OUTCOME_LABELS[v.outcome], verificationText(v), v.notes].filter(Boolean).join(' · '),
         amount:      '',
       })
     }
