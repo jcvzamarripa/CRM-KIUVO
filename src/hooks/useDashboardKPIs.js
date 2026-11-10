@@ -45,20 +45,20 @@ async function fetchKPIs() {
       .from('prospects')
       .select('id', { count: 'exact', head: true }),
 
-    // 2. Cierres este mes (aprobados) — usa created_at porque updated_at no tiene trigger
+    // 2. Cierres este mes (aprobados), por fecha de aprobación
     supabase
       .from('quotes')
       .select('id, total')
       .eq('status', 'approved')
-      .gte('created_at', monthStart),
+      .gte('approved_at', monthStart),
 
     // 3. Cierres mes anterior
     supabase
       .from('quotes')
       .select('id, total')
       .eq('status', 'approved')
-      .gte('created_at', prevMonthStart)
-      .lt('created_at', monthStart),
+      .gte('approved_at', prevMonthStart)
+      .lt('approved_at', monthStart),
 
     // 4. Todas las ventas cerradas (acumulado)
     supabase

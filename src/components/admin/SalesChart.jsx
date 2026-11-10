@@ -29,19 +29,18 @@ function useSalesWeek() {
 
     async function load() {
       const { from, to } = getWeekRange()
-      // quotes con status='approved' — closed_at no existe, usamos created_at
       const { data: rows, error } = await supabase
         .from('quotes')
-        .select('total, created_at')
+        .select('total, approved_at')
         .eq('status', 'approved')
-        .gte('created_at', from)
-        .lte('created_at', to + 'T23:59:59Z')
+        .gte('approved_at', from)
+        .lte('approved_at', to + 'T23:59:59Z')
 
       if (error || !rows) { setLoading(false); return }
 
       const byDay = [0, 0, 0, 0, 0, 0, 0]   // Mon…Sun
       rows.forEach(s => {
-        const dow = new Date(s.created_at).getDay()  // 0=Dom
+        const dow = new Date(s.approved_at).getDay()  // 0=Dom
         const idx = dow === 0 ? 6 : dow - 1          // Mon=0 … Sun=6
         byDay[idx] += Number(s.total) || 0
       })

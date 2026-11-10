@@ -76,12 +76,8 @@ export function AuthProvider({ children }) {
       .eq('id', authUser.id)
       .single()
 
-    // Prioridad: user_metadata (Supabase Auth) > app_metadata > profiles.role > 'seller'
-    const role =
-      authUser.user_metadata?.role ||
-      authUser.app_metadata?.role  ||
-      profileData?.role            ||
-      'seller'
+    // user_metadata lo puede editar el propio usuario: el rol solo sale de profiles
+    const role = profileData?.role || 'seller'
 
     setProfile({ ...(profileData ?? { id: authUser.id }), role })
     setLoading(false)
@@ -93,17 +89,14 @@ export function AuthProvider({ children }) {
   }
 
   async function signIn(email, password) {
-    // ── Modo demo: funciona siempre que las credenciales coincidan ────────────
-    // (permite login de prueba en dev aunque Supabase esté configurado)
-    const demo = DEMO_USERS[email.toLowerCase().trim()]
-    if (demo && demo.password === password) {
-      localStorage.setItem('kiuvo_demo_user', JSON.stringify(demo))
-      setUser(demo)
-      setProfile(demo)
-      return { error: null }
-    }
-
     if (!isSupabaseConfigured) {
+      const demo = DEMO_USERS[email.toLowerCase().trim()]
+      if (demo && demo.password === password) {
+        localStorage.setItem('kiuvo_demo_user', JSON.stringify(demo))
+        setUser(demo)
+        setProfile(demo)
+        return { error: null }
+      }
       return { error: { message: 'Correo o contraseña incorrectos.' } }
     }
 

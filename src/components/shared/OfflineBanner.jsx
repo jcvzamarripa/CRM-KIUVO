@@ -87,7 +87,11 @@ async function replayQueue() {
           await syncQuote(item)
           dequeue(item.id); synced++
         } else {
-          const { error } = await supabase.from(item.table).insert(item.payload)
+          // La visita se fecha con la hora en que ocurrió, no con la de sincronización
+          const payload = item.type === 'INSERT_VISIT' && !item.payload.created_at
+            ? { ...item.payload, created_at: item.timestamp }
+            : item.payload
+          const { error } = await supabase.from(item.table).insert(payload)
           if (!error) { dequeue(item.id); synced++ }
         }
       } else {
@@ -115,6 +119,24 @@ export default function OfflineBanner() {
     setPending(getQueueCount())
     return () => clearInterval(t)
   }, [isOnline])
+
+  // Al abrir la app con conexión: enviar lo que quedó en cola de sesiones anteriores
+  useEffect(() => {
+    if (!navigator.onLine || getQueueCount() === 0) return
+    let cancelled = false
+    supabase?.auth.getSession().then(({ data }) => {
+      if (cancelled || !data?.session) return
+      setPending(getQueueCount())
+      setState('syncing')
+      replayQueue().then(synced => {
+        if (cancelled) return
+        setSyncedCount(synced)
+        setState(synced > 0 ? 'synced' : 'hidden')
+        setTimeout(() => setState('hidden'), 3500)
+      })
+    })
+    return () => { cancelled = true }
+  }, [])
 
   // React to online ↔ offline transitions
   useEffect(() => {

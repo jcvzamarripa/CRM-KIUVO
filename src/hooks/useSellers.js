@@ -53,7 +53,7 @@ export function useSellers() {
     ] = await Promise.all([
       supabase
         .from('quotes')
-        .select('seller_id, total, created_at')
+        .select('seller_id, total, approved_at')
         .eq('status', 'approved'),
       supabase
         .from('prospects')
@@ -82,7 +82,7 @@ export function useSellers() {
     ;(allQuotes || []).forEach(q => {
       const amt = Number(q.total || 0)
       wonMap[q.seller_id] = (wonMap[q.seller_id] || 0) + amt
-      if (q.created_at >= monthStart.toISOString()) {
+      if (new Date(q.approved_at) >= monthStart) {
         currentMap[q.seller_id] = (currentMap[q.seller_id] || 0) + amt
       }
     })

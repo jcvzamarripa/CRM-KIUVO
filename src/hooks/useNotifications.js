@@ -13,12 +13,15 @@ export function useNotifications() {
   const load = useCallback(async () => {
     const cutoff = new Date(Date.now() - MAX_AGE_DAYS * 86400000).toISOString()
 
-    // Delete stale notifications silently (fire and forget)
+    if (!supabase) { setLoading(false); return }
+
+    // Sin .then() el builder de Supabase nunca envía la petición
     supabase
       .from('notifications')
       .delete()
       .eq('user_id', user.id)
       .lt('created_at', cutoff)
+      .then(({ error }) => { if (error) console.warn('[useNotifications] limpieza:', error.message) })
 
     const { data } = await supabase
       .from('notifications')
@@ -35,6 +38,7 @@ export function useNotifications() {
 
   // Realtime — new notifications pushed from DB triggers
   useEffect(() => {
+    if (!supabase) return
     const ch = supabase
       .channel(`notifications-${user.id}`)
       .on('postgres_changes', {

@@ -30,10 +30,10 @@ export function useSalesTrend({ days = 14 } = {}) {
       // quotes aprobadas — fuente real de cierres (tabla 'sales' no existe)
       const { data, error } = await supabase
         .from('quotes')
-        .select('created_at, total')
+        .select('approved_at, total')
         .eq('status', 'approved')
-        .gte('created_at', fromISO)
-        .lte('created_at', toISO + 'T23:59:59Z')
+        .gte('approved_at', fromISO)
+        .lte('approved_at', toISO + 'T23:59:59Z')
 
       if (error || !data) {
         setTrend(zeros)
@@ -49,7 +49,7 @@ export function useSalesTrend({ days = 14 } = {}) {
       }
 
       for (const s of data) {
-        const d = s.created_at.slice(0, 10)
+        const d = s.approved_at.slice(0, 10)
         if (d in byDay) byDay[d] += Number(s.total) || 0
       }
 

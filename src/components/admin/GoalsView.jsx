@@ -176,26 +176,24 @@ function MetasTab({ sellers = [] }) {
     setLoadingGoals(true)
 
     const next = {}
-    // Período Mes: usar profiles.goal_amount como fuente única (igual que TeamView)
-    if (period === 'Mes') {
-      sellers.forEach(s => {
-        next[s.init] = { ventas: s.goal || 100000, prospectos: 20, visitas: 25 }
-      })
-    } else {
-      // Otros períodos: leer de seller_goals
-      sellers.forEach(s => {
-        next[s.init] = { ventas: s.goal || 100000, prospectos: 20, visitas: 25 }
-      })
-      const { data } = await supabase
-        .from('seller_goals')
-        .select('seller_id, goal_ventas, goal_prospectos, goal_visitas')
-        .in('seller_id', sellers.map(s => s.id))
-        .eq('period', period)
-      ;(data || []).forEach(g => {
-        const sel = sellers.find(s => s.id === g.seller_id)
-        if (sel) next[sel.init] = { ventas: g.goal_ventas, prospectos: g.goal_prospectos, visitas: g.goal_visitas }
-      })
-    }
+    sellers.forEach(s => {
+      next[s.init] = { ventas: s.goal || 100000, prospectos: 20, visitas: 25 }
+    })
+    const { data } = await supabase
+      .from('seller_goals')
+      .select('seller_id, goal_ventas, goal_prospectos, goal_visitas')
+      .in('seller_id', sellers.map(s => s.id))
+      .eq('period', period)
+    ;(data || []).forEach(g => {
+      const sel = sellers.find(s => s.id === g.seller_id)
+      if (!sel) return
+      next[sel.init] = {
+        // En "Mes" la meta de ventas vive en profiles.goal_amount (igual que TeamView)
+        ventas:     period === 'Mes' ? next[sel.init].ventas : g.goal_ventas,
+        prospectos: g.goal_prospectos,
+        visitas:    g.goal_visitas,
+      }
+    })
 
     setMetas(next)
     setDirty(false)
@@ -214,7 +212,7 @@ function MetasTab({ sellers = [] }) {
     const [{ data: salesData }, { data: prospectsData }, { data: visitsData }] = await Promise.all([
       supabase.from('quotes').select('seller_id, total')
         .eq('status', 'approved')
-        .in('seller_id', sellerIds).gte('created_at', from).lte('created_at', toEnd),
+        .in('seller_id', sellerIds).gte('approved_at', from).lte('approved_at', toEnd),
       supabase.from('prospects').select('owner_id')
         .in('owner_id', sellerIds).gte('created_at', from).lte('created_at', toEnd),
       supabase.from('visits').select('seller_id').eq('kind', 'visit')

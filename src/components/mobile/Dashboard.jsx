@@ -23,20 +23,24 @@ function useSellerDashboard(sellerId) {
   const load = useCallback(async () => {
     if (!sellerId || !supabase) { setLoading(false); return }
 
-    const today     = new Date().toISOString().slice(0, 10)
-    const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
-    const days60ago  = new Date(Date.now() - 30 * 86400000).toISOString()
+    // Límites en hora local del teléfono: en UTC el día "termina" a las 6 pm de México
+    const now        = new Date()
+    const dayStart   = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+    const days30ago  = new Date(Date.now() - 30 * 86400000).toISOString()
+    const countOpts  = { count: 'exact', head: true }
 
-    const [profileRes, salesRes, activitiesTodayRes, atRiskRes, inactiveRes] = await Promise.all([
+    const [profileRes, salesRes, visitsRes, quotesRes, winsRes, atRiskRes, inactiveRes] = await Promise.all([
       // Meta del mes desde perfil
       supabase.from('profiles').select('goal_amount').eq('id', sellerId).single(),
-      // Ventas del mes — cotizaciones aprobadas (tabla sales no existe)
-      supabase.from('quotes').select('total').eq('seller_id', sellerId).eq('status', 'approved').gte('created_at', monthStart),
-      // Actividades de hoy
-      supabase.from('activities').select('kind')
-        .eq('seller_id', sellerId)
-        .gte('created_at', today + 'T00:00:00Z')
-        .lte('created_at', today + 'T23:59:59Z'),
+      // Ventas del mes — cotizaciones aprobadas, por fecha de aprobación
+      supabase.from('quotes').select('total').eq('seller_id', sellerId).eq('status', 'approved').gte('approved_at', monthStart),
+      supabase.from('visits').select('id', countOpts)
+        .eq('seller_id', sellerId).eq('kind', 'visit').gte('created_at', dayStart),
+      supabase.from('quotes').select('id', countOpts)
+        .eq('seller_id', sellerId).gte('created_at', dayStart),
+      supabase.from('quotes').select('id', countOpts)
+        .eq('seller_id', sellerId).eq('status', 'approved').gte('approved_at', dayStart),
       // Prospectos en riesgo (amber/red)
       supabase.from('prospects').select('id, name, stage_id, health, days_in_stage, last_contact_at')
         .eq('owner_id', sellerId)
@@ -46,21 +50,20 @@ function useSellerDashboard(sellerId) {
       // Prospectos inactivos +30 días
       supabase.from('prospects').select('id', { count: 'exact', head: true })
         .eq('owner_id', sellerId)
-        .lt('last_contact_at', days60ago),
+        .lt('last_contact_at', days30ago),
     ])
 
     const goal         = profileRes.data?.goal_amount || 100000
     const salesData    = salesRes.data || []
     const monthlySales = salesData.reduce((s, r) => s + Number(r.total || 0), 0)
-    const acts         = activitiesTodayRes.data || []
     const atRisk       = atRiskRes.data || []
 
     setData({
       monthlySales,
       goal,
-      todayVisits: acts.filter(a => a.kind === 'visit').length,
-      todayQuotes: acts.filter(a => a.kind === 'quote').length,
-      todayWins:   acts.filter(a => a.kind === 'win').length,
+      todayVisits: visitsRes.count ?? 0,
+      todayQuotes: quotesRes.count ?? 0,
+      todayWins:   winsRes.count ?? 0,
       atRiskCount:     atRisk.length,
       atRiskProspects: atRisk,
       inactiveCount:   inactiveRes.count ?? 0,
@@ -461,7 +464,7 @@ function Agenda({ sellerId, onOpenAgenda, onOpenEvent }) {
         </div>
       ) : events.length === 0 ? (
         <div style={{ background: 'var(--surface)', border: '0.5px solid var(--border)', borderRadius: 'var(--r-md)', padding: '16px 12px', textAlign: 'center', fontSize: 12, color: 'var(--fg-tertiary)' }}>
-          Sin citas para hoy 🎉
+          Sin citas en los próximos días
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
