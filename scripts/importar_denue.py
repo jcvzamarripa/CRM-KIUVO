@@ -165,20 +165,30 @@ def numero(v):
 # el tipo ES parte del nombre propio: "BARRIO" + "DE GUADALUPE" es el Barrio
 # de Guadalupe, y guardar solo "DE GUADALUPE" deja un nombre que nadie
 # reconoce en la calle.
-TIPOS_QUE_SON_NOMBRE = {
-    'BARRIO', 'EJIDO', 'PUEBLO', 'RANCHERIA', 'RANCHO',
-    'PARQUE INDUSTRIAL', 'CIUDAD INDUSTRIAL', 'ZONA INDUSTRIAL',
-}
+# Tipos que no dicen nada del lugar: no vale la pena pegarlos al nombre.
+TIPOS_SIN_INFORMACION = {'', 'NINGUNO', 'OTRO'}
 
 
 def nombre_colonia(tipo, nombre):
+    """El tipo de asentamiento ES parte del nombre del lugar.
+
+    En Aguascalientes la Colonia San Marcos, el Barrio San Marcos y el
+    Fraccionamiento San Marcos son TRES lugares distintos, en rumbos
+    distintos de la ciudad. Lo mismo con privadas, cotos, condominios y
+    unidades habitacionales.
+
+    Una versión anterior de esto quitaba el tipo creyendo que era ruido de
+    captura. No lo es: dejaba revueltos 590 nombres de 1,474, que cubrían
+    62,064 de los 71,871 negocios. "Zona Centro" escondía 6 lugares
+    distintos y "Centro" 7. No volver a quitarlo.
+    """
     tipo = (tipo or '').strip().upper()
     nombre = (nombre or '').strip()
     if not nombre:
         return None
-    if tipo not in TIPOS_QUE_SON_NOMBRE:
+    if tipo in TIPOS_SIN_INFORMACION:
         return nombre
-    if nombre.upper().startswith(tipo):   # ya viene completo, no duplicar
+    if nombre.upper().startswith(tipo + ' '):   # ya viene completo, no duplicar
         return nombre
     return f'{tipo} {nombre}'
 

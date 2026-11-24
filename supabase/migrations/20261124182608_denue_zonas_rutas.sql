@@ -19,9 +19,11 @@ create extension if not exists pg_trgm;    -- búsqueda por parecido en nombres
 -- El INEGI captura las colonias a mano: llegan "CENTRO", "Centro" y
 -- "Col. Centro" como si fueran tres cosas distintas.
 --
--- Ojo: "Barrio" NO se quita. En Aguascalientes es parte del nombre propio
--- (Barrio de Triana, Barrio de la Estación); quitarlo dejaba basura como
--- "DE LA ESTACION".
+-- OJO: esta version quita prefijos y ESTA SUPERADA. Ver la migracion
+-- 20261124231500_conservar_tipo_de_asentamiento.sql: el tipo de
+-- asentamiento es parte del nombre del lugar y no se quita nunca. La
+-- Colonia San Marcos, el Barrio San Marcos y el Fraccionamiento San
+-- Marcos son tres lugares distintos de la ciudad.
 create or replace function public.normalizar_colonia(txt text)
 returns text
 language sql
