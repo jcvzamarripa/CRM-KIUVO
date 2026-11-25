@@ -2,12 +2,15 @@ import Icon from '../shared/Icon'
 
 const NAV_ITEMS = [
   { id: 'inicio', label: 'Inicio',  icon: 'home' },
+  { id: 'ruta',   label: 'Ruta',    icon: 'navigation' },
   { id: 'embudo', label: 'Embudo',  icon: 'layout-kanban' },
   { id: 'mapa',   label: 'Mapa',    icon: 'map-2' },
   { id: 'agenda', label: 'Agenda',  icon: 'calendar' },
   { id: 'mas',    label: 'Más',     icon: 'menu-2' },
 ]
 
+// En Ruta no va el botón flotante: ahí cada parada ya tiene su propio
+// resultado, y el botón taparía la lista.
 const FAB_SCREENS = ['inicio', 'embudo', 'mapa']
 
 export default function BottomNav({ active, onChange, onCheckIn }) {

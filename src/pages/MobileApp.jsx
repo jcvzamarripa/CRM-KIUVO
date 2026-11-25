@@ -19,6 +19,7 @@ import { useAuth } from '../contexts/AuthContext'
 // Carga lazy: react-pdf (~1.4 MB) solo cuando el usuario abre el módulo de cotizaciones
 const QuoteModal         = lazy(() => import('../components/mobile/QuoteModal'))
 const SellerQuotesScreen = lazy(() => import('../components/mobile/SellerQuotesScreen'))
+const RouteScreen        = lazy(() => import('../components/mobile/RouteScreen'))
 
 function PlaceholderScreen({ title, icon }) {
   return (
@@ -92,6 +93,8 @@ export default function MobileApp({ dark, onToggleDark }) {
     />
   else if (screen === 'embudo')
     content = <Kanban jumpTo={kanbanJump} onCheckIn={prospect => setCheckIn({ prospect })} onOpenNotifications={() => setShowNotifications(true)} unreadCount={notifications.unreadCount} />
+  else if (screen === 'ruta')
+    content = <Suspense fallback={null}><RouteScreen /></Suspense>
   else if (screen === 'mapa')
     content = <MapScreen />
   else if (screen === 'agenda')
