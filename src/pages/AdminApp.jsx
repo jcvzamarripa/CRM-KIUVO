@@ -22,6 +22,7 @@ import ActivitiesView from '../components/admin/ActivitiesView'
 import SettingsView from '../components/admin/SettingsView'
 import ProductionOrdersView from '../components/admin/ProductionOrdersView'
 import SupervisionView from '../components/admin/SupervisionView'
+import TerritoryView from '../components/admin/TerritoryView'
 import useDashboardKPIs from '../hooks/useDashboardKPIs'
 import { useSalesTrend } from '../hooks/useSalesTrend'
 import { Card, Bone, Empty } from '../components/ui'
@@ -29,6 +30,7 @@ import { Card, Bone, Empty } from '../components/ui'
 const VIEW_META = {
   dashboard:  { title: 'Dashboard',     subtitle: 'Resumen operativo del equipo · este mes' },
   field:      { title: 'Supervisión',    subtitle: 'Visitas del día, verificación y tareas del equipo de campo' },
+  territory:  { title: 'Territorio',     subtitle: 'Zonas y sectores de cambaceo · reparto del equipo en el mapa' },
   pipeline:   { title: 'Embudo',         subtitle: 'Vista kanban de todos los prospectos' },
   prospects:  { title: 'Prospectos',     subtitle: 'Todos los prospectos del equipo' },
   map:        { title: 'Mapa',           subtitle: 'Actividad geográfica · últimos 7 días' },
@@ -235,6 +237,8 @@ export default function AdminApp({ dark, onToggleDark }) {
     )
   } else if (activeNav === 'field') {
     content = <SupervisionView />
+  } else if (activeNav === 'territory') {
+    content = <TerritoryView />
   } else if (activeNav === 'prospects') {
     content = <ProspectsView />
   } else if (activeNav === 'team') {

@@ -9,6 +9,7 @@ const NAV_GROUPS = [
   ] },
   { label: 'Campo', items: [
     { id: 'field',      label: 'Supervisión',  icon: 'map-pin-check' },
+    { id: 'territory',  label: 'Territorio',   icon: 'map-2' },
     { id: 'map',        label: 'Mapa',         icon: 'map-2' },
     { id: 'activities', label: 'Actividades',  icon: 'history' },
     { id: 'agenda',     label: 'Agenda',       icon: 'calendar' },
