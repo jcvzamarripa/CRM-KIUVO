@@ -30,15 +30,39 @@ const CORRECCIONES = [
 const fechaLarga = f => new Date(f + 'T12:00:00')
   .toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })
 
+/** Metros en línea recta entre dos puntos (fórmula del semiverseno). */
+function metrosEntre(a, b) {
+  if (!a || !b || a.lat == null || b.lat == null) return null
+  const R = 6371000, rad = x => x * Math.PI / 180
+  const dLat = rad(b.lat - a.lat), dLng = rad(b.lng - a.lng)
+  const h = Math.sin(dLat / 2) ** 2 +
+            Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2
+  return Math.round(2 * R * Math.asin(Math.sqrt(h)))
+}
+
+const distanciaCorta = m =>
+  m == null ? null : m < 1000 ? `${m} m` : `${(m / 1000).toFixed(1)} km`
+
+/**
+ * Abre la navegación a pie del teléfono desde donde esté el vendedor.
+ *
+ * dir_action=navigate arranca la guía por voz de una vez, en lugar de
+ * solo mostrar el lugar: el vendedor va caminando con el teléfono en la
+ * mano y no puede andar tocando botones.
+ */
+const urlComoLlegar = (lat, lng) =>
+  `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}` +
+  `&travelmode=walking&dir_action=navigate`
+
 // ─── El mapa de la ruta ──────────────────────────────────────────────────────
 // Leaflet a mano, igual que en MapScreen: la versión para React 18 choca
 // con el montaje doble del modo estricto.
-function MapaDeRuta({ paradas, onTocar, alto = 300 }) {
+function MapaDeRuta({ paradas, onTocar, alto = 300, miPos, destino }) {
   const contRef  = useRef(null)
   const mapRef   = useRef(null)
   const LfRef    = useRef(null)
   const capasRef = useRef([])
-  const yoRef    = useRef(null)
+  const yoRef    = useRef([])
   const [listo, setListo] = useState(false)
 
   useEffect(() => {
@@ -120,23 +144,47 @@ function MapaDeRuta({ paradas, onTocar, alto = 300 }) {
     return () => clearTimeout(t)
   }, [alto, listo])
 
-  // Dónde está parado el vendedor
-  function ubicarme() {
+  // Dónde está el vendedor, y la línea de él al negocio al que va.
+  // Esto es lo que convierte el mapa en algo para orientarse y no solo
+  // para ver dónde queda el lugar.
+  useEffect(() => {
     const Lf = LfRef.current, map = mapRef.current
-    if (!Lf || !map || !navigator.geolocation) return
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        const aqui = [pos.coords.latitude, pos.coords.longitude]
-        if (yoRef.current) map.removeLayer(yoRef.current)
-        yoRef.current = Lf.circleMarker(aqui, {
-          radius: 8, color: '#fff', weight: 3,
-          fillColor: '#185FA5', fillOpacity: 1,
-        }).addTo(map)
-        map.setView(aqui, 17)
-      },
-      err => console.warn('[ubicarme]', err.message),
-      { enableHighAccuracy: true, timeout: 8000 }
-    )
+    if (!listo || !Lf || !map) return
+
+    yoRef.current.forEach(c => map.removeLayer(c))
+    yoRef.current = []
+    if (!miPos) return
+
+    const aqui = [miPos.lat, miPos.lng]
+
+    // Círculo de precisión: honesto sobre qué tanto sabe el GPS
+    if (miPos.precision && miPos.precision > 15) {
+      const halo = Lf.circle(aqui, {
+        radius: miPos.precision, color: '#185FA5', weight: 1,
+        fillColor: '#185FA5', fillOpacity: 0.09,
+      }).addTo(map)
+      yoRef.current.push(halo)
+    }
+
+    const yo = Lf.circleMarker(aqui, {
+      radius: 8, color: '#fff', weight: 3,
+      fillColor: '#185FA5', fillOpacity: 1,
+    }).addTo(map)
+    yo.bindTooltip('Aquí estás')
+    yoRef.current.push(yo)
+
+    if (destino && destino.lat != null) {
+      const rumbo = Lf.polyline([aqui, [destino.lat, destino.lng]], {
+        color: '#185FA5', weight: 2.5, opacity: 0.9, dashArray: '2 6',
+      }).addTo(map)
+      yoRef.current.push(rumbo)
+    }
+  }, [miPos, destino, listo])
+
+  function centrarEnMi() {
+    const map = mapRef.current
+    if (!map || !miPos) return
+    map.setView([miPos.lat, miPos.lng], 17)
   }
 
   return (
@@ -146,13 +194,15 @@ function MapaDeRuta({ paradas, onTocar, alto = 300 }) {
     }}>
       <div ref={contRef} style={{ width: '100%', height: '100%' }} />
       <button
-        onClick={ubicarme}
-        aria-label="Dónde estoy"
+        onClick={centrarEnMi}
+        aria-label="Centrar donde estoy"
+        disabled={!miPos}
         style={{
           position: 'absolute', right: 10, bottom: 10, zIndex: 500,
           width: 42, height: 42, borderRadius: '50%', border: 'none',
           background: 'var(--surface)', boxShadow: 'var(--shadow-float)',
-          display: 'grid', placeItems: 'center', cursor: 'pointer',
+          display: 'grid', placeItems: 'center',
+          cursor: miPos ? 'pointer' : 'default', opacity: miPos ? 1 : 0.45,
         }}
       >
         <Icon name="navigation" size={20} />
@@ -162,15 +212,14 @@ function MapaDeRuta({ paradas, onTocar, alto = 300 }) {
 }
 
 // ─── Hoja de resultado de una parada ─────────────────────────────────────────
-function HojaParada({ parada, onCerrar, onMarcar, onCorregirTurno }) {
+function HojaParada({ parada, miPos, onCerrar, onMarcar, onCorregirTurno }) {
   const [guardando, setGuardando] = useState(null)
   const [turnos,    setTurnos]    = useState([])
   const [aviso,     setAviso]     = useState(null)
 
   const direccion = [parada.calle, parada.numero].filter(Boolean).join(' ')
-  const mapsUrl = parada.lat != null
-    ? `https://www.google.com/maps/search/?api=1&query=${parada.lat},${parada.lng}`
-    : null
+  const mapsUrl   = parada.lat != null ? urlComoLlegar(parada.lat, parada.lng) : null
+  const aQueTan   = metrosEntre(miPos, parada)
 
   async function marcar(id) {
     setGuardando(id)
@@ -199,6 +248,11 @@ function HojaParada({ parada, onCerrar, onMarcar, onCorregirTurno }) {
         {parada.giro && (
           <div style={{ fontSize: 12.5, color: 'var(--fg-tertiary)', marginTop: 6 }}>{parada.giro}</div>
         )}
+        {aQueTan != null && (
+          <div style={{ fontSize: 13, color: 'var(--fg)', marginTop: 8, fontWeight: 600 }}>
+            A {distanciaCorta(aQueTan)} de donde estás
+          </div>
+        )}
 
         <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
           {parada.telefono && (
@@ -207,9 +261,9 @@ function HojaParada({ parada, onCerrar, onMarcar, onCorregirTurno }) {
             </Button>
           )}
           {mapsUrl && (
-            <Button variant="soft" size="sm"
+            <Button size="sm"
                     onClick={() => window.open(mapsUrl, '_blank', 'noopener')}>
-              <Icon name="navigation" size={16} /> Cómo llegar
+              <Icon name="navigation" size={16} /> Llévame caminando
             </Button>
           )}
         </div>
@@ -273,6 +327,34 @@ export default function RouteScreen() {
   const [abierta,     setAbierta]     = useState(null)   // parada abierta
   const [filtro,      setFiltro]      = useState('pendientes')
   const [mapaGrande,  setMapaGrande]  = useState(false)
+  const [miPos,       setMiPos]       = useState(null)
+  const [errGps,      setErrGps]      = useState(null)
+
+  // Seguimiento continuo: el vendedor va caminando, así que la posición
+  // tiene que moverse sola. Un botón de "ubícame" no sirve cuando traes
+  // el teléfono en una mano y el folleto en la otra.
+  useEffect(() => {
+    if (!navigator.geolocation) { setErrGps('Este teléfono no da ubicación'); return }
+    const id = navigator.geolocation.watchPosition(
+      pos => {
+        setErrGps(null)
+        setMiPos({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          precision: Math.round(pos.coords.accuracy || 0),
+        })
+      },
+      err => setErrGps(
+        err.code === err.PERMISSION_DENIED
+          ? 'Activa la ubicación para que te guíe'
+          : 'No se pudo leer la ubicación'
+      ),
+      // maximumAge deja reusar una lectura de 10 s: caminando basta, y
+      // no le funde la pila al vendedor en toda la jornada.
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
+    )
+    return () => navigator.geolocation.clearWatch(id)
+  }, [])
 
   const visibles = paradas.filter(p =>
     filtro === 'todas' ||
@@ -281,6 +363,12 @@ export default function RouteScreen() {
 
   const hechas = paradas.filter(p => p.status === 'hecha').length
   const t = ruta && TURNOS[ruta.turno]
+
+  // A dónde va ahora: la parada abierta si hay una, si no la siguiente
+  // pendiente del recorrido.
+  const siguiente = paradas.find(p => p.status !== 'hecha') || null
+  const destino   = (abierta && paradas.find(p => p.id === abierta.id)) || siguiente
+  const aDestino  = metrosEntre(miPos, destino)
 
   if (error) {
     return (
@@ -326,7 +414,14 @@ export default function RouteScreen() {
               paradas={paradas}
               alto={mapaGrande ? 520 : 260}
               onTocar={setAbierta}
+              miPos={miPos}
+              destino={destino}
             />
+            {errGps && (
+              <div style={{ fontSize: 12.5, color: 'var(--fg-tertiary)', marginTop: 8, textAlign: 'center' }}>
+                {errGps}
+              </div>
+            )}
             <button
               onClick={() => setMapaGrande(v => !v)}
               style={{
@@ -449,9 +544,47 @@ export default function RouteScreen() {
         </>
       )}
 
+      {/* Barra fija: a dónde va ahora y cómo llegar, sin tener que
+          buscarlo en la lista. Va encima de la navegación de abajo. */}
+      {ruta && siguiente && !abierta && (
+        <div style={{
+          position: 'fixed', left: 10, right: 10, bottom: 96, zIndex: 400,
+          background: 'var(--surface)', borderRadius: 'var(--r-lg)',
+          boxShadow: 'var(--shadow-float)', padding: '10px 12px',
+          display: 'flex', alignItems: 'center', gap: 10,
+        }}>
+          <span style={{
+            width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+            background: 'var(--accent)', color: '#16212A',
+            fontSize: 13, fontWeight: 700, display: 'grid', placeItems: 'center',
+          }}>{siguiente.orden}</span>
+
+          <span style={{ flex: 1, minWidth: 0 }} onClick={() => setAbierta(siguiente)}>
+            <span style={{
+              display: 'block', fontSize: 13.5, fontWeight: 600,
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>{siguiente.nombre}</span>
+            <span style={{ display: 'block', fontSize: 12, color: 'var(--fg-secondary)' }}>
+              {aDestino != null
+                ? `A ${distanciaCorta(aDestino)} de aquí`
+                : [siguiente.calle, siguiente.numero].filter(Boolean).join(' ')}
+            </span>
+          </span>
+
+          {siguiente.lat != null && (
+            <Button size="sm"
+                    onClick={() => window.open(
+                      urlComoLlegar(siguiente.lat, siguiente.lng), '_blank', 'noopener')}>
+              <Icon name="navigation" size={16} /> Llegar
+            </Button>
+          )}
+        </div>
+      )}
+
       {abierta && (
         <HojaParada
           parada={paradas.find(p => p.id === abierta.id) || abierta}
+          miPos={miPos}
           onCerrar={() => setAbierta(null)}
           onMarcar={marcarParada}
           onCorregirTurno={corregirTurno}
