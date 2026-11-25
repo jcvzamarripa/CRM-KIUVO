@@ -40,7 +40,15 @@ function MiniMap({ points }) {
   useEffect(() => {
     if (mapRef.current || !containerRef.current) return
 
+    // React 18 monta, desmonta y vuelve a montar en desarrollo. Como
+    // import('leaflet') es asíncrono, los dos montajes alcanzan a
+    // lanzarlo antes de que mapRef tenga valor, y el segundo tronaba con
+    // "Map container is already initialized". Esta bandera sí es
+    // síncrona, así que el montaje abortado se da por enterado.
+    let cancelado = false
+
     import('leaflet').then(mod => {
+      if (cancelado || mapRef.current || !containerRef.current) return
       const Lf = mod.default || mod
 
       const map = Lf.map(containerRef.current, {
@@ -88,6 +96,7 @@ function MiniMap({ points }) {
     }).catch(err => console.error('[GeoHeatmap] Leaflet error:', err))
 
     return () => {
+      cancelado = true
       if (mapRef.current) { mapRef.current.remove(); mapRef.current = null }
     }
   }, [points])

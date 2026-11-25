@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import Icon from '../shared/Icon'
 import { Card, Pill, Button, Chip, Sheet, Empty, Bone, Segmented, ProgressBar } from '../ui'
 import { useMiRuta } from '../../hooks/useMiRuta'
@@ -29,6 +29,137 @@ const CORRECCIONES = [
 
 const fechaLarga = f => new Date(f + 'T12:00:00')
   .toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })
+
+// ─── El mapa de la ruta ──────────────────────────────────────────────────────
+// Leaflet a mano, igual que en MapScreen: la versión para React 18 choca
+// con el montaje doble del modo estricto.
+function MapaDeRuta({ paradas, onTocar, alto = 300 }) {
+  const contRef  = useRef(null)
+  const mapRef   = useRef(null)
+  const LfRef    = useRef(null)
+  const capasRef = useRef([])
+  const yoRef    = useRef(null)
+  const [listo, setListo] = useState(false)
+
+  useEffect(() => {
+    if (mapRef.current || !contRef.current) return
+
+    // React 18 monta, desmonta y vuelve a montar en desarrollo. Como
+    // import('leaflet') es asíncrono, los dos montajes alcanzan a
+    // lanzarlo antes de que mapRef tenga valor, y el segundo tronaba con
+    // "Map container is already initialized". Esta bandera sí es
+    // síncrona, así que el montaje abortado se da por enterado.
+    let cancelado = false
+
+    import('leaflet').then(mod => {
+      if (cancelado || mapRef.current || !contRef.current) return
+      const Lf = mod.default || mod
+      LfRef.current = Lf
+      const map = Lf.map(contRef.current, {
+        center: [21.88, -102.29], zoom: 15,
+        zoomControl: false, attributionControl: false,
+      })
+      mapRef.current = map
+      Lf.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map)
+      // El contenedor acaba de nacer dentro de un flex; hay que remedir
+      setTimeout(() => map.invalidateSize(), 150)
+      setTimeout(() => map.invalidateSize(), 600)
+      setListo(true)
+    }).catch(err => console.error('No cargó Leaflet:', err))
+
+    return () => {
+      cancelado = true
+      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null }
+    }
+  }, [])
+
+  // Dibuja el recorrido y las paradas numeradas
+  useEffect(() => {
+    const Lf = LfRef.current, map = mapRef.current
+    if (!listo || !Lf || !map) return
+
+    capasRef.current.forEach(c => map.removeLayer(c))
+    capasRef.current = []
+
+    const puntos = paradas.filter(p => p.lat != null && p.lng != null)
+    if (puntos.length === 0) return
+
+    const linea = Lf.polyline(puntos.map(p => [p.lat, p.lng]), {
+      color: '#185FA5', weight: 3, opacity: 0.8, dashArray: '6 5',
+    }).addTo(map)
+    capasRef.current.push(linea)
+
+    puntos.forEach(p => {
+      const hecha = p.status === 'hecha'
+      const m = Lf.marker([p.lat, p.lng], {
+        icon: Lf.divIcon({
+          className: '',
+          html: `<div style="
+            width:26px;height:26px;border-radius:50%;
+            background:${hecha ? '#1D9E75' : '#D9F25A'};
+            color:${hecha ? '#fff' : '#16212A'};
+            border:2px solid #fff;
+            font:700 12px/22px system-ui;text-align:center;
+            box-shadow:0 2px 6px rgba(0,0,0,.35)">${hecha ? '✓' : p.orden}</div>`,
+          iconSize: [26, 26], iconAnchor: [13, 13],
+        }),
+      })
+      m.on('click', () => onTocar?.(p))
+      m.addTo(map)
+      capasRef.current.push(m)
+    })
+
+    map.fitBounds(linea.getBounds(), { padding: [34, 34], maxZoom: 17 })
+  }, [paradas, listo, onTocar])
+
+  // Al agrandar o achicar el mapa, Leaflet sigue creyendo que mide lo de
+  // antes y deja franjas grises donde no cargó los mosaicos.
+  useEffect(() => {
+    if (!listo || !mapRef.current) return
+    const t = setTimeout(() => mapRef.current?.invalidateSize(), 220)
+    return () => clearTimeout(t)
+  }, [alto, listo])
+
+  // Dónde está parado el vendedor
+  function ubicarme() {
+    const Lf = LfRef.current, map = mapRef.current
+    if (!Lf || !map || !navigator.geolocation) return
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const aqui = [pos.coords.latitude, pos.coords.longitude]
+        if (yoRef.current) map.removeLayer(yoRef.current)
+        yoRef.current = Lf.circleMarker(aqui, {
+          radius: 8, color: '#fff', weight: 3,
+          fillColor: '#185FA5', fillOpacity: 1,
+        }).addTo(map)
+        map.setView(aqui, 17)
+      },
+      err => console.warn('[ubicarme]', err.message),
+      { enableHighAccuracy: true, timeout: 8000 }
+    )
+  }
+
+  return (
+    <div style={{
+      position: 'relative', height: alto, borderRadius: 'var(--r-xl)',
+      overflow: 'hidden', background: 'var(--surface)', zIndex: 0,
+    }}>
+      <div ref={contRef} style={{ width: '100%', height: '100%' }} />
+      <button
+        onClick={ubicarme}
+        aria-label="Dónde estoy"
+        style={{
+          position: 'absolute', right: 10, bottom: 10, zIndex: 500,
+          width: 42, height: 42, borderRadius: '50%', border: 'none',
+          background: 'var(--surface)', boxShadow: 'var(--shadow-float)',
+          display: 'grid', placeItems: 'center', cursor: 'pointer',
+        }}
+      >
+        <Icon name="navigation" size={20} />
+      </button>
+    </div>
+  )
+}
 
 // ─── Hoja de resultado de una parada ─────────────────────────────────────────
 function HojaParada({ parada, onCerrar, onMarcar, onCorregirTurno }) {
@@ -139,8 +270,9 @@ export default function RouteScreen() {
     loading, error, reload, marcarParada, corregirTurno,
   } = useMiRuta()
 
-  const [abierta,  setAbierta]  = useState(null)   // parada abierta
-  const [filtro,   setFiltro]   = useState('pendientes')
+  const [abierta,     setAbierta]     = useState(null)   // parada abierta
+  const [filtro,      setFiltro]      = useState('pendientes')
+  const [mapaGrande,  setMapaGrande]  = useState(false)
 
   const visibles = paradas.filter(p =>
     filtro === 'todas' ||
@@ -187,6 +319,26 @@ export default function RouteScreen() {
         </div>
       ) : (
         <>
+          {/* El mapa: sin esto la lista son nombres sueltos y el vendedor
+              no sabe por dónde empezar ni hacia dónde seguir */}
+          <div style={{ padding: '0 14px 12px' }}>
+            <MapaDeRuta
+              paradas={paradas}
+              alto={mapaGrande ? 520 : 260}
+              onTocar={setAbierta}
+            />
+            <button
+              onClick={() => setMapaGrande(v => !v)}
+              style={{
+                width: '100%', marginTop: 8, padding: '8px 0', border: 'none',
+                background: 'transparent', color: 'var(--fg-secondary)',
+                fontSize: 13, cursor: 'pointer',
+              }}
+            >
+              {mapaGrande ? 'Achicar el mapa' : 'Agrandar el mapa'}
+            </button>
+          </div>
+
           {/* Resumen del día */}
           <div style={{ padding: '0 14px' }}>
             <Card style={{ padding: 16 }}>
